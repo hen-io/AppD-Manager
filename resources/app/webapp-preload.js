@@ -1,5 +1,13 @@
 "use strict";
-const { ipcRenderer } = require("electron");
+const { ipcRenderer, webFrame } = require("electron");
+if (window.top === window) {
+  const filters = ipcRenderer.sendSync("appd-page-filters", location.href);
+  if (filters) {
+    for (const script of filters.scripts) webFrame.executeJavaScript(script).catch(() => {
+    });
+    if (filters.styles) webFrame.insertCSS(filters.styles);
+  }
+}
 const CORNERS = {
   "top-left": "top:12px;left:12px",
   "top-right": "top:12px;right:12px",

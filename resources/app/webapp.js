@@ -135,6 +135,14 @@ ipcMain.on("appd-action-button", (event) => {
   event.returnValue = cfg.actionButton;
 });
 ipcMain.on("appd-action-menu", (event) => showActionMenu(event.sender));
+ipcMain.on("appd-page-filters", (event, url) => {
+  let filters = null;
+  try {
+    if (cfg.extensions.includes("adblock")) filters = extras.pageFilters(String(url));
+  } catch {
+  }
+  event.returnValue = filters;
+});
 function shortcut(wc, input) {
   const key = input.key.toLowerCase();
   if (menuShortcut && key === menuShortcut.key && input.control === menuShortcut.control && input.shift === menuShortcut.shift && input.alt === menuShortcut.alt) {
@@ -448,12 +456,11 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: cfg.backgroundThrottling,
-      ...cfg.actionButton !== "off" ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
+      ...cfg.actionButton !== "off" || extension("adblock") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
-  if (extension("adblock")) extras.filterPages(win.webContents);
   if (extension("sponsorblock")) extras.enableSponsorBlock(win.webContents);
   if (extension("darkreader")) {
     extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
