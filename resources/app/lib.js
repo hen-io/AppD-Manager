@@ -11,6 +11,7 @@ const defaultAppsDir = path.join(root, "Applications");
 const desktopDir = path.join(process.env.XDG_DATA_HOME || path.join(home, ".local/share"), "applications");
 const launcher = process.env.APPD_BIN || path.join(__dirname, "appd");
 const MANAGER_DESKTOP_ID = "appdmanager";
+const OPEN_LINKS = ["browser", "window", "same"];
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DEFAULTS = {
   name: "",
@@ -20,10 +21,12 @@ const DEFAULTS = {
   width: 1280,
   height: 800,
   userAgent: "",
+  openLinks: "browser",
   internalHosts: [],
   fixedTitle: false,
   backgroundThrottling: true,
   pauseWhenUnfocused: false,
+  reloadAfterIdleMinutes: 0,
   jsHeapMb: 0,
   flags: []
 };
@@ -69,6 +72,9 @@ function validate(cfg) {
     }
   }
   if (!URL.canParse(cfg.url)) throw new Error(`invalid url "${cfg.url}"`);
+  if (!OPEN_LINKS.includes(cfg.openLinks)) {
+    throw new Error(`"openLinks" must be one of: ${OPEN_LINKS.join(", ")}`);
+  }
 }
 function load(id) {
   checkId(id);

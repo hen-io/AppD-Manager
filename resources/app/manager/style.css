@@ -215,7 +215,8 @@ label.check {
   margin: -8px 0 14px 24px;
 }
 input:not([type=checkbox]),
-textarea {
+textarea,
+select {
   width: 100%;
   min-width: 0;
   padding: 6px 8px;
@@ -231,6 +232,7 @@ textarea {
 }
 input:focus-visible,
 textarea:focus-visible,
+select:focus-visible,
 button:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--accent);

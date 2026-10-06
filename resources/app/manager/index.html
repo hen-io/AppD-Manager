@@ -81,10 +81,21 @@
           <input name="pauseWhenUnfocused" type="checkbox">
           Pause the page completely while another window has the focus
         </label>
-        <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again.</span>
-        <label>Hosts whose popups stay in the app
+        <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen.</span>
+        <label>Reload when you come back after more than this many minutes
+          <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
+          <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
+        </label>
+        <label>Links that open a new window or tab
+          <select name="openLinks">
+            <option value="browser">Open in the default browser</option>
+            <option value="window">Open in a new window of this app</option>
+            <option value="same">Go there in the current window</option>
+          </select>
+        </label>
+        <label>Hosts that stay in the app
           <textarea name="internalHosts" rows="2" placeholder="accounts.google.com"></textarea>
-          <span class="note">One per line. Other links that open a new window go to your browser.</span>
+          <span class="note">One per line. Only used with "default browser": links to these hosts, and to the app's own, still open in an app window (sign-in popups need that).</span>
         </label>
         <label>JavaScript memory limit (MB)
           <input name="jsHeapMb" type="number" min="0" step="1">

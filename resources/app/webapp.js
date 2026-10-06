@@ -102,9 +102,15 @@ function contextMenu(wc, p) {
 }
 app.on("web-contents-created", (_event, wc) => {
   wc.setWindowOpenHandler(({ url }) => {
-    if (url === "about:blank" || isInternal(url)) {
-      return { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true } };
+    const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true } };
+    if (url === "about:blank") return appWindow;
+    const web = /^https?:/i.test(url);
+    if (web && cfg.openLinks === "window") return appWindow;
+    if (web && cfg.openLinks === "same") {
+      wc.loadURL(url);
+      return { action: "deny" };
     }
+    if (cfg.openLinks === "browser" && isInternal(url)) return appWindow;
     openExternal(url);
     return { action: "deny" };
   });
@@ -119,6 +125,66 @@ function readState() {
   } catch {
     return {};
   }
+}
+let stoppedPids = [];
+function resumePage() {
+  for (const pid of stoppedPids) {
+    try {
+      process.kill(pid, "SIGCONT");
+    } catch {
+    }
+  }
+  stoppedPids = [];
+}
+app.on("before-quit", resumePage);
+process.on("exit", resumePage);
+function pausePage() {
+  if (stoppedPids.length) return;
+  stoppedPids = app.getAppMetrics().filter((metric) => metric.type === "Tab").map((metric) => metric.pid);
+  for (const pid of stoppedPids) {
+    try {
+      process.kill(pid, "SIGSTOP");
+    } catch {
+    }
+  }
+}
+function watchFocus(window) {
+  const wc = window.webContents;
+  const GRACE_MS = 3e3;
+  let timer = null;
+  let watchdog = null;
+  let idleSince = 0;
+  const back = () => {
+    clearTimeout(timer);
+    clearInterval(watchdog);
+    watchdog = null;
+    resumePage();
+    const idleMs = idleSince ? Date.now() - idleSince : 0;
+    idleSince = 0;
+    if (cfg.reloadAfterIdleMinutes > 0 && idleMs >= cfg.reloadAfterIdleMinutes * 6e4 && !window.isDestroyed()) {
+      wc.reload();
+    }
+  };
+  window.on("blur", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (window.isDestroyed() || BrowserWindow.getFocusedWindow()) return;
+      idleSince = Date.now() - GRACE_MS;
+      if (!cfg.pauseWhenUnfocused || wc.isDevToolsOpened()) return;
+      pausePage();
+      watchdog = setInterval(() => {
+        if (window.isDestroyed()) clearInterval(watchdog);
+        else if (BrowserWindow.getFocusedWindow()) back();
+      }, 1e3);
+    }, GRACE_MS);
+  });
+  window.on("focus", back);
+  window.on("restore", back);
+  window.on("close", resumePage);
+  window.on("closed", () => {
+    clearTimeout(timer);
+    clearInterval(watchdog);
+  });
 }
 function createWindow() {
   const state = readState();
@@ -136,28 +202,7 @@ function createWindow() {
   });
   if (state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
-  if (cfg.pauseWhenUnfocused) {
-    const wc = win.webContents;
-    const setFrozen = async (frozen) => {
-      try {
-        if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
-        await wc.debugger.sendCommand("Page.setWebLifecycleState", { state: frozen ? "frozen" : "active" });
-      } catch {
-      }
-    };
-    let timer = null;
-    win.on("blur", () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        if (!win.isDestroyed() && !BrowserWindow.getFocusedWindow() && !wc.isDevToolsOpened()) setFrozen(true);
-      }, 3e3);
-    });
-    win.on("focus", () => {
-      clearTimeout(timer);
-      setFrozen(false);
-    });
-    win.on("closed", () => clearTimeout(timer));
-  }
+  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0) watchFocus(win);
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
     try {
@@ -183,6 +228,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on("second-instance", () => {
     if (!win) return;
+    resumePage();
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
