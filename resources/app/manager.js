@@ -1,0 +1,164 @@
+"use strict";
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
+const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const lib = require("./lib");
+const update = require("./update");
+const desktopFile = `${lib.MANAGER_DESKTOP_ID}.desktop`;
+app.setName(lib.MANAGER_DESKTOP_ID);
+process.env.CHROME_DESKTOP = desktopFile;
+app.setDesktopName?.(desktopFile);
+app.setPath("userData", lib.managerDataDir);
+let win;
+function iconPreview(file) {
+  if (!file) return null;
+  try {
+    if (/\.svg$/i.test(file)) return `data:image/svg+xml;base64,${fs.readFileSync(file).toString("base64")}`;
+    const image = nativeImage.createFromPath(file);
+    return image.isEmpty() ? null : image.resize({ width: 96 }).toDataURL();
+  } catch {
+    return null;
+  }
+}
+function state() {
+  const apps = lib.list().map((id) => {
+    try {
+      const cfg = lib.load(id);
+      return { id, cfg, iconUrl: iconPreview(lib.iconFile(id, cfg)) };
+    } catch (e) {
+      return { id, error: e.message };
+    }
+  });
+  return {
+    apps,
+    defaults: lib.DEFAULTS,
+    appsDir: lib.appsDir(),
+    appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
+    version: app.getVersion(),
+    updateRepo: update.REPO
+  };
+}
+function changeAppsDir(dir) {
+  if (process.env.APPD_APPS_DIR) throw new Error("The location is fixed by the APPD_APPS_DIR environment variable.");
+  lib.setAppsDir(dir);
+  lib.sync();
+  return state();
+}
+const handlers = {
+  state,
+  save(id, input) {
+    const cfg = { ...lib.DEFAULTS, ...id ? lib.load(id) : {} };
+    for (const key of Object.keys(lib.DEFAULTS)) {
+      if (key in input) cfg[key] = input[key];
+    }
+    if (!cfg.name) throw new Error("Give the app a name.");
+    if (!cfg.url) throw new Error("Give the app a URL.");
+    id ||= lib.newId(cfg.name);
+    lib.save(id, cfg);
+    lib.sync();
+    return { id, state: state() };
+  },
+  async remove(id) {
+    lib.checkId(id);
+    const { response } = await dialog.showMessageBox(win, {
+      type: "warning",
+      buttons: ["Cancel", "Remove"],
+      defaultId: 0,
+      cancelId: 0,
+      message: `Remove "${id}"?`,
+      detail: `This deletes ${lib.appDir(id)}, including the app's logins and data, and takes it out of the menu.`
+    });
+    if (response !== 1) return { removed: false };
+    lib.remove(id);
+    lib.sync();
+    return { removed: true, state: state() };
+  },
+  launch(id) {
+    lib.load(id);
+    const env = { ...process.env };
+    delete env.CHROME_DESKTOP;
+    const child = spawn(lib.launcher, ["run", id], { detached: true, stdio: "ignore", env });
+    child.on("error", () => {
+    });
+    child.unref();
+  },
+  async pickIcon() {
+    const { filePaths } = await dialog.showOpenDialog(win, {
+      title: "Choose an icon",
+      properties: ["openFile"],
+      filters: [{ name: "Images", extensions: ["png", "svg"] }]
+    });
+    return filePaths[0] ? { path: filePaths[0], url: iconPreview(filePaths[0]) } : null;
+  },
+  async pickAppsDir() {
+    const { filePaths } = await dialog.showOpenDialog(win, {
+      title: "Choose the folder that holds your apps",
+      defaultPath: lib.appsDir(),
+      properties: ["openDirectory", "createDirectory"]
+    });
+    return filePaths[0] ? changeAppsDir(filePaths[0]) : null;
+  },
+  resetAppsDir: () => changeAppsDir(null),
+  async openAppsDir() {
+    fs.mkdirSync(lib.appsDir(), { recursive: true });
+    const error = await shell.openPath(lib.appsDir());
+    if (error) throw new Error(error);
+  },
+  checkUpdate: () => update.check(),
+  async installUpdate() {
+    const version = await update.install();
+    setTimeout(() => {
+      app.relaunch();
+      app.exit(0);
+    }, 1500);
+    return version;
+  }
+};
+for (const [name, fn] of Object.entries(handlers)) {
+  ipcMain.handle(name, async (_event, ...args) => {
+    try {
+      return { value: await fn(...args) };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+}
+function createWindow() {
+  win = new BrowserWindow({
+    width: 980,
+    height: 700,
+    minWidth: 720,
+    minHeight: 480,
+    title: "AppD-Manager",
+    webPreferences: {
+      preload: path.join(__dirname, "manager", "preload.js"),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (event) => event.preventDefault());
+  win.loadFile(path.join(__dirname, "manager", "index.html"));
+}
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+  app.on("window-all-closed", () => app.quit());
+  Menu.setApplicationMenu(null);
+  app.whenReady().then(() => {
+    try {
+      lib.sync();
+    } catch (e) {
+      console.error(`appd: ${e.message}`);
+    }
+    createWindow();
+  });
+}

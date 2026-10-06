@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -eu
+
+export APPD_BIN="$(readlink -f "$0")"
+here="$(dirname "$APPD_BIN")"
+
+if [ -x "$here/electron" ]; then
+  electron="$here/electron"
+  app="$here/resources/app"
+else
+  electron="$here/node_modules/electron/dist/electron"
+  app="$here"
+fi
+
+if [ ! -x "$electron" ]; then
+  echo "appd: Electron is not installed, run: (cd '$here' && npm install)" >&2
+  exit 1
+fi
+
+flags=()
+[ -n "${WAYLAND_DISPLAY:-}" ] && flags+=(--ozone-platform=wayland)
+
+case "${1:-manager}" in
+  run)
+    [ -n "${2:-}" ] || { echo "appd: run needs an app id" >&2; exit 2; }
+    APPD_ID="$2" exec "$electron" "${flags[@]}" "$app"
+    ;;
+  manager)
+    unset APPD_ID
+    exec "$electron" "${flags[@]}" "$app"
+    ;;
+esac
+
+ELECTRON_RUN_AS_NODE=1 exec "$electron" "$app/cli.js" "$@"

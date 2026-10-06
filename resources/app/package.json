@@ -1,0 +1,16 @@
+{
+  "name": "AppD-Manager",
+  "version": "0.1.0",
+  "description": "Make webapps easily",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "dependencies": {
+    "electron": "latest"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

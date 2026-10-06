@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:">
+  <title>AppD-Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside>
+    <header>
+      <h1>Web apps</h1>
+      <button id="new" type="button" class="primary">New app</button>
+    </header>
+
+    <ul id="apps"></ul>
+    <p id="no-apps" hidden>No apps yet.</p>
+
+    <footer>
+      <div class="caption">Apps folder</div>
+      <div id="apps-dir" class="path"></div>
+      <div class="row">
+        <button id="open-dir" type="button">Open</button>
+        <button id="change-dir" type="button">Change…</button>
+        <button id="default-dir" type="button">Use default</button>
+      </div>
+      <div class="caption" id="version"></div>
+      <div class="row">
+        <button id="update" type="button">Check for updates</button>
+      </div>
+      <div id="update-status" class="note"></div>
+    </footer>
+  </aside>
+
+  <main>
+    <section id="welcome">
+      <h2>AppD-Manager</h2>
+      <p>Select an app on the left to change it, or create a new one.</p>
+    </section>
+
+    <section id="broken" hidden>
+      <h2 id="broken-title"></h2>
+      <p>This app's config file cannot be read:</p>
+      <p id="broken-error" class="error"></p>
+      <p>Fix the file by hand, or remove the app.</p>
+      <button id="broken-remove" type="button" class="danger">Remove</button>
+    </section>
+
+    <form id="form" hidden>
+      <h2 id="form-title"></h2>
+
+      <label>Name
+        <input name="name" required placeholder="Proton Mail">
+      </label>
+      <label>URL
+        <input name="url" required placeholder="https://mail.proton.me">
+      </label>
+      <label>Description
+        <input name="description" placeholder="Shown under the name in the menu">
+      </label>
+      <label>Icon
+        <span class="row">
+          <span id="icon-preview"></span>
+          <input name="icon" placeholder="Icon name or image file">
+          <button id="pick-icon" type="button">Choose image…</button>
+        </span>
+        <span class="note">An image file (png, svg) or the name of a system icon such as <code>mail-client</code>.</span>
+      </label>
+
+      <details>
+        <summary>Advanced</summary>
+        <div class="grid">
+          <label>Window width
+            <input name="width" type="number" min="200" step="1">
+          </label>
+          <label>Window height
+            <input name="height" type="number" min="200" step="1">
+          </label>
+        </div>
+        <label class="check">
+          <input name="fixedTitle" type="checkbox">
+          Always show the app name as window title
+        </label>
+        <label class="check">
+          <input name="backgroundThrottling" type="checkbox">
+          Slow the page down while its window is hidden (saves CPU)
+        </label>
+        <label>Hosts whose popups stay in the app
+          <textarea name="internalHosts" rows="2" placeholder="accounts.google.com"></textarea>
+          <span class="note">One per line. Other links that open a new window go to your browser.</span>
+        </label>
+        <label>JavaScript memory limit (MB)
+          <input name="jsHeapMb" type="number" min="0" step="1">
+          <span class="note">0 uses the default. Raise it for very heavy apps.</span>
+        </label>
+        <label>User agent
+          <input name="userAgent" placeholder="Default: same as Chrome">
+        </label>
+        <label>Extra Chromium switches
+          <textarea name="flags" rows="2" placeholder="--enable-gpu-rasterization"></textarea>
+          <span class="note">One per line.</span>
+        </label>
+      </details>
+
+      <div class="actions">
+        <button type="submit" class="primary">Save</button>
+        <button id="launch" type="button">Launch</button>
+        <span id="status" class="note"></span>
+        <button id="remove" type="button" class="danger">Remove</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+/*
+!/.gitignore
+!/appd
+!/install.sh
+!/README*
+!/resources/
+/resources/*
+!/resources/app/
