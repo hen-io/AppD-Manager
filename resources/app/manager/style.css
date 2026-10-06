@@ -209,6 +209,22 @@ summary:focus-visible {
   align-items: center;
   gap: 6px;
 }
+#icon-choices {
+  flex-wrap: wrap;
+}
+#icon-choices button {
+  padding: 4px;
+  line-height: 0;
+}
+#icon-choices button.selected {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+#icon-choices img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

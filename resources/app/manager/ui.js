@@ -68,6 +68,10 @@ function fillForm(cfg) {
     else el.value = Array.isArray(value) ? value.join("\n") : value;
   }
 }
+function normalizeUrl(url) {
+  url = url.trim();
+  return url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? `https://${url}` : url;
+}
 function readForm() {
   const cfg = {};
   for (const el of form.elements) {
@@ -78,7 +82,7 @@ function readForm() {
     else if (typeof fallback === "number") cfg[el.name] = Number(el.value) || fallback;
     else cfg[el.name] = el.value.trim();
   }
-  if (cfg.url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(cfg.url)) cfg.url = `https://${cfg.url}`;
+  cfg.url = normalizeUrl(cfg.url);
   return cfg;
 }
 function select(id) {
@@ -89,6 +93,7 @@ function select(id) {
   $("welcome").hidden = id !== null;
   $("broken").hidden = !app || Boolean(app.cfg);
   form.hidden = !editable;
+  $("icon-choices").hidden = true;
   setStatus("");
   if (editable) {
     const cfg = isNew ? state.defaults : app.cfg;
@@ -133,9 +138,44 @@ async function pickIcon() {
     if (!picked) return;
     form.elements.icon.value = picked.path;
     showIconPreview(picked.url, form.elements.name.value);
+    $("icon-choices").hidden = true;
   } catch (e) {
     setStatus(e.message, true);
   }
+}
+function useIcon(icon, button) {
+  form.elements.icon.value = icon.path;
+  showIconPreview(icon.url, form.elements.name.value);
+  for (const other of $("icon-choices").children) other.classList.toggle("selected", other === button);
+}
+async function fetchIcons() {
+  const button = $("fetch-icons");
+  button.disabled = true;
+  setStatus("Looking for the site's icons…");
+  try {
+    const icons = await call("fetchIcons", normalizeUrl(form.elements.url.value));
+    const buttons = icons.map((icon) => {
+      const choice = document.createElement("button");
+      choice.type = "button";
+      choice.title = icon.label;
+      const image = document.createElement("img");
+      image.src = icon.url;
+      image.alt = icon.label;
+      choice.append(image);
+      choice.addEventListener("click", () => useIcon(icon, choice));
+      return choice;
+    });
+    $("icon-choices").replaceChildren(...buttons);
+    $("icon-choices").hidden = !icons.length;
+    if (icons.length) useIcon(icons[0], buttons[0]);
+    setStatus(
+      icons.length ? `Found ${icons.length === 1 ? "1 icon" : `${icons.length} icons`}. Save to keep the selected one.` : "That site offers no icon.",
+      !icons.length
+    );
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+  button.disabled = false;
 }
 async function folderAction(method) {
   try {
@@ -188,6 +228,7 @@ $("launch").addEventListener("click", () => call("launch", selected).catch((e) =
 $("remove").addEventListener("click", remove);
 $("broken-remove").addEventListener("click", remove);
 $("pick-icon").addEventListener("click", pickIcon);
+$("fetch-icons").addEventListener("click", fetchIcons);
 $("open-dir").addEventListener("click", () => folderAction("openAppsDir"));
 $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));

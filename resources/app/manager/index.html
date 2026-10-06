@@ -62,9 +62,11 @@
         <span class="row">
           <span id="icon-preview"></span>
           <input name="icon" placeholder="Icon name or image file">
+          <button id="fetch-icons" type="button">Get from site</button>
           <button id="pick-icon" type="button">Choose image…</button>
         </span>
-        <span class="note">An image file (png, svg) or the name of a system icon such as <code>mail-client</code>.</span>
+        <span id="icon-choices" class="row" hidden></span>
+        <span class="note">The site's own icon, an image file (png, svg), or the name of a system icon such as <code>mail-client</code>.</span>
       </label>
 
       <details>

@@ -5,11 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
 const update = require("./update");
+const icons = require("./icons");
 const desktopFile = `${lib.MANAGER_DESKTOP_ID}.desktop`;
 app.setName(lib.MANAGER_DESKTOP_ID);
 process.env.CHROME_DESKTOP = desktopFile;
 app.setDesktopName?.(desktopFile);
 app.setPath("userData", lib.managerDataDir);
+app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 let win;
 function iconPreview(file) {
   if (!file) return null;
@@ -91,6 +93,7 @@ const handlers = {
     });
     return filePaths[0] ? { path: filePaths[0], url: iconPreview(filePaths[0]) } : null;
   },
+  fetchIcons: (url) => icons.fetchIcons(url),
   async pickAppsDir() {
     const { filePaths } = await dialog.showOpenDialog(win, {
       title: "Choose the folder that holds your apps",

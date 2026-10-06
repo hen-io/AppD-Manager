@@ -6,3 +6,5 @@
 !/resources/
 /resources/*
 !/resources/app/
+!/icon.svg
+!/README.md

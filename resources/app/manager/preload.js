@@ -7,6 +7,7 @@ for (const name of [
   "remove",
   "launch",
   "pickIcon",
+  "fetchIcons",
   "pickAppsDir",
   "resetAppsDir",
   "openAppsDir",
