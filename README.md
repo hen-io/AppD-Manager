@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="icon.svg">
-    <img src="icon.svg" alt="AppD" height="100%">
+    <img src="icon.svg" alt="AppD" height="50%">
   </picture>
 </p>
 
