@@ -5,6 +5,7 @@ const NEW = "";
 let state = { apps: [], defaults: {} };
 let selected = null;
 let update = null;
+let running = /* @__PURE__ */ new Set();
 let loadedForm = "";
 async function call(method, ...args) {
   const result = await window.appd[method](...args);
@@ -44,6 +45,8 @@ function renderList() {
     const button = document.createElement("button");
     button.type = "button";
     button.classList.toggle("selected", app.id === selected);
+    button.classList.toggle("running", running.has(app.id));
+    if (running.has(app.id)) button.title = "Running";
     button.append(iconElement(app.iconUrl, name.textContent), text);
     button.addEventListener("click", () => select(app.id));
     const item = document.createElement("li");
@@ -57,6 +60,11 @@ function renderList() {
 function renderSidebar() {
   renderList();
   $("version").textContent = `AppD-Manager ${state.version}`;
+  $("author").hidden = !state.author.name;
+  $("author").textContent = `by ${state.author.name}`;
+  $("author-link").hidden = !state.author.url;
+  $("author-link").textContent = state.author.linkText;
+  $("author-link").title = state.author.url;
   $("installed-version").textContent = `Installed version: ${state.version}`;
   $("apps-dir").textContent = state.appsDir;
   $("change-dir").disabled = state.appsDirFixed;
@@ -92,6 +100,31 @@ function readForm() {
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
+function showLaunchButton() {
+  $("launch").textContent = running.has(selected) ? "Close app" : "Launch app";
+}
+async function refreshRunning() {
+  let ids;
+  try {
+    ids = await call("runningApps");
+  } catch {
+    return;
+  }
+  const changed = ids.length !== running.size || ids.some((id) => !running.has(id));
+  if (!changed) return;
+  running = new Set(ids);
+  renderList();
+  showLaunchButton();
+}
+async function launchOrClose() {
+  try {
+    await call(running.has(selected) ? "close" : "launch", selected);
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+  setTimeout(refreshRunning, 700);
+  setTimeout(refreshRunning, 2500);
+}
 function updateSaveButton() {
   $("save").disabled = JSON.stringify(readForm()) === loadedForm;
 }
@@ -113,6 +146,7 @@ function select(id) {
     updateSaveButton();
     showIconPreview(isNew ? null : app.iconUrl, cfg.name);
     $("launch").hidden = isNew;
+    showLaunchButton();
     $("remove").hidden = isNew;
     if (isNew) form.elements.name.focus();
   } else if (app) {
@@ -248,7 +282,7 @@ form.addEventListener("submit", save);
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));
-$("launch").addEventListener("click", () => call("launch", selected).catch((e) => setStatus(e.message, true)));
+$("launch").addEventListener("click", launchOrClose);
 $("remove").addEventListener("click", remove);
 $("broken-remove").addEventListener("click", remove);
 $("pick-icon").addEventListener("click", pickIcon);
@@ -256,6 +290,7 @@ $("fetch-icons").addEventListener("click", fetchIcons);
 $("open-dir").addEventListener("click", () => folderAction("openAppsDir"));
 $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
+$("author-link").addEventListener("click", () => call("openAuthorLink"));
 $("open-settings").addEventListener("click", () => $("settings").showModal());
 $("close-settings").addEventListener("click", () => $("settings").close());
 $("check-update").addEventListener("click", checkUpdate);
@@ -263,5 +298,7 @@ $("install-update").addEventListener("click", installUpdate);
 (async () => {
   state = await call("state");
   renderSidebar();
+  refreshRunning();
+  setInterval(refreshRunning, 2e3);
   checkUpdateOnStart();
 })();

@@ -13,6 +13,23 @@ app.setDesktopName?.(desktopFile);
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 let win;
+function author() {
+  const value = require("./package.json").author || {};
+  let name;
+  let url;
+  let linkText = "";
+  if (typeof value === "string") {
+    name = value.replace(/\s*[<(].*$/, "").trim();
+    url = (/\((https?:[^)]+)\)/.exec(value) || [])[1] || "";
+  } else {
+    name = String(value.name || "");
+    url = String(value.url || "");
+    linkText = String(value.linkText || "");
+  }
+  if (!/^https?:\/\//i.test(url)) url = "";
+  if (url && !linkText) linkText = url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  return { name, url, linkText: url ? linkText : "" };
+}
 function iconPreview(file) {
   if (!file) return null;
   try {
@@ -38,7 +55,8 @@ function state() {
     appsDir: lib.appsDir(),
     appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
     version: app.getVersion(),
-    updateRepo: update.REPO
+    updateRepo: update.REPO,
+    author: author()
   };
 }
 function changeAppsDir(dir) {
@@ -72,9 +90,17 @@ const handlers = {
       detail: `This deletes ${lib.appDir(id)}, including the app's logins and data, and takes it out of the menu.`
     });
     if (response !== 1) return { removed: false };
+    if (lib.close(id)) {
+      for (let tries = 0; tries < 30 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
+    }
     lib.remove(id);
     lib.sync();
     return { removed: true, state: state() };
+  },
+  runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
+  close(id) {
+    lib.checkId(id);
+    lib.close(id);
   },
   launch(id) {
     lib.load(id);
@@ -107,6 +133,10 @@ const handlers = {
     fs.mkdirSync(lib.appsDir(), { recursive: true });
     const error = await shell.openPath(lib.appsDir());
     if (error) throw new Error(error);
+  },
+  openAuthorLink() {
+    const { url } = author();
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   },
   checkUpdate: () => update.check(),
   async askUpdate(info) {

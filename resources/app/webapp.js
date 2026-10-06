@@ -120,6 +120,7 @@ app.on("web-contents-created", (_event, wc) => {
     if (input.type === "keyDown" && shortcut(wc, input)) event.preventDefault();
   });
   wc.on("context-menu", (_e, params) => contextMenu(wc, params));
+  wc.on("did-navigate", () => applyCpuLimit(wc));
 });
 function readState() {
   try {
@@ -129,7 +130,6 @@ function readState() {
   }
 }
 let stoppedPids = [];
-const cpuLimited = cfg.unfocusedCpuPercent > 0 && cfg.unfocusedCpuPercent < 100;
 function pagePids() {
   const pids = /* @__PURE__ */ new Set();
   for (const window of BrowserWindow.getAllWindows()) {
@@ -158,16 +158,22 @@ function resumePage() {
 }
 app.on("before-quit", resumePage);
 process.on("exit", resumePage);
-async function setCpuRate(rate) {
-  for (const window of BrowserWindow.getAllWindows()) {
-    const wc = window.webContents;
-    try {
-      if (wc.isDevToolsOpened()) continue;
-      if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
-      await wc.debugger.sendCommand("Emulation.setCPUThrottlingRate", { rate });
-    } catch {
-    }
+const percent = (value) => value > 0 && value < 100 ? value : 100;
+const alwaysPercent = percent(cfg.cpuPercent);
+const awayPercent = Math.min(alwaysPercent, percent(cfg.unfocusedCpuPercent));
+let cpuPercentNow = alwaysPercent;
+async function applyCpuLimit(wc) {
+  try {
+    if (wc.isDestroyed() || wc.isDevToolsOpened()) return;
+    if (cpuPercentNow === 100 && !wc.debugger.isAttached()) return;
+    if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
+    await wc.debugger.sendCommand("Emulation.setCPUThrottlingRate", { rate: 100 / cpuPercentNow });
+  } catch {
   }
+}
+function setCpuPercent(value) {
+  cpuPercentNow = value;
+  for (const window of BrowserWindow.getAllWindows()) applyCpuLimit(window.webContents);
 }
 function watchFocus(window) {
   const wc = window.webContents;
@@ -219,9 +225,9 @@ function watchFocus(window) {
   };
   const away = () => {
     idleSince = Date.now() - GRACE_MS;
-    if (cpuLimited) {
+    if (awayPercent < alwaysPercent) {
       throttled = true;
-      setCpuRate(Math.min(20, 100 / cfg.unfocusedCpuPercent));
+      setCpuPercent(awayPercent);
     }
     if (cfg.pauseWhenUnfocused) {
       pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
@@ -236,7 +242,7 @@ function watchFocus(window) {
     resumePage();
     if (throttled) {
       throttled = false;
-      setCpuRate(1);
+      setCpuPercent(alwaysPercent);
     }
     const idleMs = idleSince ? Date.now() - idleSince : 0;
     idleSince = 0;
@@ -308,7 +314,7 @@ function createWindow() {
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
-  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || cpuLimited) watchFocus(win);
+  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || awayPercent < alwaysPercent) watchFocus(win);
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
     try {

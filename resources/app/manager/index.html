@@ -2,135 +2,168 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
   <title>AppD-Manager</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <aside>
-    <header>
-      <h1>Web apps</h1>
-      <button id="new" type="button" class="primary">New app</button>
-    </header>
+    <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+    <button id="new" type="button" class="primary">New app</button>
 
+    <h2 class="caption">Your apps</h2>
     <ul id="apps"></ul>
-    <p id="no-apps" hidden>No apps yet.</p>
+    <p id="no-apps" class="note" hidden>No apps yet.</p>
 
     <footer>
-      <span id="version" class="note"></span>
+      <div class="about">
+        <span id="version" class="note"></span>
+        <span id="author" class="note" hidden></span>
+        <button id="author-link" type="button" class="link note" hidden></button>
+      </div>
       <button id="open-settings" type="button">Settings</button>
     </footer>
   </aside>
 
   <main>
     <section id="welcome">
-      <h2>AppD-Manager</h2>
-      <p>Select an app on the left to change it, or create a new one.</p>
+      <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+      <p>Websites as apps of their own, each in its own window.</p>
+      <p class="note">Select an app on the left to change it, or create a new one.</p>
     </section>
 
-    <section id="broken" hidden>
-      <h2 id="broken-title"></h2>
-      <p>This app's config file cannot be read:</p>
-      <p id="broken-error" class="error"></p>
-      <p>Fix the file by hand, or remove the app.</p>
-      <button id="broken-remove" type="button" class="danger">Remove</button>
+    <section id="broken" class="page" hidden>
+      <h1 id="broken-title"></h1>
+      <div class="card">
+        <p>This app's config file cannot be read:</p>
+        <p id="broken-error" class="error"></p>
+        <p>Fix the file by hand, or remove the app.</p>
+        <button id="broken-remove" type="button" class="danger">Remove</button>
+      </div>
     </section>
 
     <form id="form" hidden>
-      <h2 id="form-title"></h2>
-
-      <label>Name
-        <input name="name" required placeholder="App name...">
-      </label>
-      <label>URL
-        <input name="url" required placeholder="url...">
-      </label>
-      <label>Description
-        <input name="description" placeholder="Shown under the name in the menu">
-      </label>
-      <label>Icon
-        <span class="row">
+      <div class="page">
+        <header class="title">
           <span id="icon-preview"></span>
-          <input name="icon" placeholder="Icon name or image file">
-          <button id="fetch-icons" type="button">Get from site</button>
-          <button id="pick-icon" type="button">Choose image…</button>
-        </span>
-        <span id="icon-choices" class="row" hidden></span>
-        <span class="note">The site's own icon, an image file (png, svg), or the name of a system icon such as <code>mail-client</code>.</span>
-      </label>
+          <h1 id="form-title"></h1>
+        </header>
 
-      <details>
-        <summary>Advanced</summary>
-        <div class="grid">
-          <label>Window width
-            <input name="width" type="number" min="200" step="1">
+        <section class="card">
+          <h3>General</h3>
+          <label>Name
+            <input name="name" required placeholder="App name...">
           </label>
-          <label>Window height
-            <input name="height" type="number" min="200" step="1">
+          <label>URL
+            <input name="url" required placeholder="url...">
           </label>
-        </div>
-        <label class="check">
-          <input name="startMaximized" type="checkbox">
-          Always open maximized
-        </label>
-        <span class="note below-check">Otherwise the window opens the way you left it last time.</span>
-        <label class="check">
-          <input name="homeButton" type="checkbox">
-          Show a button back to the app while it is on another site
-        </label>
-        <label class="check">
-          <input name="fixedTitle" type="checkbox">
-          Always show the app name as window title
-        </label>
-        <label class="check">
-          <input name="backgroundThrottling" type="checkbox">
-          Slow the page down while its window is hidden (saves CPU)
-        </label>
-        <label class="check">
-          <input name="pauseWhenUnfocused" type="checkbox">
-          Pause the page completely when its window has been without focus for
-          <input id="pause-amount" type="number" min="1" step="1" aria-label="Pause after">
-          <select id="pause-unit" aria-label="Unit">
-            <option value="1">seconds</option>
-            <option value="60">minutes</option>
-          </select>
-        </label>
-        <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen.</span>
-        <label>CPU limit while another window has the focus (%)
-          <input name="unfocusedCpuPercent" type="number" min="5" max="100" step="5">
-          <span class="note">The page's scripts run at about this share of full speed; 100 is no limit. The app stays alive, just slower. If the app is also set to pause, the limit applies until the pause starts.</span>
-        </label>
-        <label>Reload when you come back after more than this many minutes
-          <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
-          <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
-        </label>
-        <label>Links that open a new window or tab
-          <select name="openLinks">
-            <option value="browser">Open in the default browser</option>
-            <option value="window">Open in a new window of this app</option>
-            <option value="same">Go there in the current window</option>
-          </select>
-        </label>
-        <label>Hosts that stay in the app
-          <textarea name="internalHosts" rows="2" placeholder="accounts.google.com"></textarea>
-          <span class="note">One per line. Only used with "default browser": links to these hosts, and to the app's own, still open in an app window (sign-in popups need that).</span>
-        </label>
-        <label>JavaScript memory limit (MB)
-          <input name="jsHeapMb" type="number" min="0" step="1">
-          <span class="note">0 uses the default. Raise it for very heavy apps.</span>
-        </label>
-        <label>User agent
-          <input name="userAgent" placeholder="Default: same as Chrome">
-        </label>
-        <label>Extra Chromium switches
-          <textarea name="flags" rows="2" placeholder="--enable-gpu-rasterization"></textarea>
-          <span class="note">One per line.</span>
-        </label>
-      </details>
+          <label>Description
+            <input name="description" placeholder="Shown under the name in the menu">
+          </label>
+          <label>Icon
+            <span class="row">
+              <input name="icon" placeholder="Icon name or image file">
+              <button id="fetch-icons" type="button">Get from site</button>
+              <button id="pick-icon" type="button">Choose image…</button>
+            </span>
+            <span id="icon-choices" class="row" hidden></span>
+            <span class="note">The site's own icon, an image file (png, svg), or the name of a system icon such as <code>mail-client</code>.</span>
+          </label>
+        </section>
+
+        <section class="card">
+          <h3>Window</h3>
+          <div class="grid">
+            <label>Width
+              <input name="width" type="number" min="200" step="1">
+            </label>
+            <label>Height
+              <input name="height" type="number" min="200" step="1">
+            </label>
+          </div>
+          <label class="check">
+            <input name="startMaximized" type="checkbox">
+            Always open maximized
+          </label>
+          <span class="note below-check">Otherwise the window opens the way you left it last time.</span>
+          <label class="check">
+            <input name="fixedTitle" type="checkbox">
+            Always show the app name as window title
+          </label>
+        </section>
+
+        <section class="card">
+          <h3>Links</h3>
+          <label>Links that open a new window or tab
+            <select name="openLinks">
+              <option value="browser">Open in the default browser</option>
+              <option value="window">Open in a new window of this app</option>
+              <option value="same">Go there in the current window</option>
+            </select>
+          </label>
+          <label>Hosts that stay in the app
+            <textarea name="internalHosts" rows="2" placeholder="accounts.google.com"></textarea>
+            <span class="note">One per line. Only used with "default browser": links to these hosts, and to the app's own, still open in an app window (sign-in popups need that).</span>
+          </label>
+          <label class="check">
+            <input name="homeButton" type="checkbox">
+            Show a button back to the app while it is on another site
+          </label>
+        </section>
+
+        <section class="card">
+          <h3>Performance</h3>
+          <label>CPU limit, always (%)
+            <input name="cpuPercent" type="number" min="1" max="100" step="1">
+            <span class="note">The page's scripts run at about this share of full speed, also while you are using the app, which then feels slower. 100 is no limit.</span>
+          </label>
+          <label>JavaScript memory limit (MB)
+            <input name="jsHeapMb" type="number" min="0" step="1">
+            <span class="note">0 uses the default. Raise it for very heavy apps.</span>
+          </label>
+        </section>
+
+        <section class="card">
+          <h3>While you are not using the app</h3>
+          <label>CPU limit while another window has the focus (%)
+            <input name="unfocusedCpuPercent" type="number" min="1" max="100" step="1">
+            <span class="note">Like the limit above, but only while the app is not the focused window; the lower of the two applies then. 100 is no extra limit. The app stays alive, just slower.</span>
+          </label>
+          <label class="check">
+            <input name="backgroundThrottling" type="checkbox">
+            Slow the page down while its window is hidden (saves CPU)
+          </label>
+          <label class="check">
+            <input name="pauseWhenUnfocused" type="checkbox">
+            Pause the page completely when its window has been without focus for
+            <input id="pause-amount" type="number" min="1" step="1" aria-label="Pause after">
+            <select id="pause-unit" aria-label="Unit">
+              <option value="1">seconds</option>
+              <option value="60">minutes</option>
+            </select>
+          </label>
+          <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the CPU limit applies.</span>
+          <label>Reload when you come back after more than this many minutes
+            <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
+            <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
+          </label>
+        </section>
+
+        <details class="card">
+          <summary>Technical</summary>
+          <label>User agent
+            <input name="userAgent" placeholder="Default: same as Chrome">
+          </label>
+          <label>Extra Chromium switches
+            <textarea name="flags" rows="2" placeholder="--enable-gpu-rasterization"></textarea>
+            <span class="note">One per line.</span>
+          </label>
+        </details>
+      </div>
 
       <div class="actions">
         <button id="save" type="submit" class="primary">Save</button>
-        <button id="launch" type="button">Launch</button>
+        <button id="launch" type="button">Launch app</button>
         <span id="status" class="note"></span>
         <button id="remove" type="button" class="danger">Remove</button>
       </div>
@@ -138,9 +171,9 @@
   </main>
 
   <dialog id="settings">
-    <h2>Settings</h2>
+    <h1>Settings</h1>
 
-    <section>
+    <section class="card">
       <h3>Apps folder</h3>
       <p id="apps-dir" class="path"></p>
       <p class="note">Each app has its own folder in here. Changing the location does not move existing apps.</p>
@@ -152,7 +185,7 @@
       <p id="folder-status" class="note error"></p>
     </section>
 
-    <section>
+    <section class="card">
       <h3>Updates</h3>
       <p id="installed-version"></p>
       <p class="note">AppD-Manager looks for a new version every time it starts.</p>
@@ -163,8 +196,7 @@
       <p id="update-status" class="note"></p>
     </section>
 
-    <div class="actions">
-      <span class="note"></span>
+    <div class="dialog-actions">
       <button id="close-settings" type="button">Close</button>
     </div>
   </dialog>

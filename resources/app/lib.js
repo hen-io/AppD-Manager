@@ -29,6 +29,7 @@ const DEFAULTS = {
   backgroundThrottling: true,
   pauseWhenUnfocused: false,
   pauseAfterSeconds: 30,
+  cpuPercent: 100,
   unfocusedCpuPercent: 100,
   reloadAfterIdleMinutes: 0,
   jsHeapMb: 0,
@@ -119,6 +120,23 @@ function remove(id) {
   checkId(id);
   fs.rmSync(appDir(id), { recursive: true, force: true });
 }
+function runningPid(id) {
+  try {
+    const lock = fs.readlinkSync(path.join(profileDir(id), "SingletonLock"));
+    const dash = lock.lastIndexOf("-");
+    const pid = Number(lock.slice(dash + 1));
+    if (!Number.isInteger(pid) || pid <= 0 || lock.slice(0, dash) !== os.hostname()) return 0;
+    process.kill(pid, 0);
+    return pid;
+  } catch {
+    return 0;
+  }
+}
+function close(id) {
+  const pid = runningPid(id);
+  if (pid) process.kill(pid, "SIGTERM");
+  return Boolean(pid);
+}
 function list() {
   const dir = appsDir();
   if (!fs.existsSync(dir)) return [];
@@ -192,6 +210,8 @@ module.exports = {
   save,
   remove,
   list,
+  runningPid,
+  close,
   iconFile,
   writeDesktop,
   sync
