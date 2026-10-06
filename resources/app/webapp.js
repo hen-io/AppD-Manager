@@ -41,21 +41,11 @@ if (cfg.jsHeapMb > 0) {
 }
 app.userAgentFallback = cfg.userAgent || app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 const GOOGLE_SIGN_IN = /^https:\/\/accounts\.(google\.(com|[a-z]{2,3}|com?\.[a-z]{2})|youtube\.com)\//i;
-const FIREFOX_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
-function googleSignInFix(ses) {
-  ses.webRequest.onBeforeSendHeaders({ urls: ["https://accounts.google.com/*", "https://accounts.youtube.com/*"] }, (details, respond) => {
-    const headers = details.requestHeaders;
-    for (const name of Object.keys(headers)) {
-      if (/^user-agent$/i.test(name) || /^sec-ch-ua/i.test(name)) delete headers[name];
-    }
-    headers["User-Agent"] = FIREFOX_USER_AGENT;
-    respond({ requestHeaders: headers });
-  });
-}
 function followGoogleSignIn(wc) {
-  wc.on("did-start-navigation", (event, url, _isInPlace, isMainFrame) => {
-    if (!(event.isMainFrame ?? isMainFrame)) return;
-    const wanted = GOOGLE_SIGN_IN.test(event.url ?? url) ? FIREFOX_USER_AGENT : app.userAgentFallback;
+  const normal = app.userAgentFallback;
+  const versionless = normal.replace(/Chrome\/[\d.]+/, "Chrome");
+  wc.on("did-navigate", (_event, url) => {
+    const wanted = GOOGLE_SIGN_IN.test(url) ? versionless : normal;
     if (wc.getUserAgent() !== wanted) wc.setUserAgent(wanted);
   });
 }
@@ -450,7 +440,6 @@ const extension = (name) => cfg.extensions.includes(name);
 async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
-  if (!cfg.userAgent) googleSignInFix(session.defaultSession);
   if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
     hideLeftovers: cfg.adBlockHideLeftovers,
     inPageAds: cfg.adBlockInPageAds,

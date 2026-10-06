@@ -465,8 +465,15 @@ textarea {
   flex-wrap: wrap;
 }
 #icon-choices button {
-  padding: 4px;
-  line-height: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 5px 6px 4px;
+}
+#icon-choices button span {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
 }
 #icon-choices button.selected {
   border-color: var(--accent);

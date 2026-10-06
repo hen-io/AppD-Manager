@@ -290,8 +290,10 @@ async function fetchIcons() {
       choice.title = icon.label;
       const image = document.createElement("img");
       image.src = icon.url;
-      image.alt = icon.label;
-      choice.append(image);
+      image.alt = "";
+      const size = document.createElement("span");
+      size.textContent = icon.label;
+      choice.append(image, size);
       choice.addEventListener("click", () => useIcon(icon, choice));
       return choice;
     });
