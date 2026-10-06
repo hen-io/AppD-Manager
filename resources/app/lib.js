@@ -24,6 +24,7 @@ const DEFAULTS = {
   userAgent: "",
   openLinks: "browser",
   internalHosts: [],
+  homeButton: true,
   fixedTitle: false,
   backgroundThrottling: true,
   pauseWhenUnfocused: false,

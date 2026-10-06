@@ -5,6 +5,7 @@ const NEW = "";
 let state = { apps: [], defaults: {} };
 let selected = null;
 let update = null;
+let loadedForm = "";
 async function call(method, ...args) {
   const result = await window.appd[method](...args);
   if (result.error) throw new Error(result.error);
@@ -91,6 +92,9 @@ function readForm() {
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
+function updateSaveButton() {
+  $("save").disabled = JSON.stringify(readForm()) === loadedForm;
+}
 function select(id) {
   selected = id;
   const app = state.apps.find((a) => a.id === id);
@@ -105,6 +109,8 @@ function select(id) {
     const cfg = isNew ? state.defaults : app.cfg;
     $("form-title").textContent = isNew ? "New app" : cfg.name;
     fillForm(cfg);
+    loadedForm = JSON.stringify(readForm());
+    updateSaveButton();
     showIconPreview(isNew ? null : app.iconUrl, cfg.name);
     $("launch").hidden = isNew;
     $("remove").hidden = isNew;
@@ -143,6 +149,7 @@ async function pickIcon() {
     const picked = await call("pickIcon");
     if (!picked) return;
     form.elements.icon.value = picked.path;
+    updateSaveButton();
     showIconPreview(picked.url, form.elements.name.value);
     $("icon-choices").hidden = true;
   } catch (e) {
@@ -151,6 +158,7 @@ async function pickIcon() {
 }
 function useIcon(icon, button) {
   form.elements.icon.value = icon.path;
+  updateSaveButton();
   showIconPreview(icon.url, form.elements.name.value);
   for (const other of $("icon-choices").children) other.classList.toggle("selected", other === button);
 }
@@ -237,6 +245,8 @@ async function checkUpdateOnStart() {
   installUpdate();
 }
 form.addEventListener("submit", save);
+form.addEventListener("input", updateSaveButton);
+form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));
 $("launch").addEventListener("click", () => call("launch", selected).catch((e) => setStatus(e.message, true)));
 $("remove").addEventListener("click", remove);

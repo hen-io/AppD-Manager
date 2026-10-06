@@ -58,6 +58,7 @@ function shortcut(wc, input) {
   else if (ctrl && key === "0") wc.setZoomLevel(0);
   else if (input.alt && !input.control && key === "arrowleft") history.goBack();
   else if (input.alt && !input.control && key === "arrowright") history.goForward();
+  else if (input.alt && !input.control && key === "home") wc.loadURL(cfg.url);
   else return false;
   return true;
 }
@@ -94,6 +95,7 @@ function contextMenu(wc, p) {
     items.push({ role: "copy" }, sep);
   }
   items.push(
+    { label: `Go to ${cfg.name}`, click: () => wc.loadURL(cfg.url) },
     { label: "Back", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
     { label: "Reload", click: () => wc.reload() },
     { label: "Inspect", click: () => wc.inspectElement(p.x, p.y) }
@@ -273,6 +275,23 @@ function watchFocus(window) {
     clearInterval(watchdog);
   });
 }
+const homeButtonScript = `(() => {
+  if (document.getElementById('appd-home-button')) return;
+  const host = document.createElement('div');
+  host.id = 'appd-home-button';
+  host.style.cssText = 'all:initial;position:fixed;left:16px;bottom:16px;z-index:2147483647';
+  const button = document.createElement('button');
+  button.textContent = ${JSON.stringify(`← ${cfg.name}`)};
+  button.title = ${JSON.stringify(`Back to ${cfg.name} (Alt+Home)`)};
+  button.style.cssText = 'all:initial;font:600 13px system-ui,sans-serif;padding:8px 14px;border-radius:999px;'
+    + 'background:rgba(35,38,41,.9);color:#fff;border:1px solid rgba(255,255,255,.3);'
+    + 'box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;opacity:.7';
+  button.addEventListener('mouseenter', () => { button.style.opacity = '1'; });
+  button.addEventListener('mouseleave', () => { button.style.opacity = '.7'; });
+  button.addEventListener('click', () => { location.href = ${JSON.stringify(cfg.url)}; });
+  host.attachShadow({ mode: 'closed' }).append(button);
+  document.documentElement.append(host);
+})()`;
 function createWindow() {
   const state = readState();
   win = new BrowserWindow({
@@ -308,6 +327,13 @@ function createWindow() {
        setTimeout(() => location.replace(${target}), 5000)<\/script>`
     ));
   });
+  if (cfg.homeButton) {
+    win.webContents.on("dom-ready", () => {
+      const url = win.webContents.getURL();
+      if (/^https?:/i.test(url) && !isInternal(url)) win.webContents.executeJavaScript(homeButtonScript).catch(() => {
+      });
+    });
+  }
   win.loadURL(cfg.url);
 }
 if (!app.requestSingleInstanceLock()) {

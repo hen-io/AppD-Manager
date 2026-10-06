@@ -40,10 +40,10 @@
       <h2 id="form-title"></h2>
 
       <label>Name
-        <input name="name" required placeholder="Proton Mail">
+        <input name="name" required placeholder="App name...">
       </label>
       <label>URL
-        <input name="url" required placeholder="https://mail.proton.me">
+        <input name="url" required placeholder="url...">
       </label>
       <label>Description
         <input name="description" placeholder="Shown under the name in the menu">
@@ -74,6 +74,10 @@
           Always open maximized
         </label>
         <span class="note below-check">Otherwise the window opens the way you left it last time.</span>
+        <label class="check">
+          <input name="homeButton" type="checkbox">
+          Show a button back to the app while it is on another site
+        </label>
         <label class="check">
           <input name="fixedTitle" type="checkbox">
           Always show the app name as window title
@@ -125,7 +129,7 @@
       </details>
 
       <div class="actions">
-        <button type="submit" class="primary">Save</button>
+        <button id="save" type="submit" class="primary">Save</button>
         <button id="launch" type="button">Launch</button>
         <span id="status" class="note"></span>
         <button id="remove" type="button" class="danger">Remove</button>
