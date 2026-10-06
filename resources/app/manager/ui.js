@@ -108,6 +108,21 @@ function renderExtensions() {
   $("extension-add").replaceChildren(new Option("Add an extension…", ""), ...choices);
   $("extension-add").hidden = !choices.length;
   $("dark-settings").hidden = !extensions.includes("darkreader");
+  $("sponsor-settings").hidden = !extensions.includes("sponsorblock");
+  $("adblock-settings").hidden = !extensions.includes("adblock");
+}
+function renderSponsorCategories(chosen) {
+  const boxes = Object.entries(state.sponsorCategories || {}).map(([name, text]) => {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.category = name;
+    input.checked = chosen.includes(name);
+    const label = document.createElement("label");
+    label.className = "check";
+    label.append(input, text);
+    return label;
+  });
+  $("sponsor-categories").replaceChildren(...boxes);
 }
 function addExtension() {
   const name = $("extension-add").value;
@@ -126,6 +141,7 @@ function fillForm(cfg) {
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
   renderExtensions();
+  renderSponsorCategories(cfg.sponsorBlockCategories);
   const seconds = cfg.pauseAfterSeconds;
   const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
   $("pause-unit").value = String(unit);
@@ -147,6 +163,7 @@ function readForm() {
   }
   cfg.url = normalizeUrl(cfg.url);
   cfg.extensions = [...extensions];
+  cfg.sponsorBlockCategories = [...$("sponsor-categories").querySelectorAll("input")].filter((box) => box.checked).map((box) => box.dataset.category);
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }

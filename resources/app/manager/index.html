@@ -140,6 +140,30 @@
           <select id="extension-add" aria-label="Add an extension">
             <option value="">Add an extension…</option>
           </select>
+          <div id="adblock-settings" hidden>
+            <h3>Ad blocker</h3>
+            <label class="check">
+              <input name="adBlockInPageAds" type="checkbox">
+              Remove ads that sites serve themselves (YouTube's video ads)
+            </label>
+            <span class="note below-check">YouTube holds a video back for about as long as the removed ad would have run, so an ad-free video can take some seconds to start.</span>
+            <label class="check">
+              <input name="adBlockHideLeftovers" type="checkbox">
+              Hide the empty boxes that blocked ads leave behind
+            </label>
+            <label>Sites where nothing is blocked
+              <textarea name="adBlockExceptions" rows="2" placeholder="example.com"></textarea>
+              <span class="note">One per line. For a site that breaks with the blocker on.</span>
+            </label>
+          </div>
+          <div id="sponsor-settings" hidden>
+            <h3>SponsorBlock skips</h3>
+            <div id="sponsor-categories"></div>
+            <label class="check">
+              <input name="sponsorBlockNotes" type="checkbox">
+              Show a short note when something is skipped
+            </label>
+          </div>
           <div id="dark-settings" class="size-row" hidden>
             <label>Dark Reader brightness (%)
               <input name="darkBrightness" type="number" min="30" max="150" step="5">
@@ -196,6 +220,11 @@
             without focus
           </label>
           <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the slow-down above applies.</span>
+          <label class="check">
+            <input name="skipMissedUpdates" type="checkbox">
+            Skip what was missed: reconnect when you come back
+          </label>
+          <span class="note below-check">For apps that show live data. After the app was slowed down or paused, the updates it missed are dropped instead of played back in a burst; it reconnects and shows the current state. Anything still loading at that moment starts over.</span>
           <label>Reload when you come back after more than this many minutes
             <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
             <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>

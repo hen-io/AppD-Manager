@@ -355,6 +355,7 @@ function watchFocus(window) {
       if (overtaken()) return;
     }
     pausePage();
+    if (cfg.skipMissedUpdates) dropBacklog();
     watchdog = setInterval(() => {
       if (window.isDestroyed()) clearInterval(watchdog);
       else if (BrowserWindow.getFocusedWindow()) back();
@@ -372,14 +373,20 @@ function watchFocus(window) {
       pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
     }
   };
-  const back = () => {
+  const dropBacklog = () => session.defaultSession.closeAllConnections().catch(() => {
+  });
+  const back = async () => {
     clearTimeout(timer);
     clearTimeout(pauseTimer);
     clearInterval(watchdog);
     watchdog = null;
-    round++;
-    resumePage();
+    const mine = ++round;
     clearInterval(soundCheck);
+    if (cfg.skipMissedUpdates && idleSince && (stoppedPids.length || throttled)) {
+      await dropBacklog();
+      if (mine !== round || window.isDestroyed()) return;
+    }
+    resumePage();
     if (throttled) {
       throttled = false;
       setCpuPercent(alwaysPercent);
@@ -444,7 +451,11 @@ async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
   if (!cfg.userAgent) googleSignInFix(session.defaultSession);
-  if (extension("adblock")) await extras.enableAdBlock(session.defaultSession).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
+  if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
+    hideLeftovers: cfg.adBlockHideLeftovers,
+    inPageAds: cfg.adBlockInPageAds,
+    exceptions: cfg.adBlockExceptions
+  }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
   win = new BrowserWindow({
     width: state.width || cfg.width,
     height: state.height || cfg.height,
@@ -461,7 +472,9 @@ async function createWindow() {
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
-  if (extension("sponsorblock")) extras.enableSponsorBlock(win.webContents);
+  if (extension("sponsorblock")) {
+    extras.enableSponsorBlock(win.webContents, { categories: cfg.sponsorBlockCategories, notes: cfg.sponsorBlockNotes });
+  }
   if (extension("darkreader")) {
     extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
   }

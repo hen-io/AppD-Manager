@@ -31,6 +31,16 @@ const EXTENSIONS = {
 };
 const COLOR_SCHEMES = ["system", "light", "dark"];
 const ACTION_BUTTON = ["off", "top-left", "top-right", "bottom-left", "bottom-right"];
+const SPONSOR_CATEGORIES = {
+  sponsor: "Sponsor messages",
+  selfpromo: "Self-promotion (own products, channels, merchandise)",
+  interaction: "Reminders to like, subscribe or follow",
+  intro: "Intros and title sequences",
+  outro: "Endings and credits",
+  preview: "Recaps and previews",
+  music_offtopic: "Non-music parts of music videos",
+  filler: "Tangents and jokes"
+};
 const OPEN_LINKS = ["browser", "window", "same"];
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DEFAULTS = {
@@ -46,6 +56,11 @@ const DEFAULTS = {
   internalHosts: [],
   homeButton: true,
   extensions: [],
+  adBlockHideLeftovers: true,
+  adBlockInPageAds: true,
+  adBlockExceptions: [],
+  sponsorBlockCategories: ["sponsor", "selfpromo", "interaction"],
+  sponsorBlockNotes: true,
   darkBrightness: 100,
   darkContrast: 100,
   darkSepia: 0,
@@ -58,6 +73,7 @@ const DEFAULTS = {
   pauseAfterSeconds: 30,
   cpuPercent: 100,
   unfocusedCpuPercent: 100,
+  skipMissedUpdates: false,
   reloadAfterIdleMinutes: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
@@ -132,6 +148,8 @@ function validate(cfg) {
   if (!URL.canParse(cfg.url)) throw new Error(`invalid url "${cfg.url}"`);
   const unknown = cfg.extensions.find((name) => !(name in EXTENSIONS));
   if (unknown !== void 0) throw new Error(`unknown extension "${unknown}" (known: ${Object.keys(EXTENSIONS).join(", ")})`);
+  const oddCategory = cfg.sponsorBlockCategories.find((name) => !(name in SPONSOR_CATEGORIES));
+  if (oddCategory !== void 0) throw new Error(`unknown SponsorBlock category "${oddCategory}" (known: ${Object.keys(SPONSOR_CATEGORIES).join(", ")})`);
   if (!COLOR_SCHEMES.includes(cfg.colorScheme)) {
     throw new Error(`"colorScheme" must be one of: ${COLOR_SCHEMES.join(", ")}`);
   }
@@ -263,6 +281,7 @@ module.exports = {
   DEFAULTS,
   APP_ACTIONS,
   EXTENSIONS,
+  SPONSOR_CATEGORIES,
   MANAGER_DESKTOP_ID,
   root,
   launcher,
