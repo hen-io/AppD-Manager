@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="con.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="icon.svg">
     <img src="icon.svg" alt="AppD" height="100%">
   </picture>
 </p>

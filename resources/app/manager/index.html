@@ -17,18 +17,8 @@
     <p id="no-apps" hidden>No apps yet.</p>
 
     <footer>
-      <div class="caption">Apps folder</div>
-      <div id="apps-dir" class="path"></div>
-      <div class="row">
-        <button id="open-dir" type="button">Open</button>
-        <button id="change-dir" type="button">Change…</button>
-        <button id="default-dir" type="button">Use default</button>
-      </div>
-      <div class="caption" id="version"></div>
-      <div class="row">
-        <button id="update" type="button">Check for updates</button>
-      </div>
-      <div id="update-status" class="note"></div>
+      <span id="version" class="note"></span>
+      <button id="open-settings" type="button">Settings</button>
     </footer>
   </aside>
 
@@ -112,6 +102,38 @@
       </div>
     </form>
   </main>
+
+  <dialog id="settings">
+    <h2>Settings</h2>
+
+    <section>
+      <h3>Apps folder</h3>
+      <p id="apps-dir" class="path"></p>
+      <p class="note">Each app has its own folder in here. Changing the location does not move existing apps.</p>
+      <div class="row">
+        <button id="open-dir" type="button">Open folder</button>
+        <button id="change-dir" type="button">Change…</button>
+        <button id="default-dir" type="button">Use default</button>
+      </div>
+      <p id="folder-status" class="note error"></p>
+    </section>
+
+    <section>
+      <h3>Updates</h3>
+      <p id="installed-version"></p>
+      <p class="note">AppD-Manager looks for a new version every time it starts.</p>
+      <div class="row">
+        <button id="check-update" type="button">Check for updates</button>
+        <button id="install-update" type="button" class="primary" hidden></button>
+      </div>
+      <p id="update-status" class="note"></p>
+    </section>
+
+    <div class="actions">
+      <span class="note"></span>
+      <button id="close-settings" type="button">Close</button>
+    </div>
+  </dialog>
 
   <script src="ui.js"></script>
 </body>

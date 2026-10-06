@@ -55,10 +55,11 @@ function renderList() {
 }
 function renderSidebar() {
   renderList();
+  $("version").textContent = `AppD-Manager ${state.version}`;
+  $("installed-version").textContent = `Installed version: ${state.version}`;
   $("apps-dir").textContent = state.appsDir;
   $("change-dir").disabled = state.appsDirFixed;
   $("default-dir").disabled = state.appsDirFixed;
-  $("version").textContent = `AppD-Manager ${state.version}`;
 }
 function fillForm(cfg) {
   for (const el of form.elements) {
@@ -178,49 +179,57 @@ async function fetchIcons() {
   button.disabled = false;
 }
 async function folderAction(method) {
+  $("folder-status").textContent = "";
   try {
     const next = await call(method);
     if (!next) return;
     state = next;
     renderSidebar();
     select(null);
-    $("update-status").textContent = "";
   } catch (e) {
-    $("update-status").textContent = e.message;
+    $("folder-status").textContent = e.message;
   }
 }
 function showUpdate() {
-  const note = $("update-status");
-  const button = $("update");
   const canInstall = update.available && !update.blocked;
-  button.textContent = canInstall ? `Update to ${update.latest}` : "Check for updates";
-  if (!update.available) note.textContent = `Up to date (${state.updateRepo}).`;
-  else note.textContent = update.blocked || `Version ${update.latest} is available.`;
+  $("install-update").hidden = !canInstall;
+  $("install-update").textContent = `Install ${update.latest}`;
+  if (!update.available) $("update-status").textContent = "You have the newest version.";
+  else $("update-status").textContent = update.blocked || `Version ${update.latest} is available.`;
 }
-async function checkUpdate(quiet) {
+async function checkUpdate() {
+  $("check-update").disabled = true;
+  $("update-status").textContent = "Checking…";
   try {
     update = await call("checkUpdate");
-    if (!quiet || update.available) showUpdate();
+    showUpdate();
   } catch (e) {
-    if (!quiet) $("update-status").textContent = `Could not check for updates: ${e.message}`;
+    update = null;
+    $("install-update").hidden = true;
+    $("update-status").textContent = `Could not check for updates: ${e.message}`;
   }
+  $("check-update").disabled = false;
+  return update;
 }
-async function updateClicked() {
-  const button = $("update");
-  button.disabled = true;
+async function installUpdate() {
+  $("check-update").disabled = true;
+  $("install-update").disabled = true;
+  $("update-status").textContent = "Downloading…";
   try {
-    if (update?.available && !update.blocked) {
-      $("update-status").textContent = "Downloading…";
-      const version = await call("installUpdate");
-      $("update-status").textContent = `Updated to ${version}. Restarting…`;
-      return;
-    }
-    $("update-status").textContent = "Checking…";
-    await checkUpdate(false);
+    const version = await call("installUpdate");
+    $("update-status").textContent = `Updated to ${version}. Restarting…`;
   } catch (e) {
     $("update-status").textContent = e.message;
+    $("check-update").disabled = false;
+    $("install-update").disabled = false;
   }
-  button.disabled = false;
+}
+async function checkUpdateOnStart() {
+  const info = await checkUpdate();
+  if (!info || !info.available) return;
+  if (!await call("askUpdate", info)) return;
+  $("settings").showModal();
+  installUpdate();
 }
 form.addEventListener("submit", save);
 $("new").addEventListener("click", () => select(NEW));
@@ -232,9 +241,12 @@ $("fetch-icons").addEventListener("click", fetchIcons);
 $("open-dir").addEventListener("click", () => folderAction("openAppsDir"));
 $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
-$("update").addEventListener("click", updateClicked);
+$("open-settings").addEventListener("click", () => $("settings").showModal());
+$("close-settings").addEventListener("click", () => $("settings").close());
+$("check-update").addEventListener("click", checkUpdate);
+$("install-update").addEventListener("click", installUpdate);
 (async () => {
   state = await call("state");
   renderSidebar();
-  checkUpdate(true);
+  checkUpdateOnStart();
 })();

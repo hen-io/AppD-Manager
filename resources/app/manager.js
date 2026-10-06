@@ -109,6 +109,26 @@ const handlers = {
     if (error) throw new Error(error);
   },
   checkUpdate: () => update.check(),
+  async askUpdate(info) {
+    if (info.blocked) {
+      await dialog.showMessageBox(win, {
+        type: "info",
+        buttons: ["OK"],
+        message: `AppD-Manager ${info.latest} is available`,
+        detail: info.blocked
+      });
+      return false;
+    }
+    const { response } = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: ["Update now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+      message: `AppD-Manager ${info.latest} is available`,
+      detail: `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`
+    });
+    return response === 0;
+  },
   async installUpdate() {
     const version = await update.install();
     setTimeout(() => {

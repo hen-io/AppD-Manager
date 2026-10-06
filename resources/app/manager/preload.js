@@ -12,6 +12,7 @@ for (const name of [
   "resetAppsDir",
   "openAppsDir",
   "checkUpdate",
+  "askUpdate",
   "installUpdate"
 ]) {
   api[name] = (...args) => ipcRenderer.invoke(name, ...args);

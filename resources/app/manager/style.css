@@ -133,9 +133,11 @@ span.icon {
   color: var(--muted);
 }
 aside footer {
-  display: grid;
-  gap: 6px;
-  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
 }
 .caption {
@@ -158,6 +160,32 @@ aside footer {
 .error {
   color: var(--danger);
   overflow-wrap: anywhere;
+}
+dialog {
+  width: min(520px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+dialog section {
+  margin-bottom: 22px;
+}
+dialog p {
+  margin: 0 0 8px;
+}
+dialog .actions span {
+  flex: 1;
+}
+h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
 }
 main {
   min-width: 0;
