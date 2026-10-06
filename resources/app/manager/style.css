@@ -210,6 +210,10 @@ label.check {
   gap: 8px;
   font-weight: 400;
 }
+.below-check {
+  display: block;
+  margin: -8px 0 14px 24px;
+}
 input:not([type=checkbox]),
 textarea {
   width: 100%;

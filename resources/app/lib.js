@@ -23,6 +23,7 @@ const DEFAULTS = {
   internalHosts: [],
   fixedTitle: false,
   backgroundThrottling: true,
+  pauseWhenUnfocused: false,
   jsHeapMb: 0,
   flags: []
 };

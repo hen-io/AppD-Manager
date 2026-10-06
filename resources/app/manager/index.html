@@ -77,6 +77,11 @@
           <input name="backgroundThrottling" type="checkbox">
           Slow the page down while its window is hidden (saves CPU)
         </label>
+        <label class="check">
+          <input name="pauseWhenUnfocused" type="checkbox">
+          Pause the page completely while another window has the focus
+        </label>
+        <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again.</span>
         <label>Hosts whose popups stay in the app
           <textarea name="internalHosts" rows="2" placeholder="accounts.google.com"></textarea>
           <span class="note">One per line. Other links that open a new window go to your browser.</span>

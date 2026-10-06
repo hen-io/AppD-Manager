@@ -136,6 +136,28 @@ function createWindow() {
   });
   if (state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
+  if (cfg.pauseWhenUnfocused) {
+    const wc = win.webContents;
+    const setFrozen = async (frozen) => {
+      try {
+        if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
+        await wc.debugger.sendCommand("Page.setWebLifecycleState", { state: frozen ? "frozen" : "active" });
+      } catch {
+      }
+    };
+    let timer = null;
+    win.on("blur", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!win.isDestroyed() && !BrowserWindow.getFocusedWindow() && !wc.isDevToolsOpened()) setFrozen(true);
+      }, 3e3);
+    });
+    win.on("focus", () => {
+      clearTimeout(timer);
+      setFrozen(false);
+    });
+    win.on("closed", () => clearTimeout(timer));
+  }
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
     try {
