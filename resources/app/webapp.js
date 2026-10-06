@@ -17,11 +17,23 @@ app.setName(desktopId);
 process.env.CHROME_DESKTOP = `${desktopId}.desktop`;
 app.setDesktopName?.(`${desktopId}.desktop`);
 app.setPath("userData", lib.profileDir(id));
-for (const flag of cfg.flags) {
-  const m = /^--([^=]+)(?:=(.*))?$/.exec(flag);
+const HARDWARE_ACCELERATION = [
+  "--ignore-gpu-blocklist",
+  "--enable-gpu-rasterization",
+  "--enable-zero-copy",
+  "--enable-features=AcceleratedVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoEncoder,VaapiIgnoreDriverChecks"
+];
+const featureLists = { "enable-features": [], "disable-features": [] };
+for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...cfg.flags]) {
+  const m = /^--([^=]+)(?:=(.*))?$/.exec(flag.trim());
   if (!m) console.error(`appd: ignoring flag "${flag}"`);
+  else if (m[1] in featureLists) featureLists[m[1]].push(...(m[2] || "").split(","));
   else if (m[2] === void 0) app.commandLine.appendSwitch(m[1]);
   else app.commandLine.appendSwitch(m[1], m[2]);
+}
+for (const [name, values] of Object.entries(featureLists)) {
+  const list = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  if (list.length) app.commandLine.appendSwitch(name, list.join(","));
 }
 if (cfg.jsHeapMb > 0) {
   app.commandLine.appendSwitch("js-flags", `--max-old-space-size=${cfg.jsHeapMb}`);
@@ -120,7 +132,6 @@ app.on("web-contents-created", (_event, wc) => {
     if (input.type === "keyDown" && shortcut(wc, input)) event.preventDefault();
   });
   wc.on("context-menu", (_e, params) => contextMenu(wc, params));
-  wc.on("did-navigate", () => applyCpuLimit(wc));
 });
 function readState() {
   try {
@@ -137,44 +148,65 @@ function pagePids() {
   }
   return [...pids].filter((pid) => pid > 0);
 }
+function signalAll(pids, signal) {
+  for (const pid of pids) {
+    try {
+      process.kill(pid, signal);
+    } catch {
+    }
+  }
+}
 function pausePage() {
   if (stoppedPids.length) return;
+  stopLimiter();
   stoppedPids = pagePids();
-  for (const pid of stoppedPids) {
-    try {
-      process.kill(pid, "SIGSTOP");
-    } catch {
-    }
-  }
+  signalAll(stoppedPids, "SIGSTOP");
 }
 function resumePage() {
-  for (const pid of stoppedPids) {
-    try {
-      process.kill(pid, "SIGCONT");
-    } catch {
-    }
-  }
+  signalAll(stoppedPids, "SIGCONT");
   stoppedPids = [];
+  runLimiter();
 }
-app.on("before-quit", resumePage);
-process.on("exit", resumePage);
+const LIMIT_PERIOD_MS = 100;
 const percent = (value) => value > 0 && value < 100 ? value : 100;
 const alwaysPercent = percent(cfg.cpuPercent);
 const awayPercent = Math.min(alwaysPercent, percent(cfg.unfocusedCpuPercent));
 let cpuPercentNow = alwaysPercent;
-async function applyCpuLimit(wc) {
-  try {
-    if (wc.isDestroyed() || wc.isDevToolsOpened()) return;
-    if (cpuPercentNow === 100 && !wc.debugger.isAttached()) return;
-    if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
-    await wc.debugger.sendCommand("Emulation.setCPUThrottlingRate", { rate: 100 / cpuPercentNow });
-  } catch {
-  }
+let limiterTimer = null;
+let limitedPids = [];
+let quitting = false;
+function stopLimiter() {
+  clearTimeout(limiterTimer);
+  limiterTimer = null;
+  signalAll(limitedPids, "SIGCONT");
+  limitedPids = [];
+}
+function runLimiter() {
+  stopLimiter();
+  if (quitting || cpuPercentNow >= 100 || stoppedPids.length) return;
+  const runMs = Math.max(1, LIMIT_PERIOD_MS * cpuPercentNow / 100);
+  const slice = () => {
+    signalAll(limitedPids, "SIGCONT");
+    limitedPids = pagePids();
+    limiterTimer = setTimeout(() => {
+      signalAll(limitedPids, "SIGSTOP");
+      limiterTimer = setTimeout(slice, LIMIT_PERIOD_MS - runMs);
+    }, runMs);
+  };
+  slice();
 }
 function setCpuPercent(value) {
   cpuPercentNow = value;
-  for (const window of BrowserWindow.getAllWindows()) applyCpuLimit(window.webContents);
+  runLimiter();
 }
+function releasePage() {
+  quitting = true;
+  stopLimiter();
+  signalAll(stoppedPids, "SIGCONT");
+  stoppedPids = [];
+}
+app.on("before-quit", releasePage);
+process.on("exit", releasePage);
 function watchFocus(window) {
   const wc = window.webContents;
   const GRACE_MS = 3e3;
@@ -341,6 +373,7 @@ function createWindow() {
     });
   }
   win.loadURL(cfg.url);
+  runLimiter();
 }
 if (!app.requestSingleInstanceLock()) {
   app.quit();

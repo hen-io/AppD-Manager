@@ -278,7 +278,16 @@ async function checkUpdateOnStart() {
   $("settings").showModal();
   installUpdate();
 }
+function addFlagPreset() {
+  const preset = $("flag-presets").value;
+  $("flag-presets").value = "";
+  if (!preset) return;
+  const current = lines(form.elements.flags.value);
+  if (!current.includes(preset)) form.elements.flags.value = [...current, preset].join("\n");
+  updateSaveButton();
+}
 form.addEventListener("submit", save);
+$("flag-presets").addEventListener("change", addFlagPreset);
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));

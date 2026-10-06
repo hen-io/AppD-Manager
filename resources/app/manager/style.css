@@ -253,6 +253,14 @@ aside footer {
   display: grid;
   min-width: 0;
 }
+#version {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+#author {
+  font-style: italic;
+}
 button.link {
   padding: 0;
   border: 0;
@@ -354,6 +362,27 @@ label.check {
   align-items: center;
   gap: 8px;
   font-weight: 400;
+}
+.size-row {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+}
+.size-row label {
+  margin-bottom: 8px;
+}
+.size-row label:not(.check) {
+  width: 110px;
+  flex: none;
+}
+.size-row label.check {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding-bottom: 8px;
+}
+.size-note {
+  display: block;
+  margin-bottom: 14px;
 }
 label.check input[type=number] {
   width: 5em;

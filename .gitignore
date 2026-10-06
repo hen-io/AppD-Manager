@@ -6,5 +6,8 @@
 !/resources/
 /resources/*
 !/resources/app/
+!/rpm/
+!/appd-manager.repo
+!/appd-manager.list
 !/banner.png
 !/README.md

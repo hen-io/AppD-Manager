@@ -73,19 +73,19 @@
 
         <section class="card">
           <h3>Window</h3>
-          <div class="grid">
+          <div class="size-row">
             <label>Width
               <input name="width" type="number" min="200" step="1">
             </label>
             <label>Height
               <input name="height" type="number" min="200" step="1">
             </label>
+            <label class="check">
+              <input name="startMaximized" type="checkbox">
+              Always open maximized
+            </label>
           </div>
-          <label class="check">
-            <input name="startMaximized" type="checkbox">
-            Always open maximized
-          </label>
-          <span class="note below-check">Otherwise the window opens the way you left it last time.</span>
+          <span class="note size-note">The size of the first window. Later the window opens the way you left it, unless it always opens maximized.</span>
           <label class="check">
             <input name="fixedTitle" type="checkbox">
             Always show the app name as window title
@@ -113,9 +113,14 @@
 
         <section class="card">
           <h3>Performance</h3>
+          <label class="check">
+            <input name="hardwareAcceleration" type="checkbox">
+            Hardware acceleration
+          </label>
+          <span class="note below-check">Uses the graphics card for drawing and video wherever possible. Switch it off if the app shows glitches or an empty window.</span>
           <label>CPU limit, always (%)
             <input name="cpuPercent" type="number" min="1" max="100" step="1">
-            <span class="note">The page's scripts run at about this share of full speed, also while you are using the app, which then feels slower. 100 is no limit.</span>
+            <span class="note">The page gets to run for only this share of the time, also while you are using the app, which then feels slower. 100 is no limit.</span>
           </label>
           <label>JavaScript memory limit (MB)
             <input name="jsHeapMb" type="number" min="0" step="1">
@@ -135,12 +140,13 @@
           </label>
           <label class="check">
             <input name="pauseWhenUnfocused" type="checkbox">
-            Pause the page completely when its window has been without focus for
+            Pause the page after
             <input id="pause-amount" type="number" min="1" step="1" aria-label="Pause after">
             <select id="pause-unit" aria-label="Unit">
               <option value="1">seconds</option>
               <option value="60">minutes</option>
             </select>
+            without focus
           </label>
           <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the CPU limit applies.</span>
           <label>Reload when you come back after more than this many minutes
@@ -155,8 +161,26 @@
             <input name="userAgent" placeholder="Default: same as Chrome">
           </label>
           <label>Extra Chromium switches
-            <textarea name="flags" rows="2" placeholder="--enable-gpu-rasterization"></textarea>
-            <span class="note">One per line.</span>
+            <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>
+            <span class="note">One per line. Changes apply the next time the app starts.</span>
+            <select id="flag-presets" aria-label="Add a common switch">
+              <option value="">Add a common switch…</option>
+              <option value="--enable-features=WebContentsForceDark">Dark mode for sites that have none</option>
+              <option value="--force-device-scale-factor=1.25">Scale everything to 125% (edit the number)</option>
+              <option value="--autoplay-policy=no-user-gesture-required">Let sound and video start by themselves</option>
+              <option value="--enable-features=TouchpadOverscrollHistoryNavigation">Two-finger swipe for back and forward</option>
+              <option value="--disable-smooth-scrolling">No smooth scrolling</option>
+              <option value="--enable-wayland-ime">Input methods (IME) on Wayland</option>
+              <option value="--lang=en-US">Language of the app and of sites (edit the code)</option>
+              <option value="--proxy-server=socks5://127.0.0.1:1080">Go through a proxy (edit the address)</option>
+              <option value="--disk-cache-size=104857600">Limit the disk cache to 100 MB</option>
+              <option value="--disable-background-timer-throttling">Keep timers at full speed in the background</option>
+              <option value="--disable-renderer-backgrounding">Keep full priority in the background</option>
+              <option value="--num-raster-threads=4">Four threads for drawing</option>
+              <option value="--enable-unsafe-webgpu">WebGPU</option>
+              <option value="--enable-features=Vulkan">Draw with Vulkan (experimental)</option>
+              <option value="--disable-gpu">No use of the graphics card at all (troubleshooting)</option>
+            </select>
           </label>
         </details>
       </div>

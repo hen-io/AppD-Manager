@@ -11,6 +11,15 @@ const rawUrl = (tag, file) => `https://raw.githubusercontent.com/${REPO}/${tag}/
 const tarballUrl = (tag) => `https://codeload.github.com/${REPO}/tar.gz/refs/tags/${tag}`;
 const installDir = path.dirname(lib.launcher);
 const isBuild = path.join(installDir, "resources", "app") === __dirname;
+function writable() {
+  try {
+    fs.accessSync(installDir, fs.constants.W_OK);
+    fs.accessSync(path.dirname(__dirname), fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 async function download(url) {
   const res = await net.fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${url}`);
@@ -40,6 +49,8 @@ async function check() {
   let blocked = "";
   if (available && !isBuild) {
     blocked = "This copy runs from the source folder and cannot update itself.";
+  } else if (available && !writable()) {
+    blocked = `Version ${latest} is available. This copy was installed by the system's package manager: update it there (sudo dnf upgrade appd-manager, or sudo apt upgrade).`;
   } else if (available) {
     const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
     if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {

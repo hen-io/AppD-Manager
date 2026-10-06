@@ -32,6 +32,7 @@ const DEFAULTS = {
   cpuPercent: 100,
   unfocusedCpuPercent: 100,
   reloadAfterIdleMinutes: 0,
+  hardwareAcceleration: true,
   jsHeapMb: 0,
   flags: []
 };
