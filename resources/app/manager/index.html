@@ -42,15 +42,15 @@
       </div>
     </section>
 
-    <form id="form" hidden>
+    <form id="form" novalidate hidden>
       <div class="page">
         <header class="title">
           <span id="icon-preview"></span>
           <h1 id="form-title"></h1>
         </header>
 
-        <section class="card">
-          <h3>General</h3>
+        <details class="card" open>
+          <summary>General</summary>
           <label>Name
             <input name="name" required placeholder="App name...">
           </label>
@@ -69,10 +69,10 @@
             <span id="icon-choices" class="row" hidden></span>
             <span class="note">The site's own icon, an image file (png, svg), or the name of a system icon such as <code>mail-client</code>.</span>
           </label>
-        </section>
+        </details>
 
-        <section class="card">
-          <h3>Window</h3>
+        <details class="card" open>
+          <summary>Window</summary>
           <div class="size-row">
             <label>Width
               <input name="width" type="number" min="200" step="1">
@@ -86,14 +86,36 @@
             </label>
           </div>
           <span class="note size-note">The size of the first window. Later the window opens the way you left it, unless it always opens maximized.</span>
+          <label>Sites that have a light and a dark look start in
+            <select name="colorScheme">
+              <option value="system">The one your desktop uses</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <span class="note">Only for sites that follow this preference. For sites without a dark look of their own, add the Dark Reader extension.</span>
+          </label>
+          <label>Menu button in the window
+            <select name="actionButton">
+              <option value="off">Not shown</option>
+              <option value="top-left">Top left</option>
+              <option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+            </select>
+            <span class="note">A small round button that is always there and opens the app's menu: reload, hard reload, empty cache, back and forward, copy the address, zoom, full screen, developer tools.</span>
+          </label>
+          <label>Keys that open the app's menu
+            <input name="menuShortcut" placeholder="None">
+            <span class="note">The same menu from the keyboard. Written like <code>Ctrl+X</code> or <code>Ctrl+Shift+M</code>; empty for none. Ctrl+X no longer cuts text in the app while it is used for this.</span>
+          </label>
           <label class="check">
             <input name="fixedTitle" type="checkbox">
             Always show the app name as window title
           </label>
-        </section>
+        </details>
 
-        <section class="card">
-          <h3>Links</h3>
+        <details class="card" open>
+          <summary>Links</summary>
           <label>Links that open a new window or tab
             <select name="openLinks">
               <option value="browser">Open in the default browser</option>
@@ -109,35 +131,60 @@
             <input name="homeButton" type="checkbox">
             Show a button back to the app while it is on another site
           </label>
-        </section>
+        </details>
 
-        <section class="card">
-          <h3>Performance</h3>
+        <details class="card" open>
+          <summary>Extensions</summary>
+          <ul id="extension-list"></ul>
+          <p id="no-extensions" class="note">None added.</p>
+          <select id="extension-add" aria-label="Add an extension">
+            <option value="">Add an extension…</option>
+          </select>
+          <div id="dark-settings" class="size-row" hidden>
+            <label>Dark Reader brightness (%)
+              <input name="darkBrightness" type="number" min="30" max="150" step="5">
+            </label>
+            <label>Contrast (%)
+              <input name="darkContrast" type="number" min="30" max="150" step="5">
+            </label>
+            <label>Sepia (%)
+              <input name="darkSepia" type="number" min="0" max="100" step="5">
+            </label>
+          </div>
+        </details>
+
+        <details class="card" open>
+          <summary>Performance</summary>
           <label class="check">
             <input name="hardwareAcceleration" type="checkbox">
             Hardware acceleration
           </label>
           <span class="note below-check">Uses the graphics card for drawing and video wherever possible. Switch it off if the app shows glitches or an empty window.</span>
           <label>CPU limit, always (%)
-            <input name="cpuPercent" type="number" min="1" max="100" step="1">
+            <input name="cpuPercent" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
             <span class="note">The page gets to run for only this share of the time, also while you are using the app, which then feels slower. 100 is no limit.</span>
           </label>
           <label>JavaScript memory limit (MB)
             <input name="jsHeapMb" type="number" min="0" step="1">
             <span class="note">0 uses the default. Raise it for very heavy apps.</span>
           </label>
-        </section>
+        </details>
 
-        <section class="card">
-          <h3>While you are not using the app</h3>
-          <label>CPU limit while another window has the focus (%)
-            <input name="unfocusedCpuPercent" type="number" min="1" max="100" step="1">
-            <span class="note">Like the limit above, but only while the app is not the focused window; the lower of the two applies then. 100 is no extra limit. The app stays alive, just slower.</span>
-          </label>
+        <details class="card" open>
+          <summary>Slow down when not in use</summary>
           <label class="check">
             <input name="backgroundThrottling" type="checkbox">
-            Slow the page down while its window is hidden (saves CPU)
+            Slow the page down while its window is hidden or not focused (saves CPU)
           </label>
+          <span class="note below-check">Not focused: about 10% of full speed, or less if the limit below says so. Not while the app is playing sound.</span>
+          <label>CPU limit while another window has the focus (%)
+            <input name="unfocusedCpuPercent" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
+            <span class="note">Like the limit under Performance, but only while the app is not the focused window; the lower of the two applies then. 100 is no extra limit. The app stays alive, just slower.</span>
+          </label>
+        </details>
+
+        <details class="card" open>
+          <summary>Pause when not in use</summary>
           <label class="check">
             <input name="pauseWhenUnfocused" type="checkbox">
             Pause the page after
@@ -148,15 +195,15 @@
             </select>
             without focus
           </label>
-          <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the CPU limit applies.</span>
+          <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the slow-down above applies.</span>
           <label>Reload when you come back after more than this many minutes
             <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
             <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
           </label>
-        </section>
+        </details>
 
         <details class="card">
-          <summary>Technical</summary>
+          <summary>Advanced</summary>
           <label>User agent
             <input name="userAgent" placeholder="Default: same as Chrome">
           </label>
@@ -200,7 +247,7 @@
     <section class="card">
       <h3>Apps folder</h3>
       <p id="apps-dir" class="path"></p>
-      <p class="note">Each app has its own folder in here. Changing the location does not move existing apps.</p>
+      <p class="note">Each app has its own folder in here. Changing the location moves your apps there, with their settings and logins. Close running apps first: they stay behind.</p>
       <div class="row">
         <button id="open-dir" type="button">Open folder</button>
         <button id="change-dir" type="button">Change…</button>

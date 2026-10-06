@@ -6,6 +6,7 @@ let state = { apps: [], defaults: {} };
 let selected = null;
 let update = null;
 let running = /* @__PURE__ */ new Set();
+let extensions = [];
 let loadedForm = "";
 async function call(method, ...args) {
   const result = await window.appd[method](...args);
@@ -70,6 +71,51 @@ function renderSidebar() {
   $("change-dir").disabled = state.appsDirFixed;
   $("default-dir").disabled = state.appsDirFixed;
 }
+function tuneCpuStep(el) {
+  let value = Number(el.value);
+  if (Number(el.dataset.last) === 1 && value === 0.5) value = 0.9;
+  if (value && value !== Number(el.value)) el.value = value;
+  const fine = !value || value < 1;
+  el.step = fine ? "0.1" : "0.5";
+  el.min = fine ? "0.1" : "0.5";
+  el.dataset.last = value;
+}
+function renderExtensions() {
+  const rows = extensions.map((name) => {
+    const info = state.extensions[name] || { name, about: "" };
+    const title = document.createElement("strong");
+    title.textContent = info.name;
+    const about = document.createElement("span");
+    about.className = "note";
+    about.textContent = info.about;
+    const text = document.createElement("div");
+    text.append(title, about);
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.addEventListener("click", () => {
+      extensions = extensions.filter((other) => other !== name);
+      renderExtensions();
+      updateSaveButton();
+    });
+    const row = document.createElement("li");
+    row.append(text, removeButton);
+    return row;
+  });
+  $("extension-list").replaceChildren(...rows);
+  $("no-extensions").hidden = Boolean(rows.length);
+  const choices = Object.entries(state.extensions || {}).filter(([name]) => !extensions.includes(name)).map(([name, info]) => new Option(info.name, name));
+  $("extension-add").replaceChildren(new Option("Add an extension…", ""), ...choices);
+  $("extension-add").hidden = !choices.length;
+  $("dark-settings").hidden = !extensions.includes("darkreader");
+}
+function addExtension() {
+  const name = $("extension-add").value;
+  if (!name || extensions.includes(name)) return;
+  extensions = [...extensions, name];
+  renderExtensions();
+  updateSaveButton();
+}
 function fillForm(cfg) {
   for (const el of form.elements) {
     if (!el.name) continue;
@@ -77,6 +123,9 @@ function fillForm(cfg) {
     if (el.type === "checkbox") el.checked = value;
     else el.value = Array.isArray(value) ? value.join("\n") : value;
   }
+  for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
+  extensions = [...cfg.extensions];
+  renderExtensions();
   const seconds = cfg.pauseAfterSeconds;
   const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
   $("pause-unit").value = String(unit);
@@ -97,6 +146,7 @@ function readForm() {
     else cfg[el.name] = el.value.trim();
   }
   cfg.url = normalizeUrl(cfg.url);
+  cfg.extensions = [...extensions];
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
@@ -125,8 +175,16 @@ async function launchOrClose() {
   setTimeout(refreshRunning, 700);
   setTimeout(refreshRunning, 2500);
 }
+let unsaved = false;
+function reportUnsaved(value) {
+  if (value === unsaved) return;
+  unsaved = value;
+  call("setUnsaved", value).catch(() => {
+  });
+}
 function updateSaveButton() {
   $("save").disabled = JSON.stringify(readForm()) === loadedForm;
+  reportUnsaved(!$("save").disabled);
 }
 function select(id) {
   selected = id;
@@ -136,6 +194,7 @@ function select(id) {
   $("welcome").hidden = id !== null;
   $("broken").hidden = !app || Boolean(app.cfg);
   form.hidden = !editable;
+  if (!editable) reportUnsaved(false);
   $("icon-choices").hidden = true;
   setStatus("");
   if (editable) {
@@ -155,18 +214,24 @@ function select(id) {
   }
   renderList();
 }
-async function save(event) {
-  event.preventDefault();
+async function saveForm() {
   try {
     const result = await call("save", selected === NEW ? null : selected, readForm());
     state = result.state;
     renderSidebar();
     select(result.id);
     setStatus("Saved. The menu entry is up to date.");
+    return true;
   } catch (e) {
     setStatus(e.message, true);
+    return false;
   }
 }
+function save(event) {
+  event.preventDefault();
+  saveForm();
+}
+window.saveBeforeClose = () => saveForm();
 async function remove() {
   try {
     const result = await call("remove", selected);
@@ -233,8 +298,11 @@ async function folderAction(method) {
     state = next;
     renderSidebar();
     select(null);
+    $("folder-status").textContent = next.message || "";
+    $("folder-status").classList.toggle("error", Boolean(next.problem));
   } catch (e) {
     $("folder-status").textContent = e.message;
+    $("folder-status").classList.add("error");
   }
 }
 function showUpdate() {
@@ -286,8 +354,10 @@ function addFlagPreset() {
   if (!current.includes(preset)) form.elements.flags.value = [...current, preset].join("\n");
   updateSaveButton();
 }
+for (const el of form.querySelectorAll(".cpu-limit")) el.addEventListener("input", () => tuneCpuStep(el));
 form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
+$("extension-add").addEventListener("change", addExtension);
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));

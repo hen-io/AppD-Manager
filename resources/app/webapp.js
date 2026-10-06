@@ -1,8 +1,9 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
+const extras = require("./extras");
 const id = process.env.APPD_ID;
 let cfg;
 try {
@@ -55,12 +56,77 @@ function isInternal(url) {
 function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 }
+async function runAction(action, wc) {
+  if (!wc || wc.isDestroyed()) return;
+  if (action === "clear-cache") {
+    const ses = wc.session || session.defaultSession;
+    await ses.clearCache().catch(() => {
+    });
+    await ses.clearCodeCaches({}).catch(() => {
+    });
+    await ses.clearStorageData({ storages: ["cachestorage", "shadercache", "serviceworkers"] }).catch(() => {
+    });
+  }
+  if (action === "clear-cache" || action === "hard-reload") wc.reloadIgnoringCache();
+}
+function actionIn(argv) {
+  const arg = argv.find((value) => value.startsWith("--appd-action="));
+  const action = arg ? arg.slice("--appd-action=".length) : "";
+  return action in lib.APP_ACTIONS ? action : "";
+}
+function parseShortcut(text) {
+  const parts = String(text || "").split("+").map((part) => part.trim().toLowerCase()).filter(Boolean);
+  const key = parts.pop();
+  if (!key) return null;
+  return { control: parts.includes("ctrl") || parts.includes("control"), shift: parts.includes("shift"), alt: parts.includes("alt"), key };
+}
+const menuShortcut = parseShortcut(cfg.menuShortcut);
+function showActionMenu(wc) {
+  if (wc.isDestroyed()) return;
+  const window = BrowserWindow.fromWebContents(wc);
+  const history = wc.navigationHistory;
+  const sep = { type: "separator" };
+  const zoom = (step) => wc.setZoomLevel(step === 0 ? 0 : wc.getZoomLevel() + step);
+  Menu.buildFromTemplate([
+    { label: "Reload", accelerator: "F5", click: () => wc.reload() },
+    ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
+    sep,
+    { label: `Go to ${cfg.name}`, accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
+    { label: "Back", accelerator: "Alt+Left", enabled: history.canGoBack(), click: () => history.goBack() },
+    { label: "Forward", accelerator: "Alt+Right", enabled: history.canGoForward(), click: () => history.goForward() },
+    sep,
+    { label: "Copy page address", click: () => clipboard.writeText(wc.getURL()) },
+    { label: "Open page in browser", click: () => openExternal(wc.getURL()) },
+    sep,
+    { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoom(0.5) },
+    { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoom(-0.5) },
+    { label: "Actual size", accelerator: "Ctrl+0", click: () => zoom(0) },
+    {
+      label: "Full screen",
+      accelerator: "F11",
+      type: "checkbox",
+      checked: Boolean(window?.isFullScreen()),
+      click: () => window?.setFullScreen(!window.isFullScreen())
+    },
+    sep,
+    { label: "Developer tools", accelerator: "F12", click: () => wc.toggleDevTools() }
+  ]).popup({ window: window ?? void 0 });
+}
+ipcMain.on("appd-action-button", (event) => {
+  event.returnValue = cfg.actionButton;
+});
+ipcMain.on("appd-action-menu", (event) => showActionMenu(event.sender));
 function shortcut(wc, input) {
   const key = input.key.toLowerCase();
+  if (menuShortcut && key === menuShortcut.key && input.control === menuShortcut.control && input.shift === menuShortcut.shift && input.alt === menuShortcut.alt) {
+    showActionMenu(wc);
+    return true;
+  }
   const ctrl = input.control && !input.alt;
   const history = wc.navigationHistory;
   if (key === "f5" || ctrl && !input.shift && key === "r") wc.reload();
   else if (ctrl && input.shift && key === "r") wc.reloadIgnoringCache();
+  else if (ctrl && input.shift && key === "delete") runAction("clear-cache", wc);
   else if (key === "f12" || ctrl && input.shift && key === "i") wc.toggleDevTools();
   else if (key === "f11") {
     const w = BrowserWindow.fromWebContents(wc);
@@ -110,6 +176,7 @@ function contextMenu(wc, p) {
     { label: `Go to ${cfg.name}`, click: () => wc.loadURL(cfg.url) },
     { label: "Back", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
     { label: "Reload", click: () => wc.reload() },
+    ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     { label: "Inspect", click: () => wc.inspectElement(p.x, p.y) }
   );
   Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
@@ -168,9 +235,12 @@ function resumePage() {
   runLimiter();
 }
 const LIMIT_PERIOD_MS = 100;
+const LIMIT_MIN_RUN_MS = 2;
 const percent = (value) => value > 0 && value < 100 ? value : 100;
 const alwaysPercent = percent(cfg.cpuPercent);
-const awayPercent = Math.min(alwaysPercent, percent(cfg.unfocusedCpuPercent));
+const setAwayPercent = Math.min(alwaysPercent, percent(cfg.unfocusedCpuPercent));
+const SLOW_PERCENT = 10;
+const awayPercent = cfg.backgroundThrottling ? Math.min(setAwayPercent, SLOW_PERCENT) : setAwayPercent;
 let cpuPercentNow = alwaysPercent;
 let limiterTimer = null;
 let limitedPids = [];
@@ -184,18 +254,20 @@ function stopLimiter() {
 function runLimiter() {
   stopLimiter();
   if (quitting || cpuPercentNow >= 100 || stoppedPids.length) return;
-  const runMs = Math.max(1, LIMIT_PERIOD_MS * cpuPercentNow / 100);
+  const runMs = Math.max(LIMIT_MIN_RUN_MS, LIMIT_PERIOD_MS * cpuPercentNow / 100);
+  const periodMs = Math.max(LIMIT_PERIOD_MS, runMs * 100 / cpuPercentNow);
   const slice = () => {
     signalAll(limitedPids, "SIGCONT");
     limitedPids = pagePids();
     limiterTimer = setTimeout(() => {
       signalAll(limitedPids, "SIGSTOP");
-      limiterTimer = setTimeout(slice, LIMIT_PERIOD_MS - runMs);
+      limiterTimer = setTimeout(slice, periodMs - runMs);
     }, runMs);
   };
   slice();
 }
 function setCpuPercent(value) {
+  if (value === cpuPercentNow) return;
   cpuPercentNow = value;
   runLimiter();
 }
@@ -215,20 +287,20 @@ function watchFocus(window) {
   let watchdog = null;
   let idleSince = 0;
   let throttled = false;
+  let soundCheck = null;
   let cover = null;
   let round = 0;
-  const makeCover = async () => {
-    const picture = await wc.capturePage();
-    if (picture.isEmpty()) return null;
-    const [width, height] = window.getContentSize();
-    const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  const COVER_STEP_MS = 1500;
+  const withinMoment = (promise) => Promise.race([
+    promise.catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), COVER_STEP_MS))
+  ]);
+  const showPicture = async (view, picture, width) => {
     const page = '<body style="margin:0;overflow:hidden"><img id="picture" style="display:block">';
     await view.webContents.loadURL(`data:text/html,${encodeURIComponent(page)}`);
     await view.webContents.executeJavaScript(
       `picture.style.width = '${width}px'; picture.src = ${JSON.stringify(picture.toDataURL())}; picture.decode()`
     );
-    view.setBounds({ x: 0, y: 0, width, height });
-    return view;
   };
   const dropCover = (view) => {
     try {
@@ -240,14 +312,19 @@ function watchFocus(window) {
   const pause = async () => {
     if (wc.isDevToolsOpened()) return;
     const mine = ++round;
-    const view = await makeCover().catch(() => null);
-    if (mine !== round || window.isDestroyed()) {
-      if (view) dropCover(view);
-      return;
-    }
-    if (view) {
+    const overtaken = () => mine !== round || window.isDestroyed();
+    stopLimiter();
+    const picture = await withinMoment(wc.capturePage());
+    if (overtaken()) return;
+    if (picture && !picture.isEmpty()) {
+      const [width, height] = window.getContentSize();
+      const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+      view.setBackgroundColor("#00000000");
+      view.setBounds({ x: 0, y: 0, width, height });
       cover = view;
       window.contentView.addChildView(view);
+      await withinMoment(showPicture(view, picture, width));
+      if (overtaken()) return;
     }
     pausePage();
     watchdog = setInterval(() => {
@@ -259,7 +336,9 @@ function watchFocus(window) {
     idleSince = Date.now() - GRACE_MS;
     if (awayPercent < alwaysPercent) {
       throttled = true;
-      setCpuPercent(awayPercent);
+      const apply = () => setCpuPercent(wc.isCurrentlyAudible() ? setAwayPercent : awayPercent);
+      apply();
+      soundCheck = setInterval(apply, 3e3);
     }
     if (cfg.pauseWhenUnfocused) {
       pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
@@ -272,6 +351,7 @@ function watchFocus(window) {
     watchdog = null;
     round++;
     resumePage();
+    clearInterval(soundCheck);
     if (throttled) {
       throttled = false;
       setCpuPercent(alwaysPercent);
@@ -311,13 +391,14 @@ function watchFocus(window) {
     clearTimeout(timer);
     clearTimeout(pauseTimer);
     clearInterval(watchdog);
+    clearInterval(soundCheck);
   });
 }
 const homeButtonScript = `(() => {
   if (document.getElementById('appd-home-button')) return;
   const host = document.createElement('div');
   host.id = 'appd-home-button';
-  host.style.cssText = 'all:initial;position:fixed;left:16px;bottom:16px;z-index:2147483647';
+  host.style.cssText = 'all:initial;position:fixed;left:${cfg.actionButton === "bottom-left" ? 58 : 16}px;bottom:${cfg.actionButton === "bottom-left" ? 12 : 16}px;z-index:2147483647';
   const button = document.createElement('button');
   button.textContent = ${JSON.stringify(`← ${cfg.name}`)};
   button.title = ${JSON.stringify(`Back to ${cfg.name} (Alt+Home)`)};
@@ -330,22 +411,32 @@ const homeButtonScript = `(() => {
   host.attachShadow({ mode: 'closed' }).append(button);
   document.documentElement.append(host);
 })()`;
-function createWindow() {
+const extension = (name) => cfg.extensions.includes(name);
+async function createWindow() {
   const state = readState();
+  nativeTheme.themeSource = cfg.colorScheme;
+  if (extension("adblock")) await extras.enableAdBlock(session.defaultSession).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
   win = new BrowserWindow({
     width: state.width || cfg.width,
     height: state.height || cfg.height,
     title: cfg.name,
     icon,
+    ...extension("darkreader") || cfg.colorScheme === "dark" ? { backgroundColor: "#181a1b" } : {},
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      backgroundThrottling: cfg.backgroundThrottling
+      backgroundThrottling: cfg.backgroundThrottling,
+      ...cfg.actionButton !== "off" ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
+  if (extension("adblock")) extras.filterPages(win.webContents);
+  if (extension("sponsorblock")) extras.enableSponsorBlock(win.webContents);
+  if (extension("darkreader")) {
+    extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
+  }
   if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || awayPercent < alwaysPercent) watchFocus(win);
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
@@ -378,9 +469,11 @@ function createWindow() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, argv) => {
     if (!win) return;
     resumePage();
+    const action = actionIn(argv);
+    if (action) runAction(action, win.webContents);
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();

@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Easily create standalone applications for webapps on your *nix system on wayland!",
   "author": {
     "name": "hen-io",
@@ -13,6 +13,8 @@
     "postinstall": "node node_modules/electron/install.js"
   },
   "dependencies": {
+    "@ghostery/adblocker": "^2.18.2",
+    "darkreader": "^4.9.133",
     "electron": "latest"
   },
   "devDependencies": {

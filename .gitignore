@@ -1,12 +1,12 @@
 /*
 !/.gitignore
+!/resources/
+/resources/*
 !/appd
 !/install.sh
 !/README*
-!/resources/
-/resources/*
-!/resources/app/
-!/rpm/
+!/resources/app
+!/rpm
 !/appd-manager.repo
 !/appd-manager.list
 !/banner.png

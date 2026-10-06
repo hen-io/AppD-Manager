@@ -23,7 +23,7 @@ flags=()
 case "${1:-manager}" in
   run)
     [ -n "${2:-}" ] || { echo "appd: run needs an app id" >&2; exit 2; }
-    APPD_ID="$2" exec "$electron" "${flags[@]}" "$app"
+    APPD_ID="$2" exec "$electron" "${flags[@]}" "$app" "${@:3}"
     ;;
   manager)
     unset APPD_ID

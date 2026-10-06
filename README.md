@@ -9,14 +9,14 @@
 
 ## Installation
 
-### Fedora (dnf)
+### DNF Package Manager - Fedora, Bazzite, RHEL
 
 ```sh
 sudo dnf config-manager addrepo --from-repofile=https://raw.githubusercontent.com/hen-io/AppD-Manager/HEAD/appd-manager.repo
 sudo dnf install appd-manager
 ```
 
-### Debian, Ubuntu (apt)
+### Apt Package manager - Debian, Ubuntu
 
 ```sh
 sudo curl -fsSLo /etc/apt/sources.list.d/appd-manager.list https://raw.githubusercontent.com/hen-io/AppD-Manager/HEAD/appd-manager.list

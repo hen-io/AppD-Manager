@@ -13,6 +13,7 @@ app.setDesktopName?.(desktopFile);
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 let win;
+let unsaved = false;
 function author() {
   const value = require("./package.json").author || {};
   let name;
@@ -52,6 +53,7 @@ function state() {
   return {
     apps,
     defaults: lib.DEFAULTS,
+    extensions: lib.EXTENSIONS,
     appsDir: lib.appsDir(),
     appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
     version: app.getVersion(),
@@ -59,14 +61,21 @@ function state() {
     author: author()
   };
 }
-function changeAppsDir(dir) {
+async function changeAppsDir(dir) {
   if (process.env.APPD_APPS_DIR) throw new Error("The location is fixed by the APPD_APPS_DIR environment variable.");
+  const { moved, left } = await lib.moveApps(dir || lib.defaultAppsDir);
   lib.setAppsDir(dir);
   lib.sync();
-  return state();
+  const parts = [];
+  if (moved.length) parts.push(`Moved ${moved.length === 1 ? "1 app" : `${moved.length} apps`}.`);
+  if (left.length) parts.push(`Still in the old folder: ${left.join(", ")}.`);
+  return { ...state(), message: parts.join(" "), problem: left.length > 0 };
 }
 const handlers = {
   state,
+  setUnsaved(value) {
+    unsaved = Boolean(value);
+  },
   save(id, input) {
     const cfg = { ...lib.DEFAULTS, ...id ? lib.load(id) : {} };
     for (const key of Object.keys(lib.DEFAULTS)) {
@@ -193,6 +202,26 @@ function createWindow() {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (event) => event.preventDefault());
+  let closing = false;
+  win.on("close", async (event) => {
+    if (!unsaved || closing) return;
+    event.preventDefault();
+    const { response } = await dialog.showMessageBox(win, {
+      type: "question",
+      buttons: ["Save", "Discard", "Cancel"],
+      defaultId: 0,
+      cancelId: 2,
+      message: "Save the changes?",
+      detail: "The app you are editing has changes that are not saved."
+    });
+    if (response === 2) return;
+    if (response === 0) {
+      const saved = await win.webContents.executeJavaScript("saveBeforeClose()").catch(() => false);
+      if (!saved) return;
+    }
+    closing = true;
+    win.close();
+  });
   win.loadFile(path.join(__dirname, "manager", "index.html"));
 }
 if (!app.requestSingleInstanceLock()) {

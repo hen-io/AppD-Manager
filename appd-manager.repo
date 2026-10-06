@@ -1,0 +1,7 @@
+[appd-manager]
+name=AppD-Manager
+baseurl=https://raw.githubusercontent.com/hen-io/AppD-Manager/HEAD/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+metadata_expire=6h
