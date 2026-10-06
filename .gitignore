@@ -9,5 +9,6 @@
 !/rpm
 !/appd-manager.repo
 !/appd-manager.list
+!/appd-manager.pacman.conf
 !/banner.png
 !/README.md
