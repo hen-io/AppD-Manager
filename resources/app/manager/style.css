@@ -210,6 +210,14 @@ label.check {
   gap: 8px;
   font-weight: 400;
 }
+label.check input[type=number] {
+  width: 5em;
+  flex: none;
+}
+label.check select {
+  width: auto;
+  flex: none;
+}
 .below-check {
   display: block;
   margin: -8px 0 14px 24px;

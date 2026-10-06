@@ -68,6 +68,10 @@ function fillForm(cfg) {
     if (el.type === "checkbox") el.checked = value;
     else el.value = Array.isArray(value) ? value.join("\n") : value;
   }
+  const seconds = cfg.pauseAfterSeconds;
+  const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
+  $("pause-unit").value = String(unit);
+  $("pause-amount").value = seconds / unit;
 }
 function normalizeUrl(url) {
   url = url.trim();
@@ -84,6 +88,7 @@ function readForm() {
     else cfg[el.name] = el.value.trim();
   }
   cfg.url = normalizeUrl(cfg.url);
+  cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
 function select(id) {

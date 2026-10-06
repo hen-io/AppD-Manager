@@ -70,6 +70,11 @@
           </label>
         </div>
         <label class="check">
+          <input name="startMaximized" type="checkbox">
+          Always open maximized
+        </label>
+        <span class="note below-check">Otherwise the window opens the way you left it last time.</span>
+        <label class="check">
           <input name="fixedTitle" type="checkbox">
           Always show the app name as window title
         </label>
@@ -79,9 +84,18 @@
         </label>
         <label class="check">
           <input name="pauseWhenUnfocused" type="checkbox">
-          Pause the page completely while another window has the focus
+          Pause the page completely when its window has been without focus for
+          <input id="pause-amount" type="number" min="1" step="1" aria-label="Pause after">
+          <select id="pause-unit" aria-label="Unit">
+            <option value="1">seconds</option>
+            <option value="60">minutes</option>
+          </select>
         </label>
         <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen.</span>
+        <label>CPU limit while another window has the focus (%)
+          <input name="unfocusedCpuPercent" type="number" min="5" max="100" step="5">
+          <span class="note">The page's scripts run at about this share of full speed; 100 is no limit. The app stays alive, just slower. If the app is also set to pause, the limit applies until the pause starts.</span>
+        </label>
         <label>Reload when you come back after more than this many minutes
           <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
           <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>

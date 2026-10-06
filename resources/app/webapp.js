@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, shell, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -127,6 +127,24 @@ function readState() {
   }
 }
 let stoppedPids = [];
+const cpuLimited = cfg.unfocusedCpuPercent > 0 && cfg.unfocusedCpuPercent < 100;
+function pagePids() {
+  const pids = /* @__PURE__ */ new Set();
+  for (const window of BrowserWindow.getAllWindows()) {
+    for (const frame of window.webContents.mainFrame.framesInSubtree) pids.add(frame.osProcessId);
+  }
+  return [...pids].filter((pid) => pid > 0);
+}
+function pausePage() {
+  if (stoppedPids.length) return;
+  stoppedPids = pagePids();
+  for (const pid of stoppedPids) {
+    try {
+      process.kill(pid, "SIGSTOP");
+    } catch {
+    }
+  }
+}
 function resumePage() {
   for (const pid of stoppedPids) {
     try {
@@ -138,12 +156,13 @@ function resumePage() {
 }
 app.on("before-quit", resumePage);
 process.on("exit", resumePage);
-function pausePage() {
-  if (stoppedPids.length) return;
-  stoppedPids = app.getAppMetrics().filter((metric) => metric.type === "Tab").map((metric) => metric.pid);
-  for (const pid of stoppedPids) {
+async function setCpuRate(rate) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    const wc = window.webContents;
     try {
-      process.kill(pid, "SIGSTOP");
+      if (wc.isDevToolsOpened()) continue;
+      if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
+      await wc.debugger.sendCommand("Emulation.setCPUThrottlingRate", { rate });
     } catch {
     }
   }
@@ -152,37 +171,105 @@ function watchFocus(window) {
   const wc = window.webContents;
   const GRACE_MS = 3e3;
   let timer = null;
+  let pauseTimer = null;
   let watchdog = null;
   let idleSince = 0;
+  let throttled = false;
+  let cover = null;
+  let round = 0;
+  const makeCover = async () => {
+    const picture = await wc.capturePage();
+    if (picture.isEmpty()) return null;
+    const [width, height] = window.getContentSize();
+    const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    const page = '<body style="margin:0;overflow:hidden"><img id="picture" style="display:block">';
+    await view.webContents.loadURL(`data:text/html,${encodeURIComponent(page)}`);
+    await view.webContents.executeJavaScript(
+      `picture.style.width = '${width}px'; picture.src = ${JSON.stringify(picture.toDataURL())}; picture.decode()`
+    );
+    view.setBounds({ x: 0, y: 0, width, height });
+    return view;
+  };
+  const dropCover = (view) => {
+    try {
+      if (!window.isDestroyed()) window.contentView.removeChildView(view);
+      view.webContents.close();
+    } catch {
+    }
+  };
+  const pause = async () => {
+    if (wc.isDevToolsOpened()) return;
+    const mine = ++round;
+    const view = await makeCover().catch(() => null);
+    if (mine !== round || window.isDestroyed()) {
+      if (view) dropCover(view);
+      return;
+    }
+    if (view) {
+      cover = view;
+      window.contentView.addChildView(view);
+    }
+    pausePage();
+    watchdog = setInterval(() => {
+      if (window.isDestroyed()) clearInterval(watchdog);
+      else if (BrowserWindow.getFocusedWindow()) back();
+    }, 1e3);
+  };
+  const away = () => {
+    idleSince = Date.now() - GRACE_MS;
+    if (cpuLimited) {
+      throttled = true;
+      setCpuRate(Math.min(20, 100 / cfg.unfocusedCpuPercent));
+    }
+    if (cfg.pauseWhenUnfocused) {
+      pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
+    }
+  };
   const back = () => {
     clearTimeout(timer);
+    clearTimeout(pauseTimer);
     clearInterval(watchdog);
     watchdog = null;
+    round++;
     resumePage();
+    if (throttled) {
+      throttled = false;
+      setCpuRate(1);
+    }
     const idleMs = idleSince ? Date.now() - idleSince : 0;
     idleSince = 0;
-    if (cfg.reloadAfterIdleMinutes > 0 && idleMs >= cfg.reloadAfterIdleMinutes * 6e4 && !window.isDestroyed()) {
-      wc.reload();
+    const reloading = cfg.reloadAfterIdleMinutes > 0 && idleMs >= cfg.reloadAfterIdleMinutes * 6e4 && !window.isDestroyed();
+    if (cover) {
+      const view = cover;
+      cover = null;
+      let dropped = false;
+      const drop = () => {
+        if (dropped) return;
+        dropped = true;
+        dropCover(view);
+      };
+      if (reloading) wc.once("did-finish-load", drop);
+      setTimeout(drop, reloading ? 1e4 : 300);
     }
+    if (reloading) wc.reload();
   };
   window.on("blur", () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
-      if (window.isDestroyed() || BrowserWindow.getFocusedWindow()) return;
-      idleSince = Date.now() - GRACE_MS;
-      if (!cfg.pauseWhenUnfocused || wc.isDevToolsOpened()) return;
-      pausePage();
-      watchdog = setInterval(() => {
-        if (window.isDestroyed()) clearInterval(watchdog);
-        else if (BrowserWindow.getFocusedWindow()) back();
-      }, 1e3);
+      if (!window.isDestroyed() && !BrowserWindow.getFocusedWindow()) away();
     }, GRACE_MS);
   });
   window.on("focus", back);
   window.on("restore", back);
+  window.on("resize", () => {
+    if (!cover) return;
+    const [width, height] = window.getContentSize();
+    cover.setBounds({ x: 0, y: 0, width, height });
+  });
   window.on("close", resumePage);
   window.on("closed", () => {
     clearTimeout(timer);
+    clearTimeout(pauseTimer);
     clearInterval(watchdog);
   });
 }
@@ -200,9 +287,9 @@ function createWindow() {
       backgroundThrottling: cfg.backgroundThrottling
     }
   });
-  if (state.maximized) win.maximize();
+  if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
-  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0) watchFocus(win);
+  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || cpuLimited) watchFocus(win);
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
     try {

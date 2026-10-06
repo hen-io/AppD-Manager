@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Easily create standalone applications for webapps on your *nix system on wayland!",
   "private": true,
   "main": "main.js",
