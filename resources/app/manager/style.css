@@ -385,15 +385,24 @@ label.check {
 #extension-add {
   margin-bottom: 14px;
 }
-#sponsor-settings,
-#adblock-settings {
-  margin-bottom: 6px;
+.extension-settings {
+  margin-bottom: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
-#sponsor-settings h3,
-#adblock-settings h3 {
-  margin: 4px 0 10px;
-  padding: 0;
-  border: 0;
+.extension-settings > summary {
+  margin: 0 -14px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.extension-settings[open] > summary {
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.extension-settings > :last-child {
+  margin-bottom: 12px;
 }
 #release-notes {
   max-height: 180px;

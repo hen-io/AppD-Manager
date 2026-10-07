@@ -140,8 +140,8 @@
           <select id="extension-add" aria-label="Add an extension">
             <option value="">Add an extension…</option>
           </select>
-          <div id="adblock-settings" hidden>
-            <h3>Ad blocker</h3>
+          <details id="adblock-settings" class="extension-settings" hidden>
+            <summary>Ad blocker settings</summary>
             <label class="check">
               <input name="adBlockInPageAds" type="checkbox">
               Remove ads that sites serve themselves (YouTube's video ads)
@@ -155,9 +155,9 @@
               <textarea name="adBlockExceptions" rows="2" placeholder="example.com"></textarea>
               <span class="note">One per line. For a site that breaks with the blocker on.</span>
             </label>
-          </div>
-          <div id="sponsor-settings" hidden>
-            <h3>SponsorBlock</h3>
+          </details>
+          <details id="sponsor-settings" class="extension-settings" hidden>
+            <summary>SponsorBlock settings</summary>
             <div id="sponsor-categories"></div>
             <span class="note sponsor-note">What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.</span>
             <label class="check">
@@ -251,9 +251,11 @@
               </select>
               <span class="note">Every video starts in this quality; one that does not have it gets the next lower one it has. You can still change it in the player.</span>
             </label>
-          </div>
-          <div id="dark-settings" class="size-row" hidden>
-            <label>Dark Reader brightness (%)
+          </details>
+          <details id="dark-settings" class="extension-settings" hidden>
+            <summary>Dark Reader settings</summary>
+            <div class="size-row">
+            <label>Brightness (%)
               <input name="darkBrightness" type="number" min="30" max="150" step="5">
             </label>
             <label>Contrast (%)
@@ -262,7 +264,8 @@
             <label>Sepia (%)
               <input name="darkSepia" type="number" min="0" max="100" step="5">
             </label>
-          </div>
+            </div>
+          </details>
         </details>
 
         <details class="card" open>
@@ -323,6 +326,24 @@
           <summary>Advanced</summary>
           <label>User agent
             <input name="userAgent" placeholder="Default: same as Chrome">
+            <span class="note">What the app tells sites it is. Sites pick their phone, tablet or TV layout by it. Empty is Chrome on a desktop.</span>
+            <select id="agent-presets" aria-label="Use a common user agent">
+              <option value="">Use a common user agent…</option>
+              <option value="-">Default (Chrome on a desktop)</option>
+              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Mobile Safari/537.36">Mobile phone (Android, Chrome)</option>
+              <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1">Mobile phone (iPhone, Safari)</option>
+              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Tablet (Android, Chrome)</option>
+              <option value="Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1">Tablet (iPad, Safari)</option>
+              <option value="Mozilla/5.0 (Linux; Android 12; BRAVIA 4K VH2 Build/STT1.211026.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 CrKey/1.56.500000 DeviceType/AndroidTV">TV (Android TV / Google TV)</option>
+              <option value="Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} TV Safari/537.36">TV (Samsung, Tizen)</option>
+              <option value="Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 WebAppManager">TV (LG, webOS)</option>
+              <option value="Mozilla/5.0 (PlayStation; PlayStation 5/8.20) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15">Game console (PlayStation 5)</option>
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Desktop: Chrome on Windows</option>
+              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Desktop: Chrome on macOS</option>
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 Edg/{chrome}">Desktop: Edge on Windows</option>
+              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15">Desktop: Safari on macOS</option>
+              <option value="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0">Desktop: Firefox on Linux</option>
+            </select>
           </label>
           <label>Extra Chromium switches
             <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>

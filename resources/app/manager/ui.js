@@ -145,6 +145,8 @@ function addExtension() {
   if (!name || extensions.includes(name)) return;
   extensions = [...extensions, name];
   renderExtensions();
+  const settings = { adblock: "adblock-settings", sponsorblock: "sponsor-settings", darkreader: "dark-settings" }[name];
+  if (settings) $(settings).open = true;
   updateSaveButton();
 }
 function fillForm(cfg) {
@@ -156,6 +158,7 @@ function fillForm(cfg) {
   }
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
+  for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
   const seconds = cfg.pauseAfterSeconds;
@@ -390,6 +393,14 @@ async function checkUpdateOnStart() {
   $("settings").showModal();
   installUpdate();
 }
+function useAgentPreset() {
+  const preset = $("agent-presets").value;
+  $("agent-presets").value = "";
+  if (!preset) return;
+  const major = (/Chrome\/(\d+)/.exec(navigator.userAgent) || [])[1] || "140";
+  form.elements.userAgent.value = preset === "-" ? "" : preset.replaceAll("{chrome}", `${major}.0.0.0`);
+  updateSaveButton();
+}
 function addFlagPreset() {
   const preset = $("flag-presets").value;
   $("flag-presets").value = "";
@@ -401,6 +412,7 @@ function addFlagPreset() {
 for (const el of form.querySelectorAll(".cpu-limit")) el.addEventListener("input", () => tuneCpuStep(el));
 form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
+$("agent-presets").addEventListener("change", useAgentPreset);
 $("extension-add").addEventListener("change", addExtension);
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
