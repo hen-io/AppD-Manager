@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Easily create standalone applications for webapps on your *nix system on wayland!",
   "author": {
     "name": "hen-io",
