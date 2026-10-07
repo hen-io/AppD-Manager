@@ -24,6 +24,13 @@ sudo apt update
 sudo apt install appd-manager
 ```
 
+### Pacman Package Manager - Arch, CachyOS, EndeavourOS, Manjaro
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hen-io/AppD-Manager/HEAD/appd-manager.pacman.conf | sudo tee -a /etc/pacman.conf
+sudo pacman -Sy appd-manager
+```
+
 ### Any other distribution
 
 Installs for your user only, without root:

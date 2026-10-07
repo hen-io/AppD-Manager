@@ -54,7 +54,7 @@ function state() {
     apps,
     defaults: lib.DEFAULTS,
     extensions: lib.EXTENSIONS,
-    sponsorCategories: lib.SPONSOR_CATEGORIES,
+    sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
     appsDir: lib.appsDir(),
     appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
     version: app.getVersion(),

@@ -157,11 +157,84 @@
             </label>
           </div>
           <div id="sponsor-settings" hidden>
-            <h3>SponsorBlock skips</h3>
+            <h3>SponsorBlock</h3>
             <div id="sponsor-categories"></div>
+            <span class="note sponsor-note">What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.</span>
+            <label class="check">
+              <input name="sponsorBlockMarkers" type="checkbox">
+              Mark the segments on the seek bar
+            </label>
+            <label class="check">
+              <input name="sponsorBlockShowDuration" type="checkbox">
+              Show the video's length without the segments
+            </label>
             <label class="check">
               <input name="sponsorBlockNotes" type="checkbox">
-              Show a short note when something is skipped
+              Show a note, with a way back, when something was skipped
+            </label>
+            <label class="check">
+              <input name="sponsorBlockSummary" type="checkbox">
+              Show a note of what was found when a video opens
+            </label>
+            <label class="check">
+              <input name="sponsorBlockUpcomingNotice" type="checkbox">
+              Announce an automatic skip a few seconds ahead
+            </label>
+            <label class="check">
+              <input name="sponsorBlockSound" type="checkbox">
+              Play a short sound when something is skipped
+            </label>
+            <label class="check">
+              <input name="sponsorBlockMute" type="checkbox">
+              Also handle segments that are marked to be muted, not skipped
+            </label>
+            <label class="check">
+              <input name="sponsorBlockFullVideo" type="checkbox">
+              Label videos that as a whole are a sponsorship or self-promotion
+            </label>
+            <label class="check">
+              <input name="sponsorBlockAskOnFullVideo" type="checkbox">
+              In such a video, ask before skipping segments of that same kind
+            </label>
+            <label class="check">
+              <input name="sponsorBlockMusicAutoSkip" type="checkbox">
+              In music videos with non-music parts marked, skip without asking
+            </label>
+            <label class="check">
+              <input name="sponsorBlockMusicOnlyOnYoutubeMusic" type="checkbox">
+              Handle non-music parts on YouTube Music only
+            </label>
+            <label class="check">
+              <input name="sponsorBlockCountSkips" type="checkbox">
+              Tell the database which segments were skipped
+            </label>
+            <span class="note below-check">It counts how often a segment is skipped. Looking a video up never tells it which video you watch; this does.</span>
+            <div class="size-row sponsor-row-wide">
+              <label>Notes stay for (seconds)
+                <input name="sponsorBlockNoticeSeconds" type="number" min="1" max="60" step="1">
+              </label>
+              <label>Ignore segments shorter than (seconds)
+                <input name="sponsorBlockMinSeconds" type="number" min="0" step="0.5">
+              </label>
+            </div>
+            <div class="size-row sponsor-row-wide">
+              <label>Key: skip / unskip
+                <input name="sponsorBlockSkipKey" placeholder="none">
+              </label>
+              <label>Key: jump to highlight
+                <input name="sponsorBlockHighlightKey" placeholder="none">
+              </label>
+              <label>Key: close the box
+                <input name="sponsorBlockCloseKey" placeholder="none">
+              </label>
+            </div>
+            <span class="note size-note">Written like Enter, Backspace, K or Ctrl+Shift+K. The skip key acts on the box that is showing.</span>
+            <label>Channels where nothing is skipped
+              <textarea name="sponsorBlockChannels" rows="2" placeholder="@handle or channel name"></textarea>
+              <span class="note">One per line: a channel's name, @handle or id. Its segments are still marked.</span>
+            </label>
+            <label>Database server
+              <input name="sponsorBlockServer" placeholder="https://sponsor.ajay.app">
             </label>
           </div>
           <div id="dark-settings" class="size-row" hidden>

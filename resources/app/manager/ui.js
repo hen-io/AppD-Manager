@@ -111,19 +111,35 @@ function renderExtensions() {
   $("sponsor-settings").hidden = !extensions.includes("sponsorblock");
   $("adblock-settings").hidden = !extensions.includes("adblock");
 }
-function renderSponsorCategories(chosen) {
-  const boxes = Object.entries(state.sponsorCategories || {}).map(([name, text]) => {
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.dataset.category = name;
-    input.checked = chosen.includes(name);
-    const label = document.createElement("label");
-    label.className = "check";
-    label.append(input, text);
-    return label;
+const SPONSOR_ACTIONS = { off: "Off", show: "Show on the seek bar only", ask: "Ask before skipping", skip: "Skip automatically" };
+const SPONSOR_ACTIONS_FOR = {
+  poi_highlight: { ask: "Offer a jump to it", skip: "Jump to it at the start" },
+  exclusive_access: { show: "Show a label" }
+};
+function renderSponsorCategories(actions, colors) {
+  const rows = Object.entries(state.sponsorCategories || {}).map(([name, info]) => {
+    const text = document.createElement("span");
+    text.textContent = info.label;
+    const action = document.createElement("select");
+    action.dataset.category = name;
+    action.setAttribute("aria-label", info.label);
+    for (const choice of info.choices) action.add(new Option((SPONSOR_ACTIONS_FOR[name] || {})[choice] || SPONSOR_ACTIONS[choice], choice));
+    action.value = actions[name] || "off";
+    const color = document.createElement("input");
+    color.type = "color";
+    color.dataset.category = name;
+    color.title = "Colour on the seek bar";
+    color.value = colors[name] || info.color;
+    const row = document.createElement("div");
+    row.className = "sponsor-row";
+    row.append(text, action, color);
+    return row;
   });
-  $("sponsor-categories").replaceChildren(...boxes);
+  $("sponsor-categories").replaceChildren(...rows);
 }
+const sponsorChoices = (kind) => Object.fromEntries(
+  [...$("sponsor-categories").querySelectorAll(kind)].map((el) => [el.dataset.category, el.value])
+);
 function addExtension() {
   const name = $("extension-add").value;
   if (!name || extensions.includes(name)) return;
@@ -141,7 +157,7 @@ function fillForm(cfg) {
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
   renderExtensions();
-  renderSponsorCategories(cfg.sponsorBlockCategories);
+  renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
   const seconds = cfg.pauseAfterSeconds;
   const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
   $("pause-unit").value = String(unit);
@@ -163,7 +179,8 @@ function readForm() {
   }
   cfg.url = normalizeUrl(cfg.url);
   cfg.extensions = [...extensions];
-  cfg.sponsorBlockCategories = [...$("sponsor-categories").querySelectorAll("input")].filter((box) => box.checked).map((box) => box.dataset.category);
+  cfg.sponsorBlockActions = sponsorChoices("select");
+  cfg.sponsorBlockColors = sponsorChoices("input");
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }

@@ -466,7 +466,7 @@ async function createWindow() {
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
   if (extension("sponsorblock")) {
-    extras.enableSponsorBlock(win.webContents, { categories: cfg.sponsorBlockCategories, notes: cfg.sponsorBlockNotes });
+    extras.enableSponsorBlock(win.webContents, cfg);
   }
   if (extension("darkreader")) {
     extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });

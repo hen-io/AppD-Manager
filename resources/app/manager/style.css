@@ -395,8 +395,37 @@ label.check {
   padding: 0;
   border: 0;
 }
-#sponsor-categories label.check {
-  margin-bottom: 8px;
+.sponsor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.sponsor-row span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sponsor-row select {
+  width: 230px;
+  flex: none;
+}
+.sponsor-row input[type=color] {
+  width: 34px;
+  height: 28px;
+  flex: none;
+  padding: 2px;
+  cursor: pointer;
+}
+.sponsor-note {
+  display: block;
+  margin: 8px 0 14px;
+}
+.sponsor-row-wide label:not(.check) {
+  width: auto;
+  flex: 1;
 }
 #dark-settings label:not(.check) {
   width: auto;

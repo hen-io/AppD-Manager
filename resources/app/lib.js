@@ -26,7 +26,7 @@ const EXTENSIONS = {
   },
   sponsorblock: {
     name: "SponsorBlock",
-    about: 'Skips sponsor messages, self-promotion and "like and subscribe" reminders in YouTube videos.'
+    about: "Offers to skip, or skips, sponsor messages, intros and other parts of YouTube videos that viewers have marked."
   },
   darkreader: {
     name: "Dark Reader",
@@ -36,15 +36,21 @@ const EXTENSIONS = {
 const COLOR_SCHEMES = ["system", "light", "dark"];
 const ACTION_BUTTON = ["off", "top-left", "top-right", "bottom-left", "bottom-right"];
 const SPONSOR_CATEGORIES = {
-  sponsor: "Sponsor messages",
-  selfpromo: "Self-promotion (own products, channels, merchandise)",
-  interaction: "Reminders to like, subscribe or follow",
-  intro: "Intros and title sequences",
-  outro: "Endings and credits",
-  preview: "Recaps and previews",
-  music_offtopic: "Non-music parts of music videos",
-  filler: "Tangents and jokes"
+  sponsor: { label: "Sponsor messages", color: "#00d400" },
+  selfpromo: { label: "Unpaid or self-promotion", color: "#ffff00" },
+  interaction: { label: "Reminders to like, subscribe or follow", color: "#cc00ff" },
+  intro: { label: "Intros and title sequences", color: "#00ffff" },
+  outro: { label: "Endcards and credits", color: "#0202ed" },
+  preview: { label: "Recaps and previews", color: "#008fd6" },
+  hook: { label: "Hooks and greetings", color: "#395699" },
+  filler: { label: "Tangents and jokes", color: "#7300ff" },
+  music_offtopic: { label: "Non-music parts of music videos", color: "#ff9900" },
+  poi_highlight: { label: "Highlight (the point of the video)", color: "#ff1684" },
+  exclusive_access: { label: "Exclusive access (whole video)", color: "#008a5c" }
 };
+const SPONSOR_ACTIONS = ["off", "show", "ask", "skip"];
+const SPONSOR_CHOICES = { poi_highlight: ["off", "ask", "skip"], exclusive_access: ["off", "show"] };
+const sponsorChoices = (category) => SPONSOR_CHOICES[category] || SPONSOR_ACTIONS;
 const OPEN_LINKS = ["browser", "window", "same"];
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DEFAULTS = {
@@ -63,8 +69,39 @@ const DEFAULTS = {
   adBlockHideLeftovers: true,
   adBlockInPageAds: true,
   adBlockExceptions: [],
-  sponsorBlockCategories: ["sponsor", "selfpromo", "interaction"],
+  sponsorBlockActions: {
+    sponsor: "ask",
+    selfpromo: "ask",
+    interaction: "ask",
+    intro: "ask",
+    outro: "ask",
+    preview: "ask",
+    hook: "off",
+    filler: "off",
+    music_offtopic: "off",
+    poi_highlight: "ask",
+    exclusive_access: "show"
+  },
+  sponsorBlockColors: Object.fromEntries(Object.entries(SPONSOR_CATEGORIES).map(([name, info]) => [name, info.color])),
+  sponsorBlockMarkers: true,
   sponsorBlockNotes: true,
+  sponsorBlockSummary: true,
+  sponsorBlockUpcomingNotice: false,
+  sponsorBlockNoticeSeconds: 4,
+  sponsorBlockMinSeconds: 0,
+  sponsorBlockMute: true,
+  sponsorBlockFullVideo: true,
+  sponsorBlockAskOnFullVideo: false,
+  sponsorBlockSound: false,
+  sponsorBlockShowDuration: true,
+  sponsorBlockMusicAutoSkip: false,
+  sponsorBlockMusicOnlyOnYoutubeMusic: false,
+  sponsorBlockCountSkips: false,
+  sponsorBlockSkipKey: "Enter",
+  sponsorBlockHighlightKey: "Ctrl+Enter",
+  sponsorBlockCloseKey: "Backspace",
+  sponsorBlockChannels: [],
+  sponsorBlockServer: "https://sponsor.ajay.app",
   darkBrightness: 100,
   darkContrast: 100,
   darkSepia: 0,
@@ -152,8 +189,18 @@ function validate(cfg) {
   if (!URL.canParse(cfg.url)) throw new Error(`invalid url "${cfg.url}"`);
   const unknown = cfg.extensions.find((name) => !(name in EXTENSIONS));
   if (unknown !== void 0) throw new Error(`unknown extension "${unknown}" (known: ${Object.keys(EXTENSIONS).join(", ")})`);
-  const oddCategory = cfg.sponsorBlockCategories.find((name) => !(name in SPONSOR_CATEGORIES));
-  if (oddCategory !== void 0) throw new Error(`unknown SponsorBlock category "${oddCategory}" (known: ${Object.keys(SPONSOR_CATEGORIES).join(", ")})`);
+  for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
+    if (!cfg[key]) throw new Error(`"${key}" must be an object`);
+    const odd = Object.keys(cfg[key]).find((name) => !(name in SPONSOR_CATEGORIES));
+    if (odd !== void 0) throw new Error(`unknown SponsorBlock category "${odd}" in "${key}" (known: ${Object.keys(SPONSOR_CATEGORIES).join(", ")})`);
+  }
+  for (const [category, action] of Object.entries(cfg.sponsorBlockActions)) {
+    if (!sponsorChoices(category).includes(action)) throw new Error(`"sponsorBlockActions.${category}" must be one of: ${sponsorChoices(category).join(", ")}`);
+  }
+  for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
+  }
+  if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
   if (!COLOR_SCHEMES.includes(cfg.colorScheme)) {
     throw new Error(`"colorScheme" must be one of: ${COLOR_SCHEMES.join(", ")}`);
   }
@@ -163,6 +210,23 @@ function validate(cfg) {
   if (!OPEN_LINKS.includes(cfg.openLinks)) {
     throw new Error(`"openLinks" must be one of: ${OPEN_LINKS.join(", ")}`);
   }
+}
+function withDefaults(stored) {
+  const cfg = { ...DEFAULTS, ...stored };
+  for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
+    if (cfg[key] && typeof cfg[key] === "object") cfg[key] = { ...DEFAULTS[key], ...cfg[key] };
+  }
+  if (Array.isArray(stored.sponsorBlockCategories)) {
+    if (!stored.sponsorBlockActions) {
+      for (const category of Object.keys(SPONSOR_CATEGORIES)) {
+        if (sponsorChoices(category).includes("ask") && category !== "poi_highlight") {
+          cfg.sponsorBlockActions[category] = stored.sponsorBlockCategories.includes(category) ? "ask" : "off";
+        }
+      }
+    }
+    delete cfg.sponsorBlockCategories;
+  }
+  return cfg;
 }
 function load(id) {
   checkId(id);
@@ -174,7 +238,7 @@ function load(id) {
   }
   let cfg;
   try {
-    cfg = { ...DEFAULTS, ...JSON.parse(raw) };
+    cfg = withDefaults(JSON.parse(raw));
     cfg.name ||= id;
     validate(cfg);
   } catch (e) {
@@ -286,6 +350,7 @@ module.exports = {
   APP_ACTIONS,
   EXTENSIONS,
   SPONSOR_CATEGORIES,
+  sponsorChoices,
   MANAGER_DESKTOP_ID,
   root,
   launcher,
