@@ -10,6 +10,7 @@ const desktopFile = `${lib.MANAGER_DESKTOP_ID}.desktop`;
 app.setName(lib.MANAGER_DESKTOP_ID);
 process.env.CHROME_DESKTOP = desktopFile;
 app.setDesktopName?.(desktopFile);
+if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId("manager"));
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 let win;
@@ -116,7 +117,8 @@ const handlers = {
     lib.load(id);
     const env = { ...process.env };
     delete env.CHROME_DESKTOP;
-    const child = spawn(lib.launcher, ["run", id], { detached: true, stdio: "ignore", env });
+    const [command, args] = lib.runCommand(id);
+    const child = spawn(command, args, { detached: true, stdio: "ignore", env });
     child.on("error", () => {
     });
     child.unref();
@@ -144,30 +146,39 @@ const handlers = {
     const error = await shell.openPath(lib.appsDir());
     if (error) throw new Error(error);
   },
+  showConfig(id) {
+    lib.checkId(id);
+    if (!fs.existsSync(lib.configPath(id))) throw new Error(`${lib.configPath(id)} does not exist.`);
+    shell.showItemInFolder(lib.configPath(id));
+  },
   openAuthorLink() {
     const { url } = author();
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   },
   checkUpdate: () => update.check(),
   async askUpdate(info) {
-    if (info.blocked) {
-      await dialog.showMessageBox(win, {
-        type: "info",
-        buttons: ["OK"],
-        message: `AppD-Manager ${info.latest} is available`,
-        detail: info.blocked
-      });
-      return false;
-    }
+    const notes = String(info.notes || "");
+    const about = [
+      info.name && info.name !== info.tag && info.name !== info.latest ? info.name : "",
+      notes.length > 1500 ? `${notes.slice(0, 1500).trimEnd()}…
+(the rest is on the release page)` : notes
+    ].filter(Boolean).join("\n\n");
+    const how = info.blocked || `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`;
+    const buttons = info.blocked ? ["OK", "Open release page"] : ["Update now", "Later", "Open release page"];
     const { response } = await dialog.showMessageBox(win, {
-      type: "question",
-      buttons: ["Update now", "Later"],
+      type: info.blocked ? "info" : "question",
+      buttons,
       defaultId: 0,
-      cancelId: 1,
+      cancelId: info.blocked ? 0 : 1,
       message: `AppD-Manager ${info.latest} is available`,
-      detail: `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`
+      detail: [about, how].filter(Boolean).join("\n\n")
     });
-    return response === 0;
+    if (buttons[response] === "Open release page") handlers.openReleasePage(info.url);
+    return !info.blocked && response === 0;
+  },
+  openReleasePage(url) {
+    const page = String(url || "");
+    shell.openExternal(page.startsWith(`https://github.com/${update.REPO}/`) ? page : update.releasesUrl);
   },
   async installUpdate() {
     const version = await update.install();

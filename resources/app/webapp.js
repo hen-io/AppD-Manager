@@ -13,10 +13,12 @@ try {
   console.error(`appd: ${e.message}`);
   process.exit(1);
 }
+if (lib.WINDOWS) Object.assign(cfg, { pauseWhenUnfocused: false, cpuPercent: 100, unfocusedCpuPercent: 100 });
 const desktopId = lib.desktopId(id);
 app.setName(desktopId);
 process.env.CHROME_DESKTOP = `${desktopId}.desktop`;
 app.setDesktopName?.(`${desktopId}.desktop`);
+if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId(id));
 app.setPath("userData", lib.profileDir(id));
 const HARDWARE_ACCELERATION = [
   "--ignore-gpu-blocklist",
@@ -504,6 +506,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
+    if (argv.includes("--appd-action=quit")) return app.quit();
     if (!win) return;
     resumePage();
     const action = actionIn(argv);
@@ -513,6 +516,10 @@ if (!app.requestSingleInstanceLock()) {
     win.focus();
   });
   app.on("window-all-closed", () => app.quit());
+  if (lib.WINDOWS) {
+    fs.writeFileSync(lib.pidFile(id), String(process.pid));
+    app.on("quit", () => fs.rmSync(lib.pidFile(id), { force: true }));
+  }
   Menu.setApplicationMenu(null);
   app.whenReady().then(createWindow);
 }

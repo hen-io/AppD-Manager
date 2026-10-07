@@ -2,14 +2,23 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const home = os.homedir();
 const root = path.join(home, ".AppD-manager");
 const settingsPath = path.join(root, "settings.json");
 const managerDataDir = path.join(root, "ManagerData");
 const defaultAppsDir = path.join(root, "Applications");
 const desktopDir = path.join(process.env.XDG_DATA_HOME || path.join(home, ".local/share"), "applications");
-const launcher = process.env.APPD_BIN || path.join(__dirname, "appd");
+const WINDOWS = process.platform === "win32";
+const launcher = process.env.APPD_BIN || (WINDOWS ? process.execPath : path.join(__dirname, "appd"));
+function runCommand(id, extra = []) {
+  if (!WINDOWS) return [launcher, ["run", id, ...extra]];
+  const built = path.join(path.dirname(launcher), "resources", "app") === __dirname;
+  return [launcher, [...built ? [] : [__dirname], `--appd-run=${id}`, ...extra]];
+}
+const startMenuDir = path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "Microsoft", "Windows", "Start Menu", "Programs", "AppD-Manager");
+const windowsAppId = (name) => `hen-io.AppD-Manager.${name}`;
+const pidFile = (id) => path.join(appDir(id), "running.pid");
 const MANAGER_DESKTOP_ID = "appdmanager";
 const APP_ACTIONS = {
   "hard-reload": "Hard reload",
@@ -50,6 +59,17 @@ const SPONSOR_CATEGORIES = {
 };
 const SPONSOR_ACTIONS = ["off", "show", "ask", "skip"];
 const SPONSOR_CHOICES = { poi_highlight: ["off", "ask", "skip"], exclusive_access: ["off", "show"] };
+const YOUTUBE_QUALITIES = {
+  "4320p": "highres",
+  "2160p": "hd2160",
+  "1440p": "hd1440",
+  "1080p": "hd1080",
+  "720p": "hd720",
+  "480p": "large",
+  "360p": "medium",
+  "240p": "small",
+  "144p": "tiny"
+};
 const sponsorChoices = (category) => SPONSOR_CHOICES[category] || SPONSOR_ACTIONS;
 const OPEN_LINKS = ["browser", "window", "same"];
 const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
@@ -102,6 +122,7 @@ const DEFAULTS = {
   sponsorBlockCloseKey: "Backspace",
   sponsorBlockChannels: [],
   sponsorBlockServer: "https://sponsor.ajay.app",
+  youtubeQuality: "auto",
   darkBrightness: 100,
   darkContrast: 100,
   darkSepia: 0,
@@ -201,6 +222,9 @@ function validate(cfg) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
+  if (cfg.youtubeQuality !== "auto" && !(cfg.youtubeQuality in YOUTUBE_QUALITIES)) {
+    throw new Error(`"youtubeQuality" must be one of: auto, ${Object.keys(YOUTUBE_QUALITIES).join(", ")}`);
+  }
   if (!COLOR_SCHEMES.includes(cfg.colorScheme)) {
     throw new Error(`"colorScheme" must be one of: ${COLOR_SCHEMES.join(", ")}`);
   }
@@ -269,6 +293,12 @@ function remove(id) {
 }
 function runningPid(id) {
   try {
+    if (WINDOWS) {
+      const pid2 = Number(fs.readFileSync(pidFile(id), "utf8"));
+      if (!Number.isInteger(pid2) || pid2 <= 0) return 0;
+      process.kill(pid2, 0);
+      return pid2;
+    }
     const lock = fs.readlinkSync(path.join(profileDir(id), "SingletonLock"));
     const dash = lock.lastIndexOf("-");
     const pid = Number(lock.slice(dash + 1));
@@ -281,7 +311,16 @@ function runningPid(id) {
 }
 function close(id) {
   const pid = runningPid(id);
-  if (pid) process.kill(pid, "SIGTERM");
+  if (pid && WINDOWS) {
+    const [command, args] = runCommand(id, ["--appd-action=quit"]);
+    const env = { ...process.env };
+    delete env.APPD_ID;
+    delete env.ELECTRON_RUN_AS_NODE;
+    spawn(command, args, { detached: true, stdio: "ignore", env }).on("error", () => {
+    }).unref();
+  } else if (pid) {
+    process.kill(pid, "SIGTERM");
+  }
   return Boolean(pid);
 }
 function list() {
@@ -301,7 +340,82 @@ function writeEntry(name, lines, sections = []) {
   fs.mkdirSync(desktopDir, { recursive: true });
   fs.writeFileSync(file, content);
 }
+function electronShell() {
+  if (!process.versions.electron || process.env.ELECTRON_RUN_AS_NODE) return null;
+  return require("electron");
+}
+function windowsIcon(source, folder) {
+  try {
+    const image = electronShell().nativeImage.createFromPath(source);
+    if (image.isEmpty()) return void 0;
+    const png = image.resize({ width: 256, height: 256 }).toPNG();
+    const head = Buffer.alloc(22);
+    head.writeUInt16LE(1, 2);
+    head.writeUInt16LE(1, 4);
+    head.writeUInt16LE(1, 10);
+    head.writeUInt16LE(32, 12);
+    head.writeUInt32LE(png.length, 14);
+    head.writeUInt32LE(22, 18);
+    const file = path.join(folder, "icon.ico");
+    fs.writeFileSync(file, Buffer.concat([head, png]));
+    return file;
+  } catch {
+    return void 0;
+  }
+}
+const shortcutPath = (name) => path.join(startMenuDir, `${String(name).replace(/[<>:"/\\|?*\x00-\x1f]/g, " ").trim() || "App"}.lnk`);
+const shortcutArgs = (args) => args.map((arg) => /\s/.test(arg) ? `"${arg}"` : arg).join(" ");
+function writeShortcut(file, options) {
+  const electron = electronShell();
+  if (!electron) return false;
+  fs.mkdirSync(startMenuDir, { recursive: true });
+  electron.shell.writeShortcutLink(file, fs.existsSync(file) ? "update" : "create", { cwd: path.dirname(launcher), ...options });
+  return true;
+}
+function writeWindowsShortcut(id, cfg) {
+  const [target, args] = runCommand(id);
+  const source = iconFile(id, cfg);
+  return writeShortcut(shortcutPath(cfg.name), {
+    target,
+    args: shortcutArgs(args),
+    description: cfg.description || cfg.url,
+    icon: source && windowsIcon(source, appDir(id)) || target,
+    iconIndex: 0,
+    appUserModelId: windowsAppId(id)
+  });
+}
+function syncWindows(ids, problems) {
+  const wanted = /* @__PURE__ */ new Set();
+  let written = true;
+  for (const id of ids) {
+    try {
+      const cfg = load(id);
+      wanted.add(path.basename(shortcutPath(cfg.name)).toLowerCase());
+      written = writeWindowsShortcut(id, cfg) && written;
+    } catch (e) {
+      problems.push(e.message);
+    }
+  }
+  const manager = shortcutPath("AppD-Manager");
+  wanted.add(path.basename(manager).toLowerCase());
+  const [target, args] = runCommand("").slice(0, 2);
+  written = writeShortcut(manager, {
+    target,
+    args: shortcutArgs(args.filter((arg) => !arg.startsWith("--appd-run="))),
+    description: "Add, change and remove web apps",
+    appUserModelId: windowsAppId("manager")
+  }) && written;
+  if (!written) {
+    problems.push("The Start menu is brought up to date the next time AppD-Manager is opened.");
+    return problems;
+  }
+  for (const file of fs.readdirSync(startMenuDir)) {
+    if (/\.lnk$/i.test(file) && !wanted.has(file.toLowerCase())) fs.rmSync(path.join(startMenuDir, file), { force: true });
+  }
+  return problems;
+}
 function writeDesktop(id, cfg) {
+  if (WINDOWS) return void writeWindowsShortcut(id, cfg);
   writeEntry(desktopId(id), [
     `Name=${entryValue(cfg.name)}`,
     `Comment=${entryValue(cfg.description || cfg.url)}`,
@@ -330,6 +444,7 @@ function writeManagerDesktop() {
 function sync() {
   const ids = list();
   const problems = [];
+  if (WINDOWS) return syncWindows(ids, problems);
   for (const id of ids) {
     try {
       writeDesktop(id, load(id));
@@ -351,7 +466,12 @@ module.exports = {
   EXTENSIONS,
   SPONSOR_CATEGORIES,
   sponsorChoices,
+  YOUTUBE_QUALITIES,
   MANAGER_DESKTOP_ID,
+  WINDOWS,
+  windowsAppId,
+  pidFile,
+  runCommand,
   root,
   launcher,
   managerDataDir,

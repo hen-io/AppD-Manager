@@ -11,6 +11,7 @@ const rawUrl = (tag, file) => `https://raw.githubusercontent.com/${REPO}/${tag}/
 const tarballUrl = (tag) => `https://codeload.github.com/${REPO}/tar.gz/refs/tags/${tag}`;
 const installDir = path.dirname(lib.launcher);
 const isBuild = path.join(installDir, "resources", "app") === __dirname;
+const releasesUrl = `https://github.com/${REPO}/releases`;
 function writable() {
   try {
     fs.accessSync(installDir, fs.constants.W_OK);
@@ -19,6 +20,18 @@ function writable() {
   } catch {
     return false;
   }
+}
+function packaged() {
+  if (lib.WINDOWS) return false;
+  const home = os.homedir();
+  return !installDir.startsWith(home + path.sep) || !writable();
+}
+function packageCommand() {
+  const has = (name) => ["/usr/bin", "/bin", "/usr/sbin"].some((dir) => fs.existsSync(path.join(dir, name)));
+  if (has("dnf")) return "sudo dnf upgrade --refresh appd-manager";
+  if (has("pacman")) return "sudo pacman -Sy appd-manager";
+  if (has("apt")) return "sudo apt update && sudo apt install --only-upgrade appd-manager";
+  return "your system's package manager";
 }
 async function download(url) {
   const res = await net.fetch(url, { cache: "no-store" });
@@ -33,31 +46,44 @@ function isNewer(a, b) {
   }
   return false;
 }
-async function latestTag() {
+async function latestRelease() {
   const res = await net.fetch(`${API}/releases/latest`, { cache: "no-store" });
-  if (res.ok) return (await res.json()).tag_name;
+  if (res.ok) {
+    const release = await res.json();
+    const url = String(release.html_url || "");
+    return {
+      tag: release.tag_name,
+      name: String(release.name || "").trim(),
+      notes: String(release.body || "").replace(/\r/g, "").trim(),
+      url: url.startsWith(`https://github.com/${REPO}/`) ? url : releasesUrl
+    };
+  }
   if (res.status !== 404) throw new Error(`GitHub answered ${res.status} for ${API}/releases/latest`);
   const tags = await (await download(`${API}/tags?per_page=100`)).json();
-  const versions = tags.map((tag) => tag.name).filter((name) => /^v?\d+(\.\d+)*$/.test(name));
-  return versions.reduce((best, name) => best === null || isNewer(name, best) ? name : best, null);
+  const versions = tags.map((tag2) => tag2.name).filter((name) => /^v?\d+(\.\d+)*$/.test(name));
+  const tag = versions.reduce((best, name) => best === null || isNewer(name, best) ? name : best, null);
+  return tag ? { tag, name: "", notes: "", url: releasesUrl } : null;
 }
 async function check() {
   const current = app.getVersion();
-  const tag = await latestTag();
+  const release = await latestRelease();
+  const { tag = null, name = "", notes = "", url = releasesUrl } = release || {};
   const latest = tag ? tag.replace(/^v/, "") : current;
   const available = isNewer(latest, current);
   let blocked = "";
   if (available && !isBuild) {
     blocked = "This copy runs from the source folder and cannot update itself.";
-  } else if (available && !writable()) {
-    blocked = `Version ${latest} is available. This copy was installed by the system's package manager: update it there (sudo dnf upgrade appd-manager, or sudo apt upgrade).`;
+  } else if (available && lib.WINDOWS && !writable()) {
+    blocked = `AppD-Manager cannot write to its own folder (${installDir}): move it to a folder of your own, or download the new version from the release page.`;
+  } else if (available && packaged()) {
+    blocked = `This copy was installed by the system's package manager, so it is updated there: ${packageCommand()}`;
   } else if (available) {
     const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
     if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {
       blocked = `Version ${latest} needs a newer runtime (Electron ${runtime.trim()}); run the install script again.`;
     }
   }
-  return { current, latest, tag, available, blocked };
+  return { current, latest, tag, name, notes, url, available, blocked };
 }
 async function install() {
   const info = await check();
@@ -82,8 +108,10 @@ async function install() {
     fs.rmSync(staged, { recursive: true, force: true });
     fs.rmSync(previous, { recursive: true, force: true });
     fs.cpSync(newApp, staged, { recursive: true });
-    fs.copyFileSync(path.join(src, "appd"), stagedLauncher);
-    fs.chmodSync(stagedLauncher, 493);
+    if (!lib.WINDOWS) {
+      fs.copyFileSync(path.join(src, "appd"), stagedLauncher);
+      fs.chmodSync(stagedLauncher, 493);
+    }
     fs.renameSync(__dirname, previous);
     try {
       fs.renameSync(staged, __dirname);
@@ -91,7 +119,7 @@ async function install() {
       fs.renameSync(previous, __dirname);
       throw e;
     }
-    fs.renameSync(stagedLauncher, lib.launcher);
+    if (!lib.WINDOWS) fs.renameSync(stagedLauncher, lib.launcher);
     fs.rmSync(previous, { recursive: true, force: true });
     return version;
   } finally {
@@ -100,4 +128,4 @@ async function install() {
     fs.rmSync(stagedLauncher, { force: true });
   }
 }
-module.exports = { REPO, check, install };
+module.exports = { REPO, releasesUrl, check, install };

@@ -395,6 +395,14 @@ label.check {
   padding: 0;
   border: 0;
 }
+#release-notes {
+  max-height: 180px;
+  margin: 8px 0 0;
+  overflow: auto;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .sponsor-row {
   display: flex;
   align-items: center;

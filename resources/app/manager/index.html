@@ -236,6 +236,21 @@
             <label>Database server
               <input name="sponsorBlockServer" placeholder="https://sponsor.ajay.app">
             </label>
+            <label>YouTube video quality
+              <select name="youtubeQuality">
+                <option value="auto">Automatic (YouTube decides)</option>
+                <option value="4320p">4320p (8K)</option>
+                <option value="2160p">2160p (4K)</option>
+                <option value="1440p">1440p</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+                <option value="360p">360p</option>
+                <option value="240p">240p</option>
+                <option value="144p">144p</option>
+              </select>
+              <span class="note">Every video starts in this quality; one that does not have it gets the next lower one it has. You can still change it in the player.</span>
+            </label>
           </div>
           <div id="dark-settings" class="size-row" hidden>
             <label>Dark Reader brightness (%)
@@ -338,6 +353,7 @@
         <button id="save" type="submit" class="primary">Save</button>
         <button id="launch" type="button">Launch app</button>
         <span id="status" class="note"></span>
+        <button id="show-config" type="button" title="Shows the app's config.json, which also holds the settings of its extensions, in the file manager">Show config file</button>
         <button id="remove" type="button" class="danger">Remove</button>
       </div>
     </form>
@@ -365,8 +381,10 @@
       <div class="row">
         <button id="check-update" type="button">Check for updates</button>
         <button id="install-update" type="button" class="primary" hidden></button>
+        <button id="release-page" type="button" hidden>Open release page</button>
       </div>
       <p id="update-status" class="note"></p>
+      <pre id="release-notes" class="note" hidden></pre>
     </section>
 
     <div class="dialog-actions">

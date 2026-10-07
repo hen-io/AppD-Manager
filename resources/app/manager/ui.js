@@ -241,6 +241,7 @@ function select(id) {
     $("launch").hidden = isNew;
     showLaunchButton();
     $("remove").hidden = isNew;
+    $("show-config").hidden = isNew;
     if (isNew) form.elements.name.focus();
   } else if (app) {
     $("broken-title").textContent = app.id;
@@ -346,7 +347,12 @@ function showUpdate() {
   $("install-update").hidden = !canInstall;
   $("install-update").textContent = `Install ${update.latest}`;
   if (!update.available) $("update-status").textContent = "You have the newest version.";
-  else $("update-status").textContent = update.blocked || `Version ${update.latest} is available.`;
+  else $("update-status").textContent = `Version ${update.latest} is available. ${update.blocked}`.trim();
+  const name = update.name && update.name !== update.tag && update.name !== update.latest ? update.name : "";
+  const notes = update.available ? [name, update.notes].filter(Boolean).join("\n\n") : "";
+  $("release-notes").textContent = notes;
+  $("release-notes").hidden = !notes;
+  $("release-page").hidden = !update.available;
 }
 async function checkUpdate() {
   $("check-update").disabled = true;
@@ -357,6 +363,8 @@ async function checkUpdate() {
   } catch (e) {
     update = null;
     $("install-update").hidden = true;
+    $("release-page").hidden = true;
+    $("release-notes").hidden = true;
     $("update-status").textContent = `Could not check for updates: ${e.message}`;
   }
   $("check-update").disabled = false;
@@ -399,6 +407,7 @@ form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));
 $("launch").addEventListener("click", launchOrClose);
 $("remove").addEventListener("click", remove);
+$("show-config").addEventListener("click", () => call("showConfig", selected).catch((e) => setStatus(e.message, true)));
 $("broken-remove").addEventListener("click", remove);
 $("pick-icon").addEventListener("click", pickIcon);
 $("fetch-icons").addEventListener("click", fetchIcons);
@@ -410,6 +419,7 @@ $("open-settings").addEventListener("click", () => $("settings").showModal());
 $("close-settings").addEventListener("click", () => $("settings").close());
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);
+$("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
 (async () => {
   state = await call("state");
   renderSidebar();
