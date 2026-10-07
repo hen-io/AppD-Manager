@@ -73,6 +73,18 @@ function isInternal(url) {
 function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 }
+function restartApp(wc) {
+  const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
+  const args = process.argv.slice(1).filter((arg) => !/^--appd-(url|action)=/.test(arg));
+  if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
+  app.relaunch({ args });
+  app.quit();
+}
+const startUrl = (() => {
+  const arg = process.argv.find((value) => value.startsWith("--appd-url="));
+  const url = arg ? arg.slice("--appd-url=".length) : "";
+  return /^https?:\/\//i.test(url) && URL.canParse(url) ? url : cfg.url;
+})();
 async function runAction(action, wc) {
   if (!wc || wc.isDestroyed()) return;
   if (action === "clear-cache") {
@@ -84,7 +96,7 @@ async function runAction(action, wc) {
     await ses.clearStorageData({ storages: ["cachestorage", "shadercache", "serviceworkers"] }).catch(() => {
     });
   }
-  if (action === "clear-cache" || action === "hard-reload") wc.reloadIgnoringCache();
+  if (action === "clear-cache" || action === "hard-reload") restartApp(wc);
 }
 function actionIn(argv) {
   const arg = argv.find((value) => value.startsWith("--appd-action="));
@@ -641,7 +653,7 @@ async function createWindow() {
     });
   }
   if (cfg.loadingScreen) showLoadingScreen(win);
-  win.loadURL(cfg.url);
+  win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
   runLimiter();
 }
 if (!app.requestSingleInstanceLock()) {

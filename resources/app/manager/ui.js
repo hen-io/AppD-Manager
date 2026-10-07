@@ -2,6 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const NEW = "";
+const ABOUT = "***";
 const SETTINGS = "**";
 const GLOBAL = "*";
 let state = { apps: [], defaults: {} };
@@ -23,6 +24,11 @@ const ICONS = {
   image: "M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z",
   "folder-open": "M19,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10L12,6H19A2,2 0 0,1 21,8H21L4,8V18L6.14,10H23.21L20.93,18.5C20.7,19.37 19.92,20 19,20Z",
   "folder-move": "M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z",
+  home: "M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z",
+  info: "M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z",
+  exit: "M19,3H5C3.89,3 3,3.89 3,5V9H5V5H19V19H5V15H3V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M10.08,15.58L11.5,17L16.5,12L11.5,7L10.08,8.41L12.67,11H3V13H12.67L10.08,15.58Z",
+  smaller: "M18.41,7.41L17,6L11,12L17,18L18.41,16.59L13.83,12L18.41,7.41M12.41,7.41L11,6L5,12L11,18L12.41,16.59L7.83,12L12.41,7.41Z",
+  larger: "M5.59,7.41L7,6L13,12L7,18L5.59,16.59L10.17,12L5.59,7.41M11.59,7.41L13,6L19,12L13,18L11.59,16.59L16.17,12L11.59,7.41Z",
   check: "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
   chevron: "M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z",
   play: "M8,5.14V19.14L19,12.14L8,5.14Z",
@@ -43,7 +49,11 @@ function label(button, icon, text) {
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", ICONS[icon]);
   svg.append(path);
-  button.replaceChildren(svg, text);
+  const words = document.createElement("span");
+  words.className = "label";
+  words.textContent = text;
+  if (text) button.replaceChildren(svg, words);
+  else button.replaceChildren(svg);
 }
 let closeMenu = () => {
 };
@@ -267,7 +277,7 @@ function renderList() {
     button.type = "button";
     button.classList.toggle("selected", app.id === selected);
     button.classList.toggle("running", running.has(app.id));
-    if (running.has(app.id)) button.title = "Running";
+    button.title = `${name.textContent}${running.has(app.id) ? " (running)" : ""}`;
     button.append(iconElement(app.iconUrl, name.textContent), text);
     button.addEventListener("click", () => select(app.id));
     const action = (icon, title, method) => {
@@ -287,6 +297,41 @@ function renderList() {
     else if (app.cfg) item.append(action("play", "Launch", "launch"));
     return item;
   });
+  const cards = state.apps.map((app) => {
+    const title = app.cfg ? app.cfg.name : app.id;
+    const name = document.createElement("div");
+    name.className = "app-name";
+    name.textContent = title;
+    const url = document.createElement("div");
+    url.className = app.cfg ? "app-url" : "app-url error";
+    url.textContent = app.cfg ? app.cfg.url : "Broken config file";
+    const text = document.createElement("div");
+    text.className = "app-text";
+    text.append(name, url);
+    const card = document.createElement("div");
+    card.className = "app-card";
+    card.classList.toggle("running", running.has(app.id));
+    card.append(iconElement(app.iconUrl, title), text);
+    const action = (icon, tip, method) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "app-action";
+      el.title = tip;
+      el.setAttribute("aria-label", `${tip}: ${title}`);
+      label(el, icon, "");
+      el.addEventListener("click", (event) => {
+        event.stopPropagation();
+        appAction(method, app.id);
+      });
+      return el;
+    };
+    if (app.cfg && running.has(app.id)) card.append(action("restart", "Restart", "restart"), action("stop", "Close", "close"));
+    else if (app.cfg) card.append(action("play", "Launch", "launch"));
+    card.addEventListener("click", () => select(app.id));
+    return card;
+  });
+  $("home-apps").replaceChildren(...cards);
+  $("home-empty").hidden = Boolean(cards.length);
   $("apps").replaceChildren(...items);
   $("apps").hidden = !items.length;
   $("no-apps").hidden = Boolean(items.length);
@@ -294,11 +339,13 @@ function renderList() {
 function renderSidebar() {
   renderList();
   $("version").textContent = `AppD-Manager ${state.version}`;
+  $("runtime").textContent = `Runs on Electron ${state.runtime.electron} (Chromium ${state.runtime.chromium}).`;
   $("author").hidden = !state.author.name;
-  $("author").textContent = `by ${state.author.name}`;
+  $("author").textContent = `Made by ${state.author.name}`;
   $("author-link").hidden = !state.author.url;
-  $("author-link").textContent = state.author.linkText;
+  label($("author-link"), "open-in-new", state.author.linkText || state.author.url);
   $("author-link").title = state.author.url;
+  $("project-page").title = state.projectUrl;
   $("installed-version").textContent = `Installed version: ${state.version}`;
   $("apps-dir").textContent = state.appsDir;
   renderImported();
@@ -607,8 +654,12 @@ function select(id) {
   $("settings").hidden = id !== SETTINGS;
   for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) tab.classList.toggle("active", tab.dataset.tab === "extensions" === isGlobal);
   $("global-note").hidden = !isGlobal;
-  $("welcome").hidden = id !== null;
-  $("broken").hidden = !app || Boolean(app.cfg) || id === SETTINGS;
+  $("home").hidden = id !== null;
+  $("about").hidden = id !== ABOUT;
+  $("broken").hidden = !app || Boolean(app.cfg);
+  const view = id === null ? "home" : isGlobal || id === SETTINGS ? "settings" : id === ABOUT ? "about" : "";
+  for (const button of $("views").querySelectorAll("[data-view]")) button.classList.toggle("active", button.dataset.view === view);
+  document.querySelector("main").scrollTop = 0;
   form.hidden = !editable;
   if (!editable) reportUnsaved(false);
   $("icon-choices").hidden = true;
@@ -819,7 +870,30 @@ $("open-dir").addEventListener("click", () => folderAction("openAppsDir"));
 $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
 $("author-link").addEventListener("click", () => call("openAuthorLink"));
-$("open-settings").addEventListener("click", () => select(SETTINGS));
+for (const button of $("views").querySelectorAll("[data-view]")) {
+  button.addEventListener("click", () => select({ home: null, settings: SETTINGS, about: ABOUT }[button.dataset.view]));
+}
+$("project-page").addEventListener("click", () => call("openProjectPage"));
+$("exit").addEventListener("click", () => call("exit").catch((e) => setStatus(e.message, true)));
+function showSidebar(small) {
+  document.body.classList.toggle("collapsed", small);
+  const tip = small ? "Show the whole sidebar" : "Make the sidebar smaller";
+  label($("collapse"), small ? "larger" : "smaller", "");
+  $("collapse").title = tip;
+  $("collapse").setAttribute("aria-label", tip);
+  try {
+    localStorage.setItem("sidebar", small ? "small" : "full");
+  } catch {
+  }
+}
+$("collapse").addEventListener("click", () => showSidebar(!document.body.classList.contains("collapsed")));
+showSidebar((() => {
+  try {
+    return localStorage.getItem("sidebar") === "small";
+  } catch {
+    return false;
+  }
+})());
 for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) {
   tab.addEventListener("click", () => select(tab.dataset.tab === "extensions" ? GLOBAL : SETTINGS));
 }
@@ -840,6 +914,7 @@ new MutationObserver((changes) => {
 (async () => {
   state = await call("state");
   renderSidebar();
+  select(null);
   if (state.edit) window.editApp(state.edit.id, state.edit.extension);
   refreshRunning();
   setInterval(refreshRunning, 2e3);

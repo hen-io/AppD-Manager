@@ -20,6 +20,8 @@ for (const name of [
   "importExtension",
   "removeExtension",
   "openAuthorLink",
+  "openProjectPage",
+  "exit",
   "openReleasePage",
   "checkUpdate",
   "askUpdate",

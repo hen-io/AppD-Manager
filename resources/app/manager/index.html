@@ -8,20 +8,23 @@
 </head>
 <body>
   <aside>
-    <img class="banner" src="../include/banner.png" alt="AppD-Manager">
-    <button id="new" type="button" class="primary" data-icon="plus">New app</button>
+    <div class="side-head">
+      <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+      <button id="collapse" type="button" class="side-toggle" title="Make the sidebar smaller" aria-label="Make the sidebar smaller"></button>
+    </div>
+    <nav id="views">
+      <button type="button" data-view="home" data-icon="home" title="Home">Home</button>
+      <button type="button" data-view="settings" data-icon="cog" title="Settings">Settings</button>
+      <button type="button" data-view="about" data-icon="info" title="About">About</button>
+    </nav>
+    <button id="new" type="button" class="primary" data-icon="plus" title="New app">New app</button>
 
     <h2 class="caption">Your apps</h2>
     <ul id="apps"></ul>
     <p id="no-apps" class="note" hidden>No apps yet.</p>
 
     <footer>
-      <div class="about">
-        <span id="version" class="note"></span>
-        <span id="author" class="note" hidden></span>
-        <button id="author-link" type="button" class="link note" hidden></button>
-      </div>
-      <button id="open-settings" type="button" data-icon="cog">Settings</button>
+      <button id="exit" type="button" data-icon="exit" title="Exit: closes AppD-Manager and every running app">Exit</button>
     </footer>
   </aside>
 
@@ -61,10 +64,29 @@
       </section>
     </section>
 
-    <section id="welcome">
+    <section id="home" class="page">
+      <header class="title">
+        <div class="title-text">
+          <h1>Your apps</h1>
+          <span class="note">Websites as apps of their own, each in its own window. Click one to change its settings.</span>
+        </div>
+      </header>
+      <div id="home-apps" class="app-grid"></div>
+      <p id="home-empty" class="note" hidden>No apps yet. "New app" on the left makes the first one.</p>
+    </section>
+
+    <section id="about" class="page" hidden>
       <img class="banner" src="../include/banner.png" alt="AppD-Manager">
-      <p>Websites as apps of their own, each in its own window.</p>
-      <p class="note">Select an app on the left to change it, or create a new one.</p>
+      <section class="card">
+        <h3 id="version"></h3>
+        <p>Websites as apps of their own: each in its own window, with its own menu entry, icon and logins.</p>
+        <p id="runtime" class="note"></p>
+        <p id="author" hidden></p>
+        <div class="row">
+          <button id="author-link" type="button" hidden></button>
+          <button id="project-page" type="button" data-icon="open-in-new">Project page</button>
+        </div>
+      </section>
     </section>
 
     <section id="broken" class="page" hidden>

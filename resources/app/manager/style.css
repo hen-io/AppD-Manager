@@ -155,11 +155,66 @@ aside {
   background: var(--panel);
   border-right: 1px solid var(--border);
 }
-aside > .banner {
-  padding: 16px 18px 6px;
+.side-head {
+  position: relative;
+}
+.side-head .banner {
+  padding: 16px 44px 6px 18px;
+}
+.side-toggle {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+.side-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.side-toggle svg.mdi {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+#views {
+  display: grid;
+  gap: 2px;
+  padding: 8px 8px 0;
+}
+#views button,
+aside footer button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+}
+#views button:hover,
+aside footer button:hover {
+  background: var(--hover);
+}
+#views button.active {
+  background: var(--selected);
+  font-weight: 600;
+}
+#views svg.mdi,
+aside footer svg.mdi {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 4px 0 2px;
 }
 aside > #new {
-  margin: 10px 14px 18px;
+  margin: 12px 14px 16px;
 }
 aside > .caption {
   padding: 0 16px 6px;
@@ -265,39 +320,123 @@ span.icon {
   text-transform: uppercase;
 }
 aside footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 14px;
+  padding: 8px;
   border-top: 1px solid var(--border);
 }
-.about {
+aside footer button {
+  color: var(--danger);
+}
+body.collapsed {
+  grid-template-columns: 62px 1fr;
+}
+body.collapsed aside .banner,
+body.collapsed aside .caption,
+body.collapsed aside .label,
+body.collapsed aside .app-text,
+body.collapsed #apps button.app-action,
+body.collapsed #no-apps {
+  display: none;
+}
+body.collapsed .side-head {
+  height: 46px;
+}
+body.collapsed .side-toggle {
+  right: 16px;
+}
+body.collapsed #views button,
+body.collapsed aside footer button {
+  justify-content: center;
+  padding: 8px 0;
+}
+body.collapsed #views svg.mdi,
+body.collapsed aside footer svg.mdi,
+body.collapsed #new svg.mdi {
+  margin: 0;
+}
+body.collapsed aside > #new {
+  margin: 12px 10px 14px;
+  padding: 8px 0;
+}
+body.collapsed #apps button {
+  justify-content: center;
+  padding: 6px 0;
+}
+body.collapsed #apps button.running::after {
+  position: absolute;
+  margin: 26px 0 0 30px;
+  outline: 2px solid var(--panel);
+}
+body.collapsed #apps li {
+  position: relative;
+}
+.app-grid {
   display: grid;
-  min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
-#version {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
+.app-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
 }
-#author {
-  font-style: italic;
+.app-card:hover {
+  border-color: var(--accent);
 }
-button.link {
+.app-card .icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  font-size: 20px;
+}
+.app-card .app-action {
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
-  font-size: inherit;
-  text-decoration: underline;
+  color: var(--muted);
 }
-button.link {
-  justify-self: start;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.app-card .app-action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.app-card .app-action svg.mdi {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.app-card.running .app-name::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #27ae60;
+}
+#home .title {
+  margin-bottom: 20px;
+}
+#home .title .note {
+  white-space: normal;
+}
+#about .banner {
+  max-width: 340px;
+  margin: 6px auto 22px;
+}
+#about h3 {
+  font-size: 17px;
+}
+#about .row {
+  margin-bottom: 12px;
+}
+#author {
+  font-style: italic;
 }
 main {
   min-width: 0;
@@ -311,18 +450,6 @@ main {
   max-width: 720px;
   margin: 0 auto;
   padding: 26px 28px 20px;
-}
-#welcome {
-  margin: auto;
-  padding: 28px;
-  max-width: 460px;
-  text-align: center;
-}
-#welcome .banner {
-  margin-bottom: 18px;
-}
-#welcome p {
-  margin-bottom: 4px;
 }
 #broken h1 {
   margin-bottom: 16px;

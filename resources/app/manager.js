@@ -22,6 +22,19 @@ function editRequest(argv) {
 }
 pendingEdit = editRequest(process.argv);
 let unsaved = false;
+let leaving = false;
+async function mayLeave() {
+  if (!unsaved) return true;
+  const response = await ask({
+    icon: "save",
+    buttons: ["Save", "Discard", "Cancel"],
+    message: "Save the changes?",
+    detail: "The app you are editing has changes that are not saved."
+  });
+  if (response === 2) return false;
+  if (response === 0) return Boolean(await win.webContents.executeJavaScript("saveBeforeClose()").catch(() => false));
+  return true;
+}
 function author() {
   const value = require("./package.json").author || {};
   let name;
@@ -70,6 +83,8 @@ function state() {
     updateRepo: update.REPO,
     author: author(),
     edit: pendingEdit,
+    runtime: { electron: process.versions.electron, chromium: process.versions.chrome },
+    projectUrl: `https://github.com/${update.REPO}`,
     extensionKeys: lib.EXTENSION_KEYS,
     extensionDefaults: lib.extensionDefaults()
   };
@@ -105,16 +120,20 @@ async function offerRestart(ids) {
     detail: (one ? "The app is running and keeps" : names.join(", ") + " are running and keep") + " the old settings until restarted. Restarting closes the window; anything not saved in the page is lost."
   });
   if (response !== 0) return one ? "The app keeps its old settings until it is started again." : "The running apps keep their old settings until they are started again.";
-  const stuck = [];
-  for (const id of ids) {
-    lib.close(id);
-    for (let tries = 0; tries < 80 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
-    if (lib.runningPid(id)) stuck.push(id);
-    else handlers.launch(id);
-  }
-  if (stuck.length) return `Could not close ${stuck.join(", ")}: close and start ${stuck.length === 1 ? "it" : "them"} by hand.`;
-  return one ? "The app was restarted with the new settings." : "The running apps were restarted with the new settings.";
+  for (const id of ids) restartApp(id);
+  return one ? "The app restarts with the new settings, on the page it was on." : "The running apps restart with the new settings, each on the page it was on.";
 }
+function startApp(id, extra = []) {
+  lib.load(id);
+  const env = { ...process.env };
+  delete env.CHROME_DESKTOP;
+  const [command, args] = lib.runCommand(id, extra);
+  const child = spawn(command, args, { detached: true, stdio: "ignore", env });
+  child.on("error", () => {
+  });
+  child.unref();
+}
+const restartApp = (id) => startApp(id, ["--appd-action=hard-reload"]);
 const handlers = {
   state() {
     const value = state();
@@ -173,22 +192,12 @@ const handlers = {
     lib.checkId(id);
     lib.close(id);
   },
-  async restart(id) {
+  restart(id) {
     lib.checkId(id);
-    lib.close(id);
-    for (let tries = 0; tries < 80 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
-    if (lib.runningPid(id)) throw new Error(`Could not close "${id}": close and start it by hand.`);
-    handlers.launch(id);
+    restartApp(id);
   },
   launch(id) {
-    lib.load(id);
-    const env = { ...process.env };
-    delete env.CHROME_DESKTOP;
-    const [command, args] = lib.runCommand(id);
-    const child = spawn(command, args, { detached: true, stdio: "ignore", env });
-    child.on("error", () => {
-    });
-    child.unref();
+    startApp(id);
   },
   async pickIcon() {
     const { filePaths } = await dialog.showOpenDialog(win, {
@@ -234,6 +243,26 @@ const handlers = {
     if (response !== 0) return null;
     lib.removeImportedExtension(String(name));
     return { state: state() };
+  },
+  openProjectPage() {
+    shell.openExternal(`https://github.com/${update.REPO}`);
+  },
+  async exit() {
+    const running = lib.list().filter((id) => lib.runningPid(id));
+    if (running.length) {
+      const response = await ask({
+        icon: "exit",
+        buttons: ["Exit", "Cancel"],
+        message: "Exit AppD-Manager?",
+        detail: `This also closes the ${running.length === 1 ? "app that is" : `${running.length} apps that are`} running.`
+      });
+      if (response !== 0) return false;
+    }
+    if (!await mayLeave()) return false;
+    for (const id of running) lib.close(id);
+    leaving = true;
+    setTimeout(() => app.quit(), 100);
+    return true;
   },
   showConfig(id) {
     lib.checkId(id);
@@ -297,22 +326,11 @@ function createWindow() {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (event) => event.preventDefault());
-  let closing = false;
   win.on("close", async (event) => {
-    if (!unsaved || closing) return;
+    if (!unsaved || leaving) return;
     event.preventDefault();
-    const response = await ask({
-      icon: "save",
-      buttons: ["Save", "Discard", "Cancel"],
-      message: "Save the changes?",
-      detail: "The app you are editing has changes that are not saved."
-    });
-    if (response === 2) return;
-    if (response === 0) {
-      const saved = await win.webContents.executeJavaScript("saveBeforeClose()").catch(() => false);
-      if (!saved) return;
-    }
-    closing = true;
+    if (!await mayLeave()) return;
+    leaving = true;
     win.close();
   });
   win.loadFile(path.join(__dirname, "manager", "index.html"));
