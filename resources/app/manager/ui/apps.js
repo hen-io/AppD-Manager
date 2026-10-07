@@ -82,6 +82,9 @@ function renderList() {
 }
 function renderSidebar() {
   renderList();
+  $("home-version").textContent = `Version ${state.version}`;
+  $("home-author").hidden = !state.author.name;
+  $("home-author").textContent = `by ${state.author.name}`;
   $("version").textContent = `AppD-Manager ${state.version}`;
   $("runtime").textContent = `Runs on Electron ${state.runtime.electron} (Chromium ${state.runtime.chromium}).`;
   $("author").hidden = !state.author.name;

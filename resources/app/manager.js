@@ -305,6 +305,13 @@ const handlers = {
     setTimeout(() => app.quit(), 100);
     return true;
   },
+  async showLog(id) {
+    lib.checkId(id);
+    const file = path.join(lib.appDir(id), "events.log");
+    if (!fs.existsSync(file)) throw new Error("Nothing is logged yet: the log starts the next time the app does.");
+    const error = await shell.openPath(file);
+    if (error) throw new Error(error);
+  },
   showConfig(id) {
     lib.checkId(id);
     if (!fs.existsSync(lib.configPath(id))) throw new Error(`${lib.configPath(id)} does not exist.`);

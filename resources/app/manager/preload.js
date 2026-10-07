@@ -20,6 +20,7 @@ for (const name of [
   "resetAppsDir",
   "openAppsDir",
   "showConfig",
+  "showLog",
   "importExtension",
   "removeExtension",
   "openAuthorLink",

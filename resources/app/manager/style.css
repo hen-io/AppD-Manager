@@ -419,6 +419,23 @@ body.collapsed #apps li {
   border-radius: 50%;
   background: #27ae60;
 }
+.home-head {
+  margin: 4px 0 26px;
+  text-align: center;
+}
+.home-head .banner {
+  max-width: 340px;
+  margin: 0 auto 8px;
+}
+#home-version {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+#home-author {
+  margin: 2px 0 0;
+  font-style: italic;
+}
 #home .title {
   margin-bottom: 20px;
 }

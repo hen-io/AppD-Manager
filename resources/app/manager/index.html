@@ -66,6 +66,11 @@
     </section>
 
     <section id="home" class="page">
+      <div class="home-head">
+        <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+        <p id="home-version"></p>
+        <p id="home-author" class="note" hidden></p>
+      </div>
       <header class="title">
         <div class="title-text">
           <h1>Your apps</h1>
@@ -394,7 +399,7 @@
           </label>
           <label class="indented">CPU limit while slowed down (%)
             <input name="unfocusedCpuPercent" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
-            <span class="note">The share of the time the page gets to run while another window has the focus. The app stays alive, just slower. Not applied while it is playing sound; if the limit under Performance is lower, that one applies.</span>
+            <span class="note">The share of the time the page gets to run while another window has the focus. The app stays alive, just slower. Not applied while it is playing sound, nor while a page is loading (at start, after a restart or a reload); if the limit under Performance is lower, that one applies.</span>
           </label>
         </details>
 
@@ -415,7 +420,7 @@
             <input name="skipMissedUpdates" type="checkbox">
             Skip what was missed: reconnect when you come back
           </label>
-          <span class="note below-check">For apps that show live data. After the app was slowed down or paused, the updates it missed are dropped instead of played back in a burst; it reconnects and shows the current state. Anything still loading at that moment starts over.</span>
+          <span class="note below-check">For apps that show live data. After the app was slowed down or paused for half a minute or more, the updates it missed are dropped instead of played back in a burst; it reconnects and shows the current state. Anything still loading at that moment starts over.</span>
           <label>Reload when you come back after more than this many minutes
             <input name="reloadAfterIdleMinutes" type="number" min="0" step="1">
             <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
@@ -498,6 +503,7 @@
             <option value="">More…</option>
             <option value="duplicate" data-note="A second app with the same settings and icon, without the logins">Duplicate</option>
             <option value="showConfig" data-note="Its config.json, in the file manager">Show config file</option>
+            <option value="showLog" data-note="What the app did and when: pages loaded and why, reloads, failures, pauses">Open the event log</option>
             <option value="clearData" data-note="Signs it out everywhere: deletes cookies and cache, keeps the settings">Delete the app's data…</option>
           </select>
         </span>

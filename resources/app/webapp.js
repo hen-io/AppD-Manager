@@ -73,10 +73,33 @@ function isInternal(url) {
 function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 }
+const logFile = path.join(lib.appDir(id), "events.log");
+try {
+  const kept = fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean);
+  if (kept.length > 300) fs.writeFileSync(logFile, `${kept.slice(-200).join("\n")}
+`);
+} catch {
+}
+function note(text) {
+  const now = /* @__PURE__ */ new Date();
+  const stamp = `${now.toLocaleDateString("sv")} ${now.toLocaleTimeString("sv")}`;
+  fs.appendFile(logFile, `${stamp}  ${text}
+`, () => {
+  });
+}
+let loadReason = "";
+const because = (reason) => {
+  loadReason = reason;
+  setTimeout(() => {
+    if (loadReason === reason) loadReason = "";
+  }, 3e3);
+};
 function restartApp(wc) {
   const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
   const args = process.argv.slice(1).filter((arg) => !/^--appd-(url|action)=/.test(arg));
   if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
+  note("restarting (hard reload, or asked for by the manager)");
+  releasePage();
   app.relaunch({ args });
   app.quit();
 }
@@ -167,7 +190,7 @@ function showActionMenu(wc) {
   const history = wc.navigationHistory;
   const sep = { type: "separator" };
   Menu.buildFromTemplate([
-    { label: "Reload", accelerator: "F5", click: () => wc.reload() },
+    { label: "Reload", accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
     { label: `Go to ${cfg.name}`, accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
@@ -225,8 +248,8 @@ function shortcut(wc, input) {
   }
   const ctrl = input.control && !input.alt;
   const history = wc.navigationHistory;
-  if (key === "f5" || ctrl && !input.shift && key === "r") wc.reload();
-  else if (ctrl && input.shift && key === "r") wc.reloadIgnoringCache();
+  if (key === "f5" || ctrl && !input.shift && key === "r") because("F5 or Ctrl+R") || wc.reload();
+  else if (ctrl && input.shift && key === "r") because("Ctrl+Shift+R") || wc.reloadIgnoringCache();
   else if (ctrl && input.shift && key === "delete") runAction("clear-cache", wc);
   else if (key === "f12" || ctrl && input.shift && key === "i") wc.toggleDevTools();
   else if (key === "f11") {
@@ -276,7 +299,7 @@ function contextMenu(wc, p) {
   items.push(
     { label: `Go to ${cfg.name}`, click: () => wc.loadURL(cfg.url) },
     { label: "Back", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
-    { label: "Reload", click: () => wc.reload() },
+    { label: "Reload", click: () => because("Reload in the right-click menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) }))
   );
   Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
@@ -410,6 +433,18 @@ function watchFocus(window) {
   let soundCheck = null;
   let cover = null;
   let round = 0;
+  const SETTLE_MS = 1e4;
+  const LOAD_MAX_MS = 6e4;
+  let busyUntil = Date.now() + LOAD_MAX_MS;
+  const busy = () => Date.now() < busyUntil;
+  wc.on("did-start-navigation", (details) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    busyUntil = Date.now() + LOAD_MAX_MS;
+    if (throttled) setCpuPercent(alwaysPercent);
+  });
+  wc.on("did-stop-loading", () => {
+    busyUntil = Date.now() + SETTLE_MS;
+  });
   const COVER_STEP_MS = 1500;
   const withinMoment = (promise) => Promise.race([
     promise.catch(() => null),
@@ -431,6 +466,10 @@ function watchFocus(window) {
   };
   const pause = async () => {
     if (wc.isDevToolsOpened()) return;
+    if (busy()) {
+      pauseTimer = setTimeout(pause, Math.max(1e3, busyUntil - Date.now()));
+      return;
+    }
     clearTimeout(slowTimer);
     const mine = ++round;
     const overtaken = () => mine !== round || window.isDestroyed();
@@ -448,6 +487,7 @@ function watchFocus(window) {
       if (overtaken()) return;
     }
     pausePage();
+    note("paused (pauseWhenUnfocused)");
     if (cfg.skipMissedUpdates) dropBacklog();
     watchdog = setInterval(() => {
       if (window.isDestroyed()) clearInterval(watchdog);
@@ -459,7 +499,7 @@ function watchFocus(window) {
     if (awayPercent < alwaysPercent) {
       slowTimer = setTimeout(() => {
         throttled = true;
-        const apply = () => setCpuPercent(wc.isCurrentlyAudible() ? alwaysPercent : awayPercent);
+        const apply = () => setCpuPercent(wc.isCurrentlyAudible() || busy() ? alwaysPercent : awayPercent);
         apply();
         soundCheck = setInterval(apply, 3e3);
       }, Math.max(0, cfg.slowAfterSeconds * 1e3 - GRACE_MS));
@@ -470,6 +510,7 @@ function watchFocus(window) {
   };
   const dropBacklog = () => session.defaultSession.closeAllConnections().catch(() => {
   });
+  const SKIP_AFTER_MS = 3e4;
   const back = async () => {
     clearTimeout(timer);
     clearTimeout(pauseTimer);
@@ -478,7 +519,9 @@ function watchFocus(window) {
     watchdog = null;
     const mine = ++round;
     clearInterval(soundCheck);
-    if (cfg.skipMissedUpdates && idleSince && (stoppedPids.length || throttled)) {
+    const awayMs = idleSince ? Date.now() - idleSince : 0;
+    if (cfg.skipMissedUpdates && awayMs >= SKIP_AFTER_MS && (stoppedPids.length || throttled)) {
+      note(`back after ${Math.round(awayMs / 1e3)} s: connections closed so the app reconnects (skipMissedUpdates)`);
       await dropBacklog();
       if (mine !== round || window.isDestroyed()) return;
     }
@@ -502,7 +545,7 @@ function watchFocus(window) {
       if (reloading) wc.once("did-finish-load", drop);
       setTimeout(drop, reloading ? 1e4 : 300);
     }
-    if (reloading) wc.reload();
+    if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reload();
   };
   window.on("blur", () => {
     clearTimeout(timer);
@@ -627,6 +670,29 @@ async function createWindow() {
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
+  note(`started, opening ${startUrl}`);
+  let showing = "";
+  win.webContents.on("did-start-navigation", (details) => {
+    if (!details.isMainFrame || details.isSameDocument || !/^https?:/i.test(details.url)) return;
+    const again = details.url === showing;
+    const why = loadReason || (again ? "asked for by the page itself, or by the server" : "");
+    note(`${again ? "reloading" : "loading"} ${details.url}${why ? ` - ${why}` : ""}`);
+    loadReason = "";
+  });
+  win.webContents.on("did-navigate", (_e, url) => {
+    showing = url;
+  });
+  let revivals = [];
+  win.webContents.on("render-process-gone", (_e, details) => {
+    if (quitting || details.reason === "clean-exit") return;
+    revivals = revivals.filter((time) => Date.now() - time < 6e4);
+    note(`the page's process is gone (${details.reason})${revivals.length < 3 ? ": loading the page again" : ""}`);
+    if (revivals.length >= 3 || win.isDestroyed()) return;
+    revivals.push(Date.now());
+    because("its process had died");
+    win.webContents.reload();
+  });
+  win.webContents.on("unresponsive", () => note("the page does not respond"));
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
   await loadCustomExtensions();
   if (extension("sponsorblock")) {
@@ -645,6 +711,8 @@ async function createWindow() {
   });
   win.webContents.on("did-fail-load", (_e, code, description, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || url.startsWith("data:")) return;
+    note(`could not load ${url}: ${description} (${code}); trying again in 5 seconds`);
+    because("another try after it could not be loaded");
     const target = JSON.stringify(url).replace(/</g, "\\u003c");
     win.webContents.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(
       `<meta name="color-scheme" content="light dark">

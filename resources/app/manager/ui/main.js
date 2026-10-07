@@ -15,6 +15,7 @@ $("more-actions").addEventListener("change", async () => {
   $("more-actions").value = "";
   try {
     if (action === "showConfig") await call("showConfig", selected);
+    if (action === "showLog") await call("showLog", selected);
     if (action === "clearData" && await call("clearData", selected)) {
       setStatus("The data of the app is deleted.");
       refreshRunning();
