@@ -68,7 +68,9 @@ function state() {
     version: app.getVersion(),
     updateRepo: update.REPO,
     author: author(),
-    edit: pendingEdit
+    edit: pendingEdit,
+    extensionKeys: lib.EXTENSION_KEYS,
+    extensionDefaults: lib.extensionDefaults()
   };
 }
 async function changeAppsDir(dir) {
@@ -86,6 +88,10 @@ const handlers = {
     const value = state();
     pendingEdit = null;
     return value;
+  },
+  saveExtensionDefaults(input) {
+    lib.setExtensionDefaults(input);
+    return { state: state() };
   },
   setUnsaved(value) {
     unsaved = Boolean(value);

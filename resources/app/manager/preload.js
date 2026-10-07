@@ -4,6 +4,7 @@ const api = {};
 for (const name of [
   "state",
   "save",
+  "saveExtensionDefaults",
   "setUnsaved",
   "remove",
   "launch",

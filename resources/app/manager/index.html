@@ -21,6 +21,7 @@
         <span id="author" class="note" hidden></span>
         <button id="author-link" type="button" class="link note" hidden></button>
       </div>
+      <button id="open-global" type="button" title="The extension settings that apply to every app without settings of its own">Extensions</button>
       <button id="open-settings" type="button">Settings</button>
     </footer>
   </aside>
@@ -133,8 +134,9 @@
           </label>
         </details>
 
-        <details class="card" open>
+        <details id="extensions-card" class="card" open>
           <summary>Extensions</summary>
+          <p id="global-note" class="note" hidden>These settings apply to every app that has the extension added, except where an app has "Own settings for this app" ticked. Running apps restart when you save.</p>
           <div id="extension-list"></div>
           <p id="no-extensions" class="note">None added.</p>
           <div class="row extension-adders">
@@ -332,7 +334,7 @@
           <summary>Advanced</summary>
           <label>User agent
             <input name="userAgent" placeholder="Default: same as Chrome">
-            <span class="note">What the app tells sites it is. Sites pick their phone, tablet or TV layout by it. Empty is Chrome on a desktop.</span>
+            <span class="note">What the app tells sites it is. Sites pick their phone, tablet or TV layout by it. Empty is Chrome on a desktop. Some sites also need their own address for it: YouTube's TV interface is youtube.com/tv with a TV user agent.</span>
             <select id="agent-presets" aria-label="Use a common user agent">
               <option value="">Use a common user agent…</option>
               <option value="-">Default (Chrome on a desktop)</option>
@@ -351,6 +353,11 @@
               <option value="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0">Desktop: Firefox on Linux</option>
             </select>
           </label>
+          <label class="check">
+            <input name="ignoreCertificateErrors" type="checkbox">
+            Ignore certificate errors (accept invalid, expired and self-signed certificates)
+          </label>
+          <span class="note below-check">Only for apps on your own network, such as a device with a self-signed certificate. With this on, nothing checks that a site is who it says it is, for every address the app loads.</span>
           <label>Extra Chromium switches
             <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>
             <span class="note">One per line. Changes apply the next time the app starts.</span>

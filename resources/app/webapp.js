@@ -7,12 +7,25 @@ const extras = require("./extras");
 const id = process.env.APPD_ID;
 let cfg;
 try {
-  cfg = lib.load(id);
+  cfg = lib.effective(lib.load(id));
   lib.writeDesktop(id, cfg);
 } catch (e) {
   console.error(`appd: ${e.message}`);
   process.exit(1);
 }
+const loadedConfig = JSON.stringify(cfg);
+function restartOnChange() {
+  let now;
+  try {
+    now = JSON.stringify(lib.effective(lib.load(id)));
+  } catch {
+    return;
+  }
+  if (now === loadedConfig) return;
+  app.relaunch();
+  app.quit();
+}
+for (const file of [lib.configPath(id), lib.settingsPath]) fs.watchFile(file, { interval: 1500 }, restartOnChange);
 if (lib.WINDOWS) Object.assign(cfg, { pauseWhenUnfocused: false, cpuPercent: 100, unfocusedCpuPercent: 100 });
 const desktopId = lib.desktopId(id);
 app.setName(desktopId);
@@ -38,6 +51,7 @@ for (const [name, values] of Object.entries(featureLists)) {
   const list = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   if (list.length) app.commandLine.appendSwitch(name, list.join(","));
 }
+if (cfg.ignoreCertificateErrors) app.commandLine.appendSwitch("ignore-certificate-errors");
 if (cfg.jsHeapMb > 0) {
   app.commandLine.appendSwitch("js-flags", `--max-old-space-size=${cfg.jsHeapMb}`);
 }

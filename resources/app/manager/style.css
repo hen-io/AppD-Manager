@@ -387,6 +387,25 @@ label.check {
   display: block;
   margin-bottom: 2px;
 }
+.extension > header label.check {
+  margin: 0;
+  flex: none;
+  white-space: nowrap;
+}
+.extension > .note {
+  display: block;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+}
+form.global details.card:not(#extensions-card),
+form.global .extension-adders,
+form.global .below-row,
+form.global #icon-preview,
+form.global #launch,
+form.global #remove,
+form.global #show-config {
+  display: none;
+}
 .extension-adders {
   margin-bottom: 8px;
 }

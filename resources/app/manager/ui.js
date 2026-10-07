@@ -2,11 +2,13 @@
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const NEW = "";
+const GLOBAL = "*";
 let state = { apps: [], defaults: {} };
 let selected = null;
 let update = null;
 let running = /* @__PURE__ */ new Set();
 let extensions = [];
+let ownSettings = [];
 let customExtensions = [];
 const customInfo = {};
 let loadedForm = "";
@@ -83,6 +85,31 @@ function tuneCpuStep(el) {
   el.dataset.last = value;
 }
 const EXTENSION_SETTINGS = { adblock: "adblock-settings", sponsorblock: "sponsor-settings", darkreader: "dark-settings" };
+function fillKeys(keys, values) {
+  for (const key of keys) {
+    const el = form.elements[key];
+    if (!el) continue;
+    if (el.type === "checkbox") el.checked = values[key];
+    else el.value = Array.isArray(values[key]) ? values[key].join("\n") : values[key];
+  }
+  if (keys.includes("sponsorBlockActions")) renderSponsorCategories(values.sponsorBlockActions, values.sponsorBlockColors);
+}
+function ownSettingsBox(name) {
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = ownSettings.includes(name);
+  input.addEventListener("change", () => {
+    ownSettings = input.checked ? [...ownSettings, name] : ownSettings.filter((other) => other !== name);
+    if (input.checked) fillKeys(state.extensionKeys[name], state.extensionDefaults);
+    renderExtensions();
+    if (input.checked) $(EXTENSION_SETTINGS[name]).open = true;
+    updateSaveButton();
+  });
+  const label = document.createElement("label");
+  label.className = "check";
+  label.append(input, "Own settings for this app");
+  return label;
+}
 function extensionBox(title, about, settings, remove2) {
   const name = document.createElement("strong");
   name.textContent = title;
@@ -100,7 +127,8 @@ function extensionBox(title, about, settings, remove2) {
     updateSaveButton();
   });
   const head = document.createElement("header");
-  head.append(text, removeButton);
+  head.append(text);
+  if (remove2) head.append(removeButton);
   const box = document.createElement("section");
   box.className = "extension";
   box.append(head);
@@ -109,12 +137,32 @@ function extensionBox(title, about, settings, remove2) {
 }
 function renderExtensions() {
   for (const id of Object.values(EXTENSION_SETTINGS)) $("extension-store").append($(id));
+  if (selected === GLOBAL) {
+    const all = Object.keys(EXTENSION_SETTINGS).map((name) => {
+      const box = extensionBox(state.extensions[name].name, state.extensions[name].about, $(EXTENSION_SETTINGS[name]), null);
+      box.dataset.extension = name;
+      return box;
+    });
+    $("extension-list").replaceChildren(...all);
+    $("no-extensions").hidden = true;
+    return;
+  }
   const boxes = extensions.map((name) => {
     const info = state.extensions[name] || { name, about: "" };
-    const box = extensionBox(info.name, info.about, EXTENSION_SETTINGS[name] ? $(EXTENSION_SETTINGS[name]) : null, () => {
+    const own = !EXTENSION_SETTINGS[name] || ownSettings.includes(name);
+    const box = extensionBox(info.name, info.about, own && EXTENSION_SETTINGS[name] ? $(EXTENSION_SETTINGS[name]) : null, () => {
       extensions = extensions.filter((other) => other !== name);
     });
     box.dataset.extension = name;
+    if (EXTENSION_SETTINGS[name]) {
+      box.querySelector("header").insertBefore(ownSettingsBox(name), box.querySelector("header button"));
+      if (!own) {
+        const note = document.createElement("span");
+        note.className = "note";
+        note.textContent = 'Uses the settings for all apps ("Extensions" at the bottom left).';
+        box.append(note);
+      }
+    }
     return box;
   });
   const imported = customExtensions.map((folder) => {
@@ -204,6 +252,7 @@ function fillForm(cfg) {
   }
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
+  ownSettings = [...cfg.ownExtensionSettings];
   customExtensions = [...cfg.customExtensions];
   describeCustomExtensions();
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
@@ -230,6 +279,7 @@ function readForm() {
   }
   cfg.url = normalizeUrl(cfg.url);
   cfg.extensions = [...extensions];
+  cfg.ownExtensionSettings = [...ownSettings];
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
@@ -275,8 +325,11 @@ function updateSaveButton() {
 function select(id) {
   selected = id;
   const app = state.apps.find((a) => a.id === id);
-  const isNew = id === NEW;
+  const isGlobal = id === GLOBAL;
+  const isNew = id === NEW || isGlobal;
   const editable = isNew || Boolean(app?.cfg);
+  form.classList.toggle("global", isGlobal);
+  $("global-note").hidden = !isGlobal;
   $("welcome").hidden = id !== null;
   $("broken").hidden = !app || Boolean(app.cfg);
   form.hidden = !editable;
@@ -284,8 +337,8 @@ function select(id) {
   $("icon-choices").hidden = true;
   setStatus("");
   if (editable) {
-    const cfg = isNew ? state.defaults : app.cfg;
-    $("form-title").textContent = isNew ? "New app" : cfg.name;
+    const cfg = isGlobal ? { ...state.defaults, ...state.extensionDefaults } : isNew ? state.defaults : app.cfg;
+    $("form-title").textContent = isGlobal ? "Extension settings for all apps" : isNew ? "New app" : cfg.name;
     fillForm(cfg);
     loadedForm = JSON.stringify(readForm());
     updateSaveButton();
@@ -294,7 +347,7 @@ function select(id) {
     showLaunchButton();
     $("remove").hidden = isNew;
     $("show-config").hidden = isNew;
-    if (isNew) form.elements.name.focus();
+    if (id === NEW) form.elements.name.focus();
   } else if (app) {
     $("broken-title").textContent = app.id;
     $("broken-error").textContent = app.error;
@@ -302,12 +355,23 @@ function select(id) {
   renderList();
 }
 async function saveForm() {
+  if (selected === GLOBAL) {
+    try {
+      state = (await call("saveExtensionDefaults", readForm())).state;
+      select(GLOBAL);
+      setStatus("Saved. Running apps that use these settings restart.");
+      return true;
+    } catch (e) {
+      setStatus(e.message, true);
+      return false;
+    }
+  }
   try {
     const result = await call("save", selected === NEW ? null : selected, readForm());
     state = result.state;
     renderSidebar();
     select(result.id);
-    setStatus(running.has(result.id) ? "Saved. The app is running: close it and launch it again for the changes to take effect." : "Saved. The menu entry is up to date.");
+    setStatus(running.has(result.id) ? "Saved. The app is running: it restarts with the new settings." : "Saved. The menu entry is up to date.");
     return true;
   } catch (e) {
     setStatus(e.message, true);
@@ -478,6 +542,7 @@ $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
 $("author-link").addEventListener("click", () => call("openAuthorLink"));
 $("open-settings").addEventListener("click", () => $("settings").showModal());
+$("open-global").addEventListener("click", () => select(GLOBAL));
 $("close-settings").addEventListener("click", () => $("settings").close());
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);

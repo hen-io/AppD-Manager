@@ -105,6 +105,7 @@ const DEFAULTS = {
   homeButton: true,
   extensions: [],
   customExtensions: [],
+  ownExtensionSettings: [],
   adBlockHideLeftovers: true,
   adBlockInPageAds: true,
   adBlockExceptions: [],
@@ -158,7 +159,13 @@ const DEFAULTS = {
   reloadAfterIdleMinutes: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
+  ignoreCertificateErrors: false,
   flags: []
+};
+const EXTENSION_KEYS = {
+  adblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("adBlock")),
+  sponsorblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("sponsorBlock") || key === "youtubeQuality"),
+  darkreader: ["darkBrightness", "darkContrast", "darkSepia"]
 };
 function readSettings() {
   try {
@@ -241,6 +248,8 @@ function validate(cfg) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
+  const oddOwn = cfg.ownExtensionSettings.find((name) => !(name in EXTENSION_KEYS));
+  if (oddOwn !== void 0) throw new Error(`"ownExtensionSettings" can hold: ${Object.keys(EXTENSION_KEYS).join(", ")}`);
   if (cfg.youtubeQuality !== "auto" && !(cfg.youtubeQuality in YOUTUBE_QUALITIES)) {
     throw new Error(`"youtubeQuality" must be one of: auto, ${Object.keys(YOUTUBE_QUALITIES).join(", ")}`);
   }
@@ -254,11 +263,42 @@ function validate(cfg) {
     throw new Error(`"openLinks" must be one of: ${OPEN_LINKS.join(", ")}`);
   }
 }
+function extensionDefaults() {
+  const stored = readSettings().extensionSettings || {};
+  const values = {};
+  for (const key of Object.values(EXTENSION_KEYS).flat()) {
+    const def = DEFAULTS[key];
+    const ok = typeof stored[key] === typeof def && Array.isArray(stored[key]) === Array.isArray(def) && stored[key] !== null;
+    values[key] = !ok ? def : typeof def === "object" && !Array.isArray(def) ? { ...def, ...stored[key] } : stored[key];
+  }
+  return values;
+}
+function setExtensionDefaults(values) {
+  const picked = extensionDefaults();
+  for (const key of Object.keys(picked)) {
+    if (key in values) picked[key] = values[key];
+  }
+  validate({ ...DEFAULTS, url: "https://example.com", ...picked });
+  const settings = readSettings();
+  settings.extensionSettings = picked;
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+}
+function effective(cfg) {
+  const shared = extensionDefaults();
+  const result = { ...cfg };
+  for (const [name, keys] of Object.entries(EXTENSION_KEYS)) {
+    if (cfg.ownExtensionSettings.includes(name)) continue;
+    for (const key of keys) result[key] = shared[key];
+  }
+  return result;
+}
 function withDefaults(stored) {
   const cfg = { ...DEFAULTS, ...stored };
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
     if (cfg[key] && typeof cfg[key] === "object") cfg[key] = { ...DEFAULTS[key], ...cfg[key] };
   }
+  if (!("ownExtensionSettings" in stored)) cfg.ownExtensionSettings = Object.keys(EXTENSION_KEYS);
   if (Array.isArray(stored.sponsorBlockCategories)) {
     if (!stored.sponsorBlockActions) {
       for (const category of Object.keys(SPONSOR_CATEGORIES)) {
@@ -489,6 +529,10 @@ module.exports = {
   MANAGER_DESKTOP_ID,
   WINDOWS,
   windowsAppId,
+  EXTENSION_KEYS,
+  extensionDefaults,
+  setExtensionDefaults,
+  effective,
   pidFile,
   runCommand,
   managerCommand,
