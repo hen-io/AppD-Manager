@@ -149,6 +149,7 @@ const DEFAULTS = {
   actionButton: "off",
   menuShortcut: "Ctrl+X",
   fixedTitle: false,
+  hideScrollbars: false,
   loadingScreen: true,
   backgroundThrottling: true,
   pauseWhenUnfocused: false,

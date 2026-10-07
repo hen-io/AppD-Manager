@@ -242,6 +242,16 @@ function contextMenu(wc, p) {
 }
 app.on("web-contents-created", (_event, wc) => {
   if (!cfg.userAgent) followGoogleSignIn(wc);
+  if (cfg.hideScrollbars) {
+    wc.on("frame-created", (_e, { frame }) => {
+      frame?.on("dom-ready", () => frame.executeJavaScript(`(() => {
+        const style = document.createElement('style');
+        style.textContent = '::-webkit-scrollbar { display: none !important; } * { scrollbar-width: none !important; }';
+        document.documentElement?.append(style);
+      })()`).catch(() => {
+      }));
+    });
+  }
   wc.setWindowOpenHandler(({ url }) => {
     const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true } };
     if (url === "about:blank") return appWindow;
