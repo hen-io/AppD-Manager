@@ -47,7 +47,7 @@ function main([command, id, ...rest]) {
       lib.checkId(id);
       if (!url) throw new Error("missing url");
       if (fs.existsSync(lib.appDir(id))) throw new Error(`app "${id}" already exists`);
-      lib.save(id, applySettings({ ...lib.DEFAULTS, name: id, url }, pairs));
+      lib.save(id, applySettings({ ...lib.fresh(), name: id, url }, pairs));
       sync();
       console.log(`Created ${lib.configPath(id)}`);
       break;

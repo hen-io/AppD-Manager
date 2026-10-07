@@ -25,7 +25,7 @@ function describeExtension(folder) {
   const text = (value) => typeof value === "string" && !value.startsWith("__MSG_") ? value : "";
   return {
     name: [text(manifest.name) || path.basename(folder), text(manifest.version)].filter(Boolean).join(" "),
-    about: `${text(manifest.description) || "Imported Chrome extension"} (${folder})`,
+    about: text(manifest.description) || "Imported Chrome extension",
     options: text(manifest.options_ui?.page) || text(manifest.options_page)
   };
 }
@@ -105,7 +105,6 @@ const DEFAULTS = {
   homeButton: true,
   extensions: [],
   customExtensions: [],
-  ownExtensionSettings: [],
   adBlockHideLeftovers: true,
   adBlockInPageAds: true,
   adBlockExceptions: [],
@@ -160,7 +159,8 @@ const DEFAULTS = {
   hardwareAcceleration: true,
   jsHeapMb: 0,
   ignoreCertificateErrors: false,
-  flags: []
+  flags: [],
+  configVersion: 2
 };
 const EXTENSION_KEYS = {
   adblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("adBlock")),
@@ -248,8 +248,6 @@ function validate(cfg) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
-  const oddOwn = cfg.ownExtensionSettings.find((name) => !(name in EXTENSION_KEYS));
-  if (oddOwn !== void 0) throw new Error(`"ownExtensionSettings" can hold: ${Object.keys(EXTENSION_KEYS).join(", ")}`);
   if (cfg.youtubeQuality !== "auto" && !(cfg.youtubeQuality in YOUTUBE_QUALITIES)) {
     throw new Error(`"youtubeQuality" must be one of: auto, ${Object.keys(YOUTUBE_QUALITIES).join(", ")}`);
   }
@@ -284,21 +282,78 @@ function setExtensionDefaults(values) {
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
-function effective(cfg) {
-  const shared = extensionDefaults();
-  const result = { ...cfg };
-  for (const [name, keys] of Object.entries(EXTENSION_KEYS)) {
-    if (cfg.ownExtensionSettings.includes(name)) continue;
-    for (const key of keys) result[key] = shared[key];
+const ALL_EXTENSION_KEYS = Object.values(EXTENSION_KEYS).flat();
+const plainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+function differing(values, base) {
+  const result = {};
+  for (const key of ALL_EXTENSION_KEYS) {
+    if (!(key in values)) continue;
+    if (plainObject(values[key]) && plainObject(base[key])) {
+      const entries = Object.entries(values[key]).filter(([name, value]) => base[key][name] !== value);
+      if (entries.length) result[key] = Object.fromEntries(entries);
+    } else if (JSON.stringify(values[key]) !== JSON.stringify(base[key])) {
+      result[key] = values[key];
+    }
   }
   return result;
 }
-function withDefaults(stored) {
-  const cfg = { ...DEFAULTS, ...stored };
-  for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
-    if (cfg[key] && typeof cfg[key] === "object") cfg[key] = { ...DEFAULTS[key], ...cfg[key] };
+const fresh = () => ({ ...DEFAULTS, ...extensionDefaults() });
+const extensionsDir = path.join(root, "Extensions");
+const extensionFolder = (entry) => /[\\/]/.test(entry) ? entry : path.join(extensionsDir, entry);
+function importedExtensions() {
+  const found = {};
+  if (!fs.existsSync(extensionsDir)) return found;
+  for (const name of fs.readdirSync(extensionsDir).sort()) {
+    try {
+      found[name] = describeExtension(path.join(extensionsDir, name));
+    } catch {
+    }
   }
-  if (!("ownExtensionSettings" in stored)) cfg.ownExtensionSettings = Object.keys(EXTENSION_KEYS);
+  return found;
+}
+function importExtension(folder) {
+  const info = describeExtension(folder);
+  const source = path.resolve(folder);
+  if (source.startsWith(extensionsDir + path.sep)) throw new Error("That extension is in the library already.");
+  const name = info.name.toLowerCase().replace(/ [\d.]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "extension";
+  const target = path.join(extensionsDir, name);
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.mkdirSync(extensionsDir, { recursive: true });
+  fs.cpSync(source, target, { recursive: true });
+  return name;
+}
+function removeImportedExtension(name) {
+  if (!ID_RE.test(name)) throw new Error(`invalid extension name "${name}"`);
+  fs.rmSync(path.join(extensionsDir, name), { recursive: true, force: true });
+  for (const id of list()) {
+    try {
+      const stored = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
+      if (!Array.isArray(stored.customExtensions) || !stored.customExtensions.includes(name)) continue;
+      stored.customExtensions = stored.customExtensions.filter((other) => other !== name);
+      fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
+    } catch {
+    }
+  }
+}
+function withDefaults(file) {
+  const stored = { ...file };
+  if (!(stored.configVersion >= 2)) {
+    if (Array.isArray(stored.ownExtensionSettings)) {
+      for (const [name, keys] of Object.entries(EXTENSION_KEYS)) {
+        if (!stored.ownExtensionSettings.includes(name)) keys.forEach((key) => delete stored[key]);
+      }
+    }
+    delete stored.ownExtensionSettings;
+    const changed = differing(stored, DEFAULTS);
+    for (const key of ALL_EXTENSION_KEYS) delete stored[key];
+    Object.assign(stored, changed);
+    stored.configVersion = DEFAULTS.configVersion;
+  }
+  const shared = extensionDefaults();
+  const cfg = { ...DEFAULTS, ...shared, ...stored };
+  for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
+    if (plainObject(stored[key])) cfg[key] = { ...shared[key], ...stored[key] };
+  }
   if (Array.isArray(stored.sponsorBlockCategories)) {
     if (!stored.sponsorBlockActions) {
       for (const category of Object.keys(SPONSOR_CATEGORIES)) {
@@ -344,7 +399,10 @@ function save(id, cfg) {
     fs.copyFileSync(icon, path.join(appDir(id), name));
     cfg = { ...cfg, icon: name };
   }
-  fs.writeFileSync(configPath(id), JSON.stringify(cfg, null, 2) + "\n");
+  const stored = { ...cfg };
+  for (const key of ALL_EXTENSION_KEYS) delete stored[key];
+  Object.assign(stored, differing(cfg, extensionDefaults()));
+  fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
 }
 function remove(id) {
   checkId(id);
@@ -532,11 +590,16 @@ module.exports = {
   EXTENSION_KEYS,
   extensionDefaults,
   setExtensionDefaults,
-  effective,
   pidFile,
   runCommand,
   managerCommand,
   describeExtension,
+  fresh,
+  extensionsDir,
+  extensionFolder,
+  importedExtensions,
+  importExtension,
+  removeImportedExtension,
   root,
   launcher,
   managerDataDir,

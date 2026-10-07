@@ -7,25 +7,12 @@ const extras = require("./extras");
 const id = process.env.APPD_ID;
 let cfg;
 try {
-  cfg = lib.effective(lib.load(id));
+  cfg = lib.load(id);
   lib.writeDesktop(id, cfg);
 } catch (e) {
   console.error(`appd: ${e.message}`);
   process.exit(1);
 }
-const loadedConfig = JSON.stringify(cfg);
-function restartOnChange() {
-  let now;
-  try {
-    now = JSON.stringify(lib.effective(lib.load(id)));
-  } catch {
-    return;
-  }
-  if (now === loadedConfig) return;
-  app.relaunch();
-  app.quit();
-}
-for (const file of [lib.configPath(id), lib.settingsPath]) fs.watchFile(file, { interval: 1500 }, restartOnChange);
 if (lib.WINDOWS) Object.assign(cfg, { pauseWhenUnfocused: false, cpuPercent: 100, unfocusedCpuPercent: 100 });
 const desktopId = lib.desktopId(id);
 app.setName(desktopId);
@@ -109,7 +96,8 @@ const menuShortcut = parseShortcut(cfg.menuShortcut);
 const customExtensions = [];
 async function loadCustomExtensions() {
   const loader = session.defaultSession.extensions || session.defaultSession;
-  for (const folder of cfg.customExtensions) {
+  for (const entry of cfg.customExtensions) {
+    const folder = lib.extensionFolder(entry);
     try {
       const info = lib.describeExtension(folder);
       const loaded = await loader.loadExtension(folder, { allowFileAccess: true });

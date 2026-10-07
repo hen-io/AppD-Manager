@@ -8,9 +8,7 @@ let selected = null;
 let update = null;
 let running = /* @__PURE__ */ new Set();
 let extensions = [];
-let ownSettings = [];
 let customExtensions = [];
-const customInfo = {};
 let loadedForm = "";
 async function call(method, ...args) {
   const result = await window.appd[method](...args);
@@ -72,6 +70,7 @@ function renderSidebar() {
   $("author-link").title = state.author.url;
   $("installed-version").textContent = `Installed version: ${state.version}`;
   $("apps-dir").textContent = state.appsDir;
+  renderImported();
   $("change-dir").disabled = state.appsDirFixed;
   $("default-dir").disabled = state.appsDirFixed;
 }
@@ -94,21 +93,24 @@ function fillKeys(keys, values) {
   }
   if (keys.includes("sponsorBlockActions")) renderSponsorCategories(values.sponsorBlockActions, values.sponsorBlockColors);
 }
-function ownSettingsBox(name) {
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.checked = ownSettings.includes(name);
-  input.addEventListener("change", () => {
-    ownSettings = input.checked ? [...ownSettings, name] : ownSettings.filter((other) => other !== name);
-    if (input.checked) fillKeys(state.extensionKeys[name], state.extensionDefaults);
-    renderExtensions();
-    if (input.checked) $(EXTENSION_SETTINGS[name]).open = true;
-    updateSaveButton();
-  });
-  const label = document.createElement("label");
-  label.className = "check";
-  label.append(input, "Own settings for this app");
-  return label;
+function ownCount(name, cfg) {
+  let count = 0;
+  for (const key of state.extensionKeys[name]) {
+    const [mine, shared] = [cfg[key], state.extensionDefaults[key]];
+    if (mine && typeof mine === "object" && !Array.isArray(mine)) count += Object.keys(mine).filter((kind) => mine[kind] !== shared[kind]).length;
+    else if (JSON.stringify(mine) !== JSON.stringify(shared)) count += 1;
+  }
+  return count;
+}
+function showOwnSettings() {
+  const rows = [...form.querySelectorAll(".extension > .own")];
+  if (!rows.length) return;
+  const cfg = readForm();
+  for (const row of rows) {
+    const count = ownCount(row.parentElement.dataset.extension, cfg);
+    row.querySelector(".note").textContent = count ? `${count} ${count === 1 ? "setting is" : "settings are"} this app's own; the rest follow the settings for all apps.` : "Follows the settings for all apps.";
+    row.querySelector("button").hidden = !count;
+  }
 }
 function extensionBox(title, about, settings, remove2) {
   const name = document.createElement("strong");
@@ -118,22 +120,39 @@ function extensionBox(title, about, settings, remove2) {
   note.textContent = about;
   const text = document.createElement("div");
   text.append(name, note);
-  const removeButton = document.createElement("button");
-  removeButton.type = "button";
-  removeButton.textContent = "Remove";
-  removeButton.addEventListener("click", () => {
-    remove2();
-    renderExtensions();
-    updateSaveButton();
-  });
   const head = document.createElement("header");
   head.append(text);
-  if (remove2) head.append(removeButton);
+  if (remove2) {
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.addEventListener("click", () => {
+      remove2();
+      renderExtensions();
+      updateSaveButton();
+    });
+    head.append(removeButton);
+  }
   const box = document.createElement("section");
   box.className = "extension";
   box.append(head);
   if (settings) box.append(settings);
   return box;
+}
+function ownSettingsRow(name) {
+  const note = document.createElement("span");
+  note.className = "note";
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.textContent = "Use the settings for all apps";
+  reset.addEventListener("click", () => {
+    fillKeys(state.extensionKeys[name], state.extensionDefaults);
+    updateSaveButton();
+  });
+  const row = document.createElement("div");
+  row.className = "own";
+  row.append(note, reset);
+  return row;
 }
 function renderExtensions() {
   for (const id of Object.values(EXTENSION_SETTINGS)) $("extension-store").append($(id));
@@ -149,53 +168,61 @@ function renderExtensions() {
   }
   const boxes = extensions.map((name) => {
     const info = state.extensions[name] || { name, about: "" };
-    const own = !EXTENSION_SETTINGS[name] || ownSettings.includes(name);
-    const box = extensionBox(info.name, info.about, own && EXTENSION_SETTINGS[name] ? $(EXTENSION_SETTINGS[name]) : null, () => {
+    const settings = EXTENSION_SETTINGS[name] ? $(EXTENSION_SETTINGS[name]) : null;
+    const box = extensionBox(info.name, info.about, null, () => {
       extensions = extensions.filter((other) => other !== name);
     });
     box.dataset.extension = name;
-    if (EXTENSION_SETTINGS[name]) {
-      box.querySelector("header").insertBefore(ownSettingsBox(name), box.querySelector("header button"));
-      if (!own) {
-        const note = document.createElement("span");
-        note.className = "note";
-        note.textContent = 'Uses the settings for all apps ("Extensions" at the bottom left).';
-        box.append(note);
-      }
-    }
+    if (settings) box.append(ownSettingsRow(name), settings);
     return box;
   });
-  const imported = customExtensions.map((folder) => {
-    const info = customInfo[folder] || { name: folder, about: "" };
+  const imported = customExtensions.map((name) => {
+    const info = state.imported[name] || { name, about: "Not in the library (Settings > Extensions): it does not run." };
     return extensionBox(info.name, info.about, null, () => {
-      customExtensions = customExtensions.filter((other) => other !== folder);
+      customExtensions = customExtensions.filter((other) => other !== name);
     });
   });
   $("extension-list").replaceChildren(...boxes, ...imported);
   $("no-extensions").hidden = Boolean(boxes.length + imported.length);
-  const choices = Object.entries(state.extensions || {}).filter(([name]) => !extensions.includes(name)).map(([name, info]) => new Option(info.name, name));
+  const choices = [
+    ...Object.entries(state.extensions || {}).filter(([name]) => !extensions.includes(name)).map(([name, info]) => new Option(info.name, name)),
+    ...Object.entries(state.imported || {}).filter(([name]) => !customExtensions.includes(name)).map(([name, info]) => new Option(`${info.name} (imported)`, `imported:${name}`))
+  ];
   $("extension-add").replaceChildren(new Option("Add an extension…", ""), ...choices);
   $("extension-add").disabled = !choices.length;
+  showOwnSettings();
 }
-async function describeCustomExtensions() {
-  const unknown = customExtensions.filter((folder) => !customInfo[folder]);
-  if (!unknown.length) return;
-  try {
-    Object.assign(customInfo, await call("describeExtensions", unknown));
-    renderExtensions();
-  } catch {
-  }
+function renderImported() {
+  const rows = Object.entries(state.imported || {}).map(([name, info]) => {
+    const title = document.createElement("strong");
+    title.textContent = info.name;
+    const about = document.createElement("span");
+    about.className = "note";
+    about.textContent = info.about;
+    const text = document.createElement("div");
+    text.append(title, about);
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.textContent = "Remove";
+    removeButton.addEventListener("click", () => changeLibrary("removeExtension", name));
+    const row = document.createElement("li");
+    row.append(text, removeButton);
+    return row;
+  });
+  $("imported-list").replaceChildren(...rows);
+  $("no-imported").hidden = Boolean(rows.length);
 }
-async function importExtension() {
+async function changeLibrary(method, ...args) {
+  $("extension-status").textContent = "";
   try {
-    const picked = await call("pickExtension");
-    if (!picked) return;
-    customInfo[picked.folder] = picked.info;
-    if (!customExtensions.includes(picked.folder)) customExtensions = [...customExtensions, picked.folder];
-    renderExtensions();
-    updateSaveButton();
+    const result = await call(method, ...args);
+    if (!result) return;
+    state = result.state;
+    renderImported();
+    customExtensions = customExtensions.filter((name) => name in state.imported || method !== "removeExtension");
+    if (selected !== null && !form.hidden) renderExtensions();
   } catch (e) {
-    setStatus(e.message, true);
+    $("extension-status").textContent = e.message;
   }
 }
 window.editApp = (id, extension) => {
@@ -237,6 +264,12 @@ const sponsorChoices = (kind) => Object.fromEntries(
 );
 function addExtension() {
   const name = $("extension-add").value;
+  if (name.startsWith("imported:")) {
+    customExtensions = [...customExtensions, name.slice("imported:".length)];
+    renderExtensions();
+    updateSaveButton();
+    return;
+  }
   if (!name || extensions.includes(name)) return;
   extensions = [...extensions, name];
   renderExtensions();
@@ -252,9 +285,7 @@ function fillForm(cfg) {
   }
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
-  ownSettings = [...cfg.ownExtensionSettings];
   customExtensions = [...cfg.customExtensions];
-  describeCustomExtensions();
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
@@ -279,7 +310,6 @@ function readForm() {
   }
   cfg.url = normalizeUrl(cfg.url);
   cfg.extensions = [...extensions];
-  cfg.ownExtensionSettings = [...ownSettings];
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
@@ -320,6 +350,7 @@ function reportUnsaved(value) {
 }
 function updateSaveButton() {
   $("save").disabled = JSON.stringify(readForm()) === loadedForm;
+  showOwnSettings();
   reportUnsaved(!$("save").disabled);
 }
 function select(id) {
@@ -337,7 +368,7 @@ function select(id) {
   $("icon-choices").hidden = true;
   setStatus("");
   if (editable) {
-    const cfg = isGlobal ? { ...state.defaults, ...state.extensionDefaults } : isNew ? state.defaults : app.cfg;
+    const cfg = isNew ? state.defaults : app.cfg;
     $("form-title").textContent = isGlobal ? "Extension settings for all apps" : isNew ? "New app" : cfg.name;
     fillForm(cfg);
     loadedForm = JSON.stringify(readForm());
@@ -357,9 +388,11 @@ function select(id) {
 async function saveForm() {
   if (selected === GLOBAL) {
     try {
-      state = (await call("saveExtensionDefaults", readForm())).state;
+      const result = await call("saveExtensionDefaults", readForm());
+      state = result.state;
       select(GLOBAL);
-      setStatus("Saved. Running apps that use these settings restart.");
+      setStatus(`Saved. ${result.restart}`.trim());
+      refreshRunning();
       return true;
     } catch (e) {
       setStatus(e.message, true);
@@ -371,7 +404,8 @@ async function saveForm() {
     state = result.state;
     renderSidebar();
     select(result.id);
-    setStatus(running.has(result.id) ? "Saved. The app is running: it restarts with the new settings." : "Saved. The menu entry is up to date.");
+    setStatus(result.restart ? `Saved. ${result.restart}` : "Saved. The menu entry is up to date.");
+    refreshRunning();
     return true;
   } catch (e) {
     setStatus(e.message, true);
@@ -527,7 +561,7 @@ form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
 $("agent-presets").addEventListener("change", useAgentPreset);
 $("extension-add").addEventListener("change", addExtension);
-$("extension-import").addEventListener("click", importExtension);
+$("extension-import").addEventListener("click", () => changeLibrary("importExtension"));
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));
@@ -542,7 +576,10 @@ $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
 $("author-link").addEventListener("click", () => call("openAuthorLink"));
 $("open-settings").addEventListener("click", () => $("settings").showModal());
-$("open-global").addEventListener("click", () => select(GLOBAL));
+$("open-global").addEventListener("click", () => {
+  $("settings").close();
+  select(GLOBAL);
+});
 $("close-settings").addEventListener("click", () => $("settings").close());
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);

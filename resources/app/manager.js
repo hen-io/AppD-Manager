@@ -60,7 +60,8 @@ function state() {
   });
   return {
     apps,
-    defaults: lib.DEFAULTS,
+    defaults: lib.fresh(),
+    imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
     sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
     appsDir: lib.appsDir(),
@@ -83,21 +84,60 @@ async function changeAppsDir(dir) {
   if (left.length) parts.push(`Still in the old folder: ${left.join(", ")}.`);
   return { ...state(), message: parts.join(" "), problem: left.length > 0 };
 }
+async function offerRestart(ids) {
+  if (!ids.length) return "";
+  const names = ids.map((id) => {
+    try {
+      return lib.load(id).name;
+    } catch {
+      return id;
+    }
+  });
+  const one = ids.length === 1;
+  const { response } = await dialog.showMessageBox(win, {
+    type: "question",
+    buttons: [one ? "Restart now" : "Restart them now", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+    message: one ? `Restart "${names[0]}" now?` : `Restart ${ids.length} running apps now?`,
+    detail: (one ? "The app is running and keeps" : names.join(", ") + " are running and keep") + " the old settings until restarted. Restarting closes the window; anything not saved in the page is lost."
+  });
+  if (response !== 0) return one ? "The app keeps its old settings until it is started again." : "The running apps keep their old settings until they are started again.";
+  const stuck = [];
+  for (const id of ids) {
+    lib.close(id);
+    for (let tries = 0; tries < 80 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
+    if (lib.runningPid(id)) stuck.push(id);
+    else handlers.launch(id);
+  }
+  if (stuck.length) return `Could not close ${stuck.join(", ")}: close and start ${stuck.length === 1 ? "it" : "them"} by hand.`;
+  return one ? "The app was restarted with the new settings." : "The running apps were restarted with the new settings.";
+}
 const handlers = {
   state() {
     const value = state();
     pendingEdit = null;
     return value;
   },
-  saveExtensionDefaults(input) {
+  async saveExtensionDefaults(input) {
+    const loaded = (id) => {
+      try {
+        const cfg = lib.load(id);
+        return JSON.stringify(cfg.extensions.flatMap((name) => (lib.EXTENSION_KEYS[name] || []).map((key) => cfg[key])));
+      } catch {
+        return "";
+      }
+    };
+    const before = Object.fromEntries(lib.list().filter((id) => lib.runningPid(id)).map((id) => [id, loaded(id)]));
     lib.setExtensionDefaults(input);
-    return { state: state() };
+    const restart = await offerRestart(Object.keys(before).filter((id) => loaded(id) !== before[id]));
+    return { state: state(), restart };
   },
   setUnsaved(value) {
     unsaved = Boolean(value);
   },
-  save(id, input) {
-    const cfg = { ...lib.DEFAULTS, ...id ? lib.load(id) : {} };
+  async save(id, input) {
+    const cfg = { ...lib.fresh(), ...id ? lib.load(id) : {} };
     for (const key of Object.keys(lib.DEFAULTS)) {
       if (key in input) cfg[key] = input[key];
     }
@@ -106,7 +146,8 @@ const handlers = {
     id ||= lib.newId(cfg.name);
     lib.save(id, cfg);
     lib.sync();
-    return { id, state: state() };
+    const restart = await offerRestart(lib.runningPid(id) ? [id] : []);
+    return { id, state: state(), restart };
   },
   async remove(id) {
     lib.checkId(id);
@@ -164,21 +205,28 @@ const handlers = {
     const error = await shell.openPath(lib.appsDir());
     if (error) throw new Error(error);
   },
-  async pickExtension() {
+  async importExtension() {
     const { filePaths } = await dialog.showOpenDialog(win, {
       title: "Choose the folder of an unpacked extension (it holds manifest.json)",
       properties: ["openDirectory"]
     });
-    return filePaths[0] ? { folder: filePaths[0], info: lib.describeExtension(filePaths[0]) } : null;
+    if (!filePaths[0]) return null;
+    lib.importExtension(filePaths[0]);
+    return { state: state() };
   },
-  describeExtensions(folders) {
-    return Object.fromEntries(folders.map((folder) => {
-      try {
-        return [folder, lib.describeExtension(String(folder))];
-      } catch (e) {
-        return [folder, { name: path.basename(String(folder)), about: e.message }];
-      }
-    }));
+  async removeExtension(name) {
+    const info = lib.importedExtensions()[name];
+    const { response } = await dialog.showMessageBox(win, {
+      type: "warning",
+      buttons: ["Cancel", "Remove"],
+      defaultId: 0,
+      cancelId: 0,
+      message: `Remove the extension "${info ? info.name : name}"?`,
+      detail: "It is taken out of the library and out of every app that uses it."
+    });
+    if (response !== 1) return null;
+    lib.removeImportedExtension(String(name));
+    return { state: state() };
   },
   showConfig(id) {
     lib.checkId(id);
