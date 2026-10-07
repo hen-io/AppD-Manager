@@ -149,18 +149,19 @@ const DEFAULTS = {
   actionButton: "off",
   menuShortcut: "Ctrl+X",
   fixedTitle: false,
+  loadingScreen: true,
   backgroundThrottling: true,
   pauseWhenUnfocused: false,
   pauseAfterSeconds: 30,
   cpuPercent: 100,
-  unfocusedCpuPercent: 100,
+  unfocusedCpuPercent: 10,
   skipMissedUpdates: false,
   reloadAfterIdleMinutes: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
   ignoreCertificateErrors: false,
   flags: [],
-  configVersion: 2
+  configVersion: 3
 };
 const EXTENSION_KEYS = {
   adblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("adBlock")),
@@ -337,7 +338,8 @@ function removeImportedExtension(name) {
 }
 function withDefaults(file) {
   const stored = { ...file };
-  if (!(stored.configVersion >= 2)) {
+  const version = stored.configVersion >= 1 ? stored.configVersion : 1;
+  if (version < 2) {
     if (Array.isArray(stored.ownExtensionSettings)) {
       for (const [name, keys] of Object.entries(EXTENSION_KEYS)) {
         if (!stored.ownExtensionSettings.includes(name)) keys.forEach((key) => delete stored[key]);
@@ -347,8 +349,14 @@ function withDefaults(file) {
     const changed = differing(stored, DEFAULTS);
     for (const key of ALL_EXTENSION_KEYS) delete stored[key];
     Object.assign(stored, changed);
-    stored.configVersion = DEFAULTS.configVersion;
   }
+  if (version < 3) {
+    const limit = stored.unfocusedCpuPercent > 0 && stored.unfocusedCpuPercent < 100 ? stored.unfocusedCpuPercent : 100;
+    if (stored.backgroundThrottling === false && limit < 100) stored.backgroundThrottling = true;
+    else if (stored.backgroundThrottling === false) stored.unfocusedCpuPercent = DEFAULTS.unfocusedCpuPercent;
+    else stored.unfocusedCpuPercent = Math.min(limit, 10);
+  }
+  stored.configVersion = DEFAULTS.configVersion;
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {

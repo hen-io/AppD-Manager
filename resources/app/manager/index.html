@@ -9,7 +9,7 @@
 <body>
   <aside>
     <img class="banner" src="../include/banner.png" alt="AppD-Manager">
-    <button id="new" type="button" class="primary">New app</button>
+    <button id="new" type="button" class="primary" data-icon="plus">New app</button>
 
     <h2 class="caption">Your apps</h2>
     <ul id="apps"></ul>
@@ -21,11 +21,46 @@
         <span id="author" class="note" hidden></span>
         <button id="author-link" type="button" class="link note" hidden></button>
       </div>
-      <button id="open-settings" type="button">Settings</button>
+      <button id="open-settings" type="button" data-icon="cog">Settings</button>
     </footer>
   </aside>
 
   <main>
+    <nav id="settings-tabs" hidden>
+      <h1>Settings</h1>
+      <div class="tabs">
+        <button type="button" data-tab="general" data-icon="tune">General</button>
+        <button type="button" data-tab="extensions" data-icon="puzzle">Extensions</button>
+      </div>
+    </nav>
+
+    <section id="settings" class="page" hidden>
+      <section class="card">
+        <h3>Apps folder</h3>
+        <p id="apps-dir" class="path"></p>
+        <p class="note">Each app has its own folder in here. Changing the location moves your apps there, with their settings and logins. Close running apps first: they stay behind.</p>
+        <div class="row">
+          <button id="open-dir" type="button" data-icon="folder-open">Open folder</button>
+          <button id="change-dir" type="button" data-icon="folder-move">Change…</button>
+          <button id="default-dir" type="button" data-icon="restore">Use default</button>
+        </div>
+        <p id="folder-status" class="note error"></p>
+      </section>
+
+      <section class="card">
+        <h3>Updates</h3>
+        <p id="installed-version"></p>
+        <p class="note">AppD-Manager looks for a new version every time it starts.</p>
+        <div class="row">
+          <button id="check-update" type="button" data-icon="update">Check for updates</button>
+          <button id="install-update" type="button" class="primary" hidden></button>
+          <button id="release-page" type="button" data-icon="open-in-new" hidden>Open release page</button>
+        </div>
+        <p id="update-status" class="note"></p>
+        <pre id="release-notes" class="note" hidden></pre>
+      </section>
+    </section>
+
     <section id="welcome">
       <img class="banner" src="../include/banner.png" alt="AppD-Manager">
       <p>Websites as apps of their own, each in its own window.</p>
@@ -38,7 +73,7 @@
         <p>This app's config file cannot be read:</p>
         <p id="broken-error" class="error"></p>
         <p>Fix the file by hand, or remove the app.</p>
-        <button id="broken-remove" type="button" class="danger">Remove</button>
+        <button id="broken-remove" type="button" class="danger" data-icon="delete">Remove</button>
       </div>
     </section>
 
@@ -63,8 +98,8 @@
           <label>Icon
             <span class="row">
               <input name="icon" placeholder="Icon name or image file">
-              <button id="fetch-icons" type="button">Get from site</button>
-              <button id="pick-icon" type="button">Choose image…</button>
+              <button id="fetch-icons" type="button" data-icon="web">Get from site</button>
+              <button id="pick-icon" type="button" data-icon="image">Choose image…</button>
             </span>
             <span id="icon-choices" class="row" hidden></span>
             <span class="note">The site's own icon, an image file (png, svg), or the name of a system icon such as <code>mail-client</code>.</span>
@@ -112,6 +147,10 @@
             <input name="fixedTitle" type="checkbox">
             Always show the app name as window title
           </label>
+          <label class="check">
+            <input name="loadingScreen" type="checkbox">
+            Show a loading screen with the app's icon while the site loads at start
+          </label>
         </details>
 
         <details class="card" open>
@@ -143,7 +182,7 @@
               <option value="">Add an extension…</option>
             </select>
           </div>
-          <span class="note below-row">An extension's settings are the ones for all apps (Settings &gt; Extensions) until you change them here; what you change here applies to this app only.</span>
+          <span class="note below-row">An extension's settings are the ones for all apps (Settings, tab Extensions) until you change them here; what you change here applies to this app only.</span>
                     <div id="extension-store" hidden>
           <details id="adblock-settings" class="extension-settings">
             <summary>Settings</summary>
@@ -297,10 +336,9 @@
             <input name="backgroundThrottling" type="checkbox">
             Slow the page down while its window is hidden or not focused (saves CPU)
           </label>
-          <span class="note below-check">Not focused: about 10% of full speed, or less if the limit below says so. Not while the app is playing sound.</span>
-          <label>CPU limit while another window has the focus (%)
+          <label class="indented">CPU limit while slowed down (%)
             <input name="unfocusedCpuPercent" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
-            <span class="note">Like the limit under Performance, but only while the app is not the focused window; the lower of the two applies then. 100 is no extra limit. The app stays alive, just slower.</span>
+            <span class="note">The share of the time the page gets to run while another window has the focus. The app stays alive, just slower. Not applied while it is playing sound; if the limit under Performance is lower, that one applies.</span>
           </label>
         </details>
 
@@ -379,65 +417,33 @@
             </select>
           </label>
         </details>
+
+        <section id="library-card" class="card">
+          <h3>Imported extensions</h3>
+          <ul id="imported-list" class="plain-list"></ul>
+          <p id="no-imported" class="note">None imported.</p>
+          <p class="note">Unpacked Chrome extensions (the folder that holds <code>manifest.json</code>) are copied into AppD-Manager's library; add them to an app in its Extensions section. They run on what Electron supports of the extension system: ones that change pages mostly work, ones that need a toolbar button or the full browser do not.</p>
+          <div class="row">
+            <button id="extension-import" type="button" data-icon="folder-plus">Import an extension folder…</button>
+          </div>
+          <p id="extension-status" class="note error"></p>
+        </section>
       </div>
 
       <div class="actions">
-        <button id="save" type="submit" class="primary">Save</button>
+        <button id="save" type="submit" class="primary" data-icon="save">Save</button>
         <button id="launch" type="button">Launch app</button>
         <span id="status" class="note"></span>
-        <button id="show-config" type="button" title="Shows the app's config.json, which also holds the settings of its extensions, in the file manager">Show config file</button>
-        <button id="remove" type="button" class="danger">Remove</button>
+        <button id="show-config" type="button" data-icon="file" title="Shows the app's config.json, which also holds the settings of its extensions, in the file manager">Show config file</button>
+        <button id="remove" type="button" class="danger" data-icon="delete">Remove</button>
       </div>
     </form>
   </main>
 
-  <dialog id="settings">
-    <h1>Settings</h1>
-
-    <section class="card">
-      <h3>Apps folder</h3>
-      <p id="apps-dir" class="path"></p>
-      <p class="note">Each app has its own folder in here. Changing the location moves your apps there, with their settings and logins. Close running apps first: they stay behind.</p>
-      <div class="row">
-        <button id="open-dir" type="button">Open folder</button>
-        <button id="change-dir" type="button">Change…</button>
-        <button id="default-dir" type="button">Use default</button>
-      </div>
-      <p id="folder-status" class="note error"></p>
-    </section>
-
-    <section class="card">
-      <h3>Extensions</h3>
-      <p class="note">The settings of the built-in extensions for all apps. What an app sets differently in its own Extensions section wins there.</p>
-      <div class="row">
-        <button id="open-global" type="button">Extension settings for all apps…</button>
-      </div>
-      <h3 class="sub">Imported extensions</h3>
-      <ul id="imported-list" class="plain-list"></ul>
-      <p id="no-imported" class="note">None imported.</p>
-      <p class="note">Unpacked Chrome extensions (the folder that holds <code>manifest.json</code>) are copied into AppD-Manager's library; add them to an app in its Extensions section. They run on what Electron supports of the extension system: ones that change pages mostly work, ones that need a toolbar button or the full browser do not.</p>
-      <div class="row">
-        <button id="extension-import" type="button">Import an extension folder…</button>
-      </div>
-      <p id="extension-status" class="note error"></p>
-    </section>
-
-    <section class="card">
-      <h3>Updates</h3>
-      <p id="installed-version"></p>
-      <p class="note">AppD-Manager looks for a new version every time it starts.</p>
-      <div class="row">
-        <button id="check-update" type="button">Check for updates</button>
-        <button id="install-update" type="button" class="primary" hidden></button>
-        <button id="release-page" type="button" hidden>Open release page</button>
-      </div>
-      <p id="update-status" class="note"></p>
-      <pre id="release-notes" class="note" hidden></pre>
-    </section>
-
-    <div class="dialog-actions">
-      <button id="close-settings" type="button">Close</button>
-    </div>
+  <dialog id="ask">
+    <h2 id="ask-message"></h2>
+    <p id="ask-detail" class="note"></p>
+    <div id="ask-buttons" class="row"></div>
   </dialog>
 
   <script src="ui.js"></script>

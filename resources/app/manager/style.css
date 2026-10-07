@@ -419,10 +419,6 @@ h3.sub {
 .plain-list strong {
   display: block;
 }
-#settings {
-  max-height: 90vh;
-  overflow-y: auto;
-}
 form.global details.card:not(#extensions-card),
 form.global .extension-adders,
 form.global .below-row,
@@ -535,6 +531,12 @@ label.check select {
   width: auto;
   flex: none;
 }
+label.indented {
+  margin-left: 24px;
+}
+label.indented.off {
+  opacity: .5;
+}
 .below-check {
   display: block;
   margin: -8px 0 14px 24px;
@@ -602,30 +604,86 @@ textarea {
   flex: 1;
   min-width: 0;
 }
+#settings-tabs {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 26px 28px 0;
+}
+#settings-tabs h1 {
+  margin-bottom: 14px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tabs button {
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: none;
+}
+.tabs button:hover {
+  background: var(--hover);
+}
+.tabs button.active {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+#settings.page,
+form.global > .page {
+  padding-top: 18px;
+}
+#settings p,
+#library-card p {
+  margin-bottom: 8px;
+}
+#settings p:empty,
+#library-card p:empty {
+  display: none;
+}
+form.global .title,
+form:not(.global) #library-card {
+  display: none;
+}
 dialog {
-  width: min(540px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
-  padding: 22px 22px 18px;
+  width: min(460px, calc(100vw - 48px));
+  padding: 22px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg);
+  background: var(--card);
   color: var(--text);
   box-shadow: 0 12px 40px rgb(0 0 0 / 30%);
 }
 dialog::backdrop {
   background: rgb(0 0 0 / 45%);
 }
-dialog h1 {
-  margin-bottom: 16px;
+dialog h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+dialog h2 svg.mdi {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
 }
 dialog p {
-  margin-bottom: 8px;
+  max-height: 50vh;
+  margin: 0 0 18px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
-dialog p:empty {
-  display: none;
-}
-.dialog-actions {
-  display: flex;
+dialog .row {
   justify-content: flex-end;
-  margin-top: 4px;
+}
+svg.mdi {
+  width: 16px;
+  height: 16px;
+  margin: -3px 6px -3px -2px;
+  fill: currentColor;
+  vertical-align: middle;
 }

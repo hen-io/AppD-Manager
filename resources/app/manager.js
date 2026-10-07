@@ -84,6 +84,10 @@ async function changeAppsDir(dir) {
   if (left.length) parts.push(`Still in the old folder: ${left.join(", ")}.`);
   return { ...state(), message: parts.join(" "), problem: left.length > 0 };
 }
+function ask(question) {
+  const cancel = question.cancel ?? question.buttons.length - 1;
+  return win.webContents.executeJavaScript(`window.ask(${JSON.stringify({ ...question, cancel })})`).catch(() => cancel);
+}
 async function offerRestart(ids) {
   if (!ids.length) return "";
   const names = ids.map((id) => {
@@ -94,11 +98,9 @@ async function offerRestart(ids) {
     }
   });
   const one = ids.length === 1;
-  const { response } = await dialog.showMessageBox(win, {
-    type: "question",
+  const response = await ask({
+    icon: "restart",
     buttons: [one ? "Restart now" : "Restart them now", "Later"],
-    defaultId: 0,
-    cancelId: 1,
     message: one ? `Restart "${names[0]}" now?` : `Restart ${ids.length} running apps now?`,
     detail: (one ? "The app is running and keeps" : names.join(", ") + " are running and keep") + " the old settings until restarted. Restarting closes the window; anything not saved in the page is lost."
   });
@@ -151,15 +153,14 @@ const handlers = {
   },
   async remove(id) {
     lib.checkId(id);
-    const { response } = await dialog.showMessageBox(win, {
-      type: "warning",
-      buttons: ["Cancel", "Remove"],
-      defaultId: 0,
-      cancelId: 0,
+    const response = await ask({
+      icon: "delete",
+      danger: true,
+      buttons: ["Remove", "Cancel"],
       message: `Remove "${id}"?`,
       detail: `This deletes ${lib.appDir(id)}, including the app's logins and data, and takes it out of the menu.`
     });
-    if (response !== 1) return { removed: false };
+    if (response !== 0) return { removed: false };
     if (lib.close(id)) {
       for (let tries = 0; tries < 30 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
     }
@@ -216,15 +217,14 @@ const handlers = {
   },
   async removeExtension(name) {
     const info = lib.importedExtensions()[name];
-    const { response } = await dialog.showMessageBox(win, {
-      type: "warning",
-      buttons: ["Cancel", "Remove"],
-      defaultId: 0,
-      cancelId: 0,
+    const response = await ask({
+      icon: "delete",
+      danger: true,
+      buttons: ["Remove", "Cancel"],
       message: `Remove the extension "${info ? info.name : name}"?`,
       detail: "It is taken out of the library and out of every app that uses it."
     });
-    if (response !== 1) return null;
+    if (response !== 0) return null;
     lib.removeImportedExtension(String(name));
     return { state: state() };
   },
@@ -247,11 +247,10 @@ const handlers = {
     ].filter(Boolean).join("\n\n");
     const how = info.blocked || `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`;
     const buttons = info.blocked ? ["OK", "Open release page"] : ["Update now", "Later", "Open release page"];
-    const { response } = await dialog.showMessageBox(win, {
-      type: info.blocked ? "info" : "question",
+    const response = await ask({
+      icon: "update",
       buttons,
-      defaultId: 0,
-      cancelId: info.blocked ? 0 : 1,
+      cancel: info.blocked ? 0 : 1,
       message: `AppD-Manager ${info.latest} is available`,
       detail: [about, how].filter(Boolean).join("\n\n")
     });
@@ -300,11 +299,9 @@ function createWindow() {
   win.on("close", async (event) => {
     if (!unsaved || closing) return;
     event.preventDefault();
-    const { response } = await dialog.showMessageBox(win, {
-      type: "question",
+    const response = await ask({
+      icon: "save",
       buttons: ["Save", "Discard", "Cancel"],
-      defaultId: 0,
-      cancelId: 2,
       message: "Save the changes?",
       detail: "The app you are editing has changes that are not saved."
     });
