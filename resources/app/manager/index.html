@@ -151,6 +151,16 @@
             <input name="loadingScreen" type="checkbox">
             Show a loading screen with the app's icon while the site loads at start
           </label>
+          <div class="size-row">
+            <label>Default zoom (%)
+              <input name="defaultZoom" type="number" min="25" max="500" step="5">
+            </label>
+            <label class="check">
+              <input name="allowZoom" type="checkbox">
+              Allow zooming by hand (Ctrl with +, - or the wheel, and the menu)
+            </label>
+          </div>
+          <span class="note size-note">A zoom set by hand lasts until the page is reloaded or the app is started again; "Reset zoom" in the app's menu (Ctrl+0) goes back to the default at once.</span>
           <label class="check">
             <input name="hideScrollbars" type="checkbox">
             Hide the scrollbars (pages still scroll)
@@ -338,7 +348,13 @@
           <summary>Slow down when not in use</summary>
           <label class="check">
             <input name="backgroundThrottling" type="checkbox">
-            Slow the page down while its window is hidden or not focused (saves CPU)
+            Slow the page down after
+            <input id="slow-amount" type="number" min="1" step="1" aria-label="Slow down after">
+            <select id="slow-unit" aria-label="Unit">
+              <option value="1">seconds</option>
+              <option value="60">minutes</option>
+            </select>
+            without focus (saves CPU)
           </label>
           <label class="indented">CPU limit while slowed down (%)
             <input name="unfocusedCpuPercent" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
@@ -404,7 +420,6 @@
             <select id="flag-presets" aria-label="Add a common switch">
               <option value="">Add a common switch…</option>
               <option value="--enable-features=WebContentsForceDark">Dark mode for sites that have none</option>
-              <option value="--force-device-scale-factor=1.25">Scale everything to 125% (edit the number)</option>
               <option value="--autoplay-policy=no-user-gesture-required">Let sound and video start by themselves</option>
               <option value="--enable-features=TouchpadOverscrollHistoryNavigation">Two-finger swipe for back and forward</option>
               <option value="--disable-smooth-scrolling">No smooth scrolling</option>

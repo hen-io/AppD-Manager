@@ -184,8 +184,22 @@ aside > #no-apps {
 #apps li + li {
   margin-top: 2px;
 }
+#apps li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+#apps li:hover {
+  background: var(--hover);
+}
+#apps li.selected {
+  background: var(--selected);
+}
 #apps button {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -195,11 +209,25 @@ aside > #no-apps {
   background: none;
   text-align: left;
 }
-#apps button:hover {
-  background: var(--hover);
+#apps button.app-action {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  color: var(--muted);
 }
-#apps button.selected {
-  background: var(--selected);
+#apps button.app-action:last-child {
+  margin-right: 6px;
+}
+#apps button.app-action:hover {
+  background: var(--card);
+  color: var(--text);
+}
+#apps button.app-action svg.mdi {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 .app-text {
   min-width: 0;

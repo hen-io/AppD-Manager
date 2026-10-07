@@ -23,6 +23,7 @@ const ICONS = {
   image: "M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z",
   "folder-open": "M19,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10L12,6H19A2,2 0 0,1 21,8H21L4,8V18L6.14,10H23.21L20.93,18.5C20.7,19.37 19.92,20 19,20Z",
   "folder-move": "M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z",
+  play: "M8,5.14V19.14L19,12.14L8,5.14Z",
   restart: "M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z",
   restore: "M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z",
   update: "M21,10.12H14.22L16.96,7.3C14.23,4.6 9.81,4.5 7.08,7.2C4.35,9.91 4.35,14.28 7.08,17C9.81,19.7 14.23,19.7 16.96,17C18.32,15.65 19,14.08 19,12.1H21C21,14.08 20.12,16.65 18.36,18.39C14.85,21.87 9.15,21.87 5.64,18.39C2.14,14.92 2.11,9.28 5.62,5.81C9.13,2.34 14.76,2.34 18.27,5.81L21,3V10.12M12.5,8V12.25L16,14.33L15.28,15.54L11,13V8H12.5Z",
@@ -111,8 +112,21 @@ function renderList() {
     if (running.has(app.id)) button.title = "Running";
     button.append(iconElement(app.iconUrl, name.textContent), text);
     button.addEventListener("click", () => select(app.id));
+    const action = (icon, title, method) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "app-action";
+      el.title = title;
+      el.setAttribute("aria-label", `${title}: ${name.textContent}`);
+      label(el, icon, "");
+      el.addEventListener("click", () => appAction(method, app.id));
+      return el;
+    };
     const item = document.createElement("li");
+    item.classList.toggle("selected", app.id === selected);
     item.append(button);
+    if (app.cfg && running.has(app.id)) item.append(action("restart", "Restart", "restart"), action("stop", "Close", "close"));
+    else if (app.cfg) item.append(action("play", "Launch", "launch"));
     return item;
   });
   $("apps").replaceChildren(...items);
@@ -348,10 +362,12 @@ function fillForm(cfg) {
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
-  const seconds = cfg.pauseAfterSeconds;
-  const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
-  $("pause-unit").value = String(unit);
-  $("pause-amount").value = seconds / unit;
+  for (const [key, name] of [["pauseAfterSeconds", "pause"], ["slowAfterSeconds", "slow"]]) {
+    const seconds = cfg[key];
+    const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
+    $(`${name}-unit`).value = String(unit);
+    $(`${name}-amount`).value = seconds / unit;
+  }
 }
 function normalizeUrl(url) {
   url = url.trim();
@@ -372,6 +388,7 @@ function readForm() {
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
+  cfg.slowAfterSeconds = Math.max(1, Math.round(Number($("slow-amount").value) || 0)) * Number($("slow-unit").value);
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
@@ -392,15 +409,16 @@ async function refreshRunning() {
   renderList();
   showLaunchButton();
 }
-async function launchOrClose() {
+async function appAction(method, id) {
   try {
-    await call(running.has(selected) ? "close" : "launch", selected);
+    await call(method, id);
   } catch (e) {
     setStatus(e.message, true);
   }
   setTimeout(refreshRunning, 700);
   setTimeout(refreshRunning, 2500);
 }
+const launchOrClose = () => appAction(running.has(selected) ? "close" : "launch", selected);
 let unsaved = false;
 function reportUnsaved(value) {
   if (value === unsaved) return;

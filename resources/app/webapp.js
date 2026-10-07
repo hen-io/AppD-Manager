@@ -39,6 +39,11 @@ for (const [name, values] of Object.entries(featureLists)) {
   if (list.length) app.commandLine.appendSwitch(name, list.join(","));
 }
 if (cfg.ignoreCertificateErrors) app.commandLine.appendSwitch("ignore-certificate-errors");
+if (!cfg.backgroundThrottling) {
+  for (const name of ["disable-renderer-backgrounding", "disable-backgrounding-occluded-windows", "disable-background-timer-throttling"]) {
+    app.commandLine.appendSwitch(name);
+  }
+}
 if (cfg.jsHeapMb > 0) {
   app.commandLine.appendSwitch("js-flags", `--max-old-space-size=${cfg.jsHeapMb}`);
 }
@@ -93,6 +98,21 @@ function parseShortcut(text) {
   return { control: parts.includes("ctrl") || parts.includes("control"), shift: parts.includes("shift"), alt: parts.includes("alt"), key };
 }
 const menuShortcut = parseShortcut(cfg.menuShortcut);
+const DEFAULT_ZOOM = Math.min(5, Math.max(0.25, cfg.defaultZoom / 100));
+let manualZoom = null;
+const applyZoom = (wc) => wc.setZoomFactor(manualZoom ?? DEFAULT_ZOOM);
+const everyPage = (run) => BrowserWindow.getAllWindows().forEach((window) => run(window.webContents));
+function zoomBy(wc, step) {
+  if (!cfg.allowZoom) return;
+  wc.setZoomLevel(Math.min(8, Math.max(-7, wc.getZoomLevel() + step * 0.5)));
+  manualZoom = wc.getZoomFactor();
+  everyPage(applyZoom);
+}
+function resetZoom(wc) {
+  manualZoom = null;
+  applyZoom(wc);
+  everyPage(applyZoom);
+}
 const customExtensions = [];
 async function loadCustomExtensions() {
   const loader = session.defaultSession.extensions || session.defaultSession;
@@ -134,7 +154,6 @@ function showActionMenu(wc) {
   const window = BrowserWindow.fromWebContents(wc);
   const history = wc.navigationHistory;
   const sep = { type: "separator" };
-  const zoom = (step) => wc.setZoomLevel(step === 0 ? 0 : wc.getZoomLevel() + step);
   Menu.buildFromTemplate([
     { label: "Reload", accelerator: "F5", click: () => wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
@@ -146,9 +165,16 @@ function showActionMenu(wc) {
     { label: "Copy page address", click: () => clipboard.writeText(wc.getURL()) },
     { label: "Open page in browser", click: () => openExternal(wc.getURL()) },
     sep,
-    { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoom(0.5) },
-    { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoom(-0.5) },
-    { label: "Actual size", accelerator: "Ctrl+0", click: () => zoom(0) },
+    ...cfg.allowZoom ? [
+      { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoomBy(wc, 1) },
+      { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoomBy(wc, -1) },
+      {
+        label: `Reset zoom (${Math.round(DEFAULT_ZOOM * 100)}%)`,
+        accelerator: "Ctrl+0",
+        enabled: manualZoom !== null && Math.abs(manualZoom - DEFAULT_ZOOM) > 1e-3,
+        click: () => resetZoom(wc)
+      }
+    ] : [],
     {
       label: "Full screen",
       accelerator: "F11",
@@ -190,9 +216,9 @@ function shortcut(wc, input) {
   else if (key === "f11") {
     const w = BrowserWindow.fromWebContents(wc);
     w?.setFullScreen(!w.isFullScreen());
-  } else if (ctrl && (key === "=" || key === "+")) wc.setZoomLevel(wc.getZoomLevel() + 0.5);
-  else if (ctrl && key === "-") wc.setZoomLevel(wc.getZoomLevel() - 0.5);
-  else if (ctrl && key === "0") wc.setZoomLevel(0);
+  } else if (ctrl && (key === "=" || key === "+")) zoomBy(wc, 1);
+  else if (ctrl && key === "-") zoomBy(wc, -1);
+  else if (ctrl && key === "0") resetZoom(wc);
   else if (input.alt && !input.control && key === "arrowleft") history.goBack();
   else if (input.alt && !input.control && key === "arrowright") history.goForward();
   else if (input.alt && !input.control && key === "home") wc.loadURL(cfg.url);
@@ -242,6 +268,14 @@ function contextMenu(wc, p) {
 }
 app.on("web-contents-created", (_event, wc) => {
   if (!cfg.userAgent) followGoogleSignIn(wc);
+  let shown = "";
+  wc.on("did-navigate", (_e, url) => {
+    if (!/^(https?|file):/i.test(url)) return;
+    if (url === shown) manualZoom = null;
+    shown = url;
+    applyZoom(wc);
+  });
+  wc.on("zoom-changed", (_e, direction) => zoomBy(wc, direction === "in" ? 1 : -1));
   if (cfg.hideScrollbars) {
     wc.on("frame-created", (_e, { frame }) => {
       frame?.on("dom-ready", () => frame.executeJavaScript(`(() => {
@@ -352,6 +386,7 @@ function watchFocus(window) {
   const GRACE_MS = 3e3;
   let timer = null;
   let pauseTimer = null;
+  let slowTimer = null;
   let watchdog = null;
   let idleSince = 0;
   let throttled = false;
@@ -379,6 +414,7 @@ function watchFocus(window) {
   };
   const pause = async () => {
     if (wc.isDevToolsOpened()) return;
+    clearTimeout(slowTimer);
     const mine = ++round;
     const overtaken = () => mine !== round || window.isDestroyed();
     stopLimiter();
@@ -404,10 +440,12 @@ function watchFocus(window) {
   const away = () => {
     idleSince = Date.now() - GRACE_MS;
     if (awayPercent < alwaysPercent) {
-      throttled = true;
-      const apply = () => setCpuPercent(wc.isCurrentlyAudible() ? alwaysPercent : awayPercent);
-      apply();
-      soundCheck = setInterval(apply, 3e3);
+      slowTimer = setTimeout(() => {
+        throttled = true;
+        const apply = () => setCpuPercent(wc.isCurrentlyAudible() ? alwaysPercent : awayPercent);
+        apply();
+        soundCheck = setInterval(apply, 3e3);
+      }, Math.max(0, cfg.slowAfterSeconds * 1e3 - GRACE_MS));
     }
     if (cfg.pauseWhenUnfocused) {
       pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
@@ -418,6 +456,7 @@ function watchFocus(window) {
   const back = async () => {
     clearTimeout(timer);
     clearTimeout(pauseTimer);
+    clearTimeout(slowTimer);
     clearInterval(watchdog);
     watchdog = null;
     const mine = ++round;

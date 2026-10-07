@@ -173,6 +173,13 @@ const handlers = {
     lib.checkId(id);
     lib.close(id);
   },
+  async restart(id) {
+    lib.checkId(id);
+    lib.close(id);
+    for (let tries = 0; tries < 80 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
+    if (lib.runningPid(id)) throw new Error(`Could not close "${id}": close and start it by hand.`);
+    handlers.launch(id);
+  },
   launch(id) {
     lib.load(id);
     const env = { ...process.env };
