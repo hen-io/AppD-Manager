@@ -23,6 +23,8 @@ const ICONS = {
   image: "M19,19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z",
   "folder-open": "M19,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10L12,6H19A2,2 0 0,1 21,8H21L4,8V18L6.14,10H23.21L20.93,18.5C20.7,19.37 19.92,20 19,20Z",
   "folder-move": "M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z",
+  check: "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z",
+  chevron: "M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z",
   play: "M8,5.14V19.14L19,12.14L8,5.14Z",
   restart: "M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z",
   restore: "M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z",
@@ -42,6 +44,145 @@ function label(button, icon, text) {
   path.setAttribute("d", ICONS[icon]);
   svg.append(path);
   button.replaceChildren(svg, text);
+}
+let closeMenu = () => {
+};
+function openMenu(select2, button) {
+  closeMenu();
+  const options = [...select2.options].filter((option, index) => !(index === 0 && option.value === ""));
+  if (!options.length) return;
+  const menu = document.createElement("div");
+  menu.className = `picker-menu ${select2.className.includes("mono") ? "mono" : ""}`;
+  menu.setAttribute("role", "listbox");
+  const items = options.map((option) => {
+    const name = document.createElement("strong");
+    name.textContent = option.text;
+    const text = document.createElement("div");
+    text.append(name);
+    if (option.dataset.note) {
+      const note = document.createElement("span");
+      note.className = "note";
+      note.textContent = option.dataset.note;
+      text.append(note);
+    }
+    const item = document.createElement("div");
+    item.className = "picker-item";
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(option.selected && select2.value !== ""));
+    label(item, "check", "");
+    item.append(text);
+    item.addEventListener("click", () => choose(option));
+    item.addEventListener("mousemove", () => activate(items.indexOf(item)));
+    return item;
+  });
+  menu.append(...items);
+  document.body.append(menu);
+  const box = button.getBoundingClientRect();
+  const below = window.innerHeight - box.bottom - 12;
+  const above = box.top - 12;
+  const up = below < Math.min(menu.scrollHeight, 220) && above > below;
+  menu.style.minWidth = `${Math.max(box.width, 200)}px`;
+  menu.style.maxWidth = `${Math.max(box.width, 460)}px`;
+  menu.style.maxHeight = `${Math.min(420, up ? above : below)}px`;
+  menu.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  if (up) menu.style.bottom = `${window.innerHeight - box.top + 4}px`;
+  else menu.style.top = `${box.bottom + 4}px`;
+  let active = -1;
+  function activate(index) {
+    active = (index + items.length) % items.length;
+    items.forEach((item, i) => item.classList.toggle("active", i === active));
+    items[active].scrollIntoView({ block: "nearest" });
+  }
+  function choose(option) {
+    close();
+    select2.value = option.value;
+    select2.dispatchEvent(new Event("input", { bubbles: true }));
+    select2.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  const keys = (event) => {
+    if (event.key === "ArrowDown") activate(active + 1);
+    else if (event.key === "ArrowUp") activate(active - 1);
+    else if (event.key === "Home") activate(0);
+    else if (event.key === "End") activate(items.length - 1);
+    else if (event.key === "Enter" || event.key === " ") choose(options[active]);
+    else if (event.key === "Escape" || event.key === "Tab") close();
+    else if (event.key.length === 1) {
+      const from = active + 1;
+      const hit = [...options.keys()].map((i) => (i + from) % options.length).find((i) => options[i].text.replace(/^-+/, "").toLowerCase().startsWith(event.key.toLowerCase()));
+      if (hit !== void 0) activate(hit);
+      return;
+    } else return;
+    if (event.key !== "Tab") event.preventDefault();
+    event.stopPropagation();
+  };
+  const outside = (event) => {
+    if (!menu.contains(event.target) && event.target !== button && !button.contains(event.target)) close();
+  };
+  const away = (event) => {
+    if (!menu.contains(event.target)) close();
+  };
+  function close() {
+    menu.remove();
+    button.setAttribute("aria-expanded", "false");
+    document.removeEventListener("keydown", keys, true);
+    document.removeEventListener("mousedown", outside, true);
+    document.removeEventListener("scroll", away, true);
+    window.removeEventListener("resize", close);
+    closeMenu = () => {
+    };
+  }
+  closeMenu = close;
+  button.setAttribute("aria-expanded", "true");
+  document.addEventListener("keydown", keys, true);
+  document.addEventListener("mousedown", outside, true);
+  document.addEventListener("scroll", away, true);
+  window.addEventListener("resize", close);
+  activate(Math.max(0, options.findIndex((option) => option.selected)));
+}
+function enhance(select2) {
+  if (select2.classList.contains("picked")) return;
+  select2.classList.add("picked");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `picker ${select2.className.includes("mono") ? "mono" : ""}`;
+  button.setAttribute("aria-haspopup", "listbox");
+  button.setAttribute("aria-expanded", "false");
+  if (select2.getAttribute("aria-label")) button.setAttribute("aria-label", select2.getAttribute("aria-label"));
+  const text = document.createElement("span");
+  label(button, "chevron", "");
+  button.prepend(text);
+  select2.after(button);
+  const show = () => {
+    const option = select2.selectedOptions[0];
+    text.textContent = option ? option.text : "";
+    button.classList.toggle("placeholder", !select2.value);
+    button.disabled = select2.disabled;
+    button.hidden = select2.hidden;
+  };
+  const value = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+  Object.defineProperty(select2, "value", {
+    configurable: true,
+    get() {
+      return value.get.call(select2);
+    },
+    set(next) {
+      value.set.call(select2, next);
+      show();
+    }
+  });
+  select2.addEventListener("change", show);
+  select2.closest("label")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) button.focus();
+  });
+  new MutationObserver(show).observe(select2, { childList: true, attributes: true, attributeFilter: ["disabled", "hidden"] });
+  button.addEventListener("click", () => button.getAttribute("aria-expanded") === "true" ? closeMenu() : openMenu(select2, button));
+  button.addEventListener("keydown", (event) => {
+    if ((event.key === "ArrowDown" || event.key === "ArrowUp") && button.getAttribute("aria-expanded") !== "true") {
+      event.preventDefault();
+      openMenu(select2, button);
+    }
+  });
+  show();
 }
 function showRelease(box, release) {
   const named = release && release.name && release.name !== release.tag && release.name !== release.latest;
@@ -686,6 +827,16 @@ $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
 for (const button of document.querySelectorAll("button[data-icon]")) label(button, button.dataset.icon, button.textContent);
+document.querySelectorAll("select").forEach(enhance);
+new MutationObserver((changes) => {
+  for (const change of changes) {
+    for (const node of change.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      if (node.matches("select")) enhance(node);
+      else node.querySelectorAll("select").forEach(enhance);
+    }
+  }
+}).observe(document.body, { childList: true, subtree: true });
 (async () => {
   state = await call("state");
   renderSidebar();

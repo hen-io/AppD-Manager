@@ -397,20 +397,20 @@
             <span class="note">What the app tells sites it is. Sites pick their phone, tablet or TV layout by it. Empty is Chrome on a desktop. Some sites also need their own address for it: YouTube's TV interface is youtube.com/tv with a TV user agent.</span>
             <select id="agent-presets" aria-label="Use a common user agent">
               <option value="">Use a common user agent…</option>
-              <option value="-">Default (Chrome on a desktop)</option>
-              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Mobile Safari/537.36">Mobile phone (Android, Chrome)</option>
-              <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1">Mobile phone (iPhone, Safari)</option>
-              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Tablet (Android, Chrome)</option>
-              <option value="Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1">Tablet (iPad, Safari)</option>
-              <option value="Mozilla/5.0 (Linux; Android 12; BRAVIA 4K VH2 Build/STT1.211026.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 CrKey/1.56.500000 DeviceType/AndroidTV">TV (Android TV / Google TV)</option>
-              <option value="Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} TV Safari/537.36">TV (Samsung, Tizen)</option>
-              <option value="Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 WebAppManager">TV (LG, webOS)</option>
-              <option value="Mozilla/5.0 (PlayStation; PlayStation 5/8.20) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15">Game console (PlayStation 5)</option>
-              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Desktop: Chrome on Windows</option>
-              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36">Desktop: Chrome on macOS</option>
-              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 Edg/{chrome}">Desktop: Edge on Windows</option>
-              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15">Desktop: Safari on macOS</option>
-              <option value="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0">Desktop: Firefox on Linux</option>
+              <option value="-" data-note="Chrome on a desktop, as it really is">Default</option>
+              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Mobile Safari/537.36" data-note="Android, Chrome">Mobile phone</option>
+              <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1" data-note="iPhone, Safari">Mobile phone</option>
+              <option value="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36" data-note="Android, Chrome">Tablet</option>
+              <option value="Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1" data-note="iPad, Safari">Tablet</option>
+              <option value="Mozilla/5.0 (Linux; Android 12; BRAVIA 4K VH2 Build/STT1.211026.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 CrKey/1.56.500000 DeviceType/AndroidTV" data-note="Android TV / Google TV">TV</option>
+              <option value="Mozilla/5.0 (SMART-TV; Linux; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} TV Safari/537.36" data-note="Samsung, Tizen">TV</option>
+              <option value="Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 WebAppManager" data-note="LG, webOS">TV</option>
+              <option value="Mozilla/5.0 (PlayStation; PlayStation 5/8.20) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" data-note="PlayStation 5">Game console</option>
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36" data-note="Chrome on Windows">Desktop</option>
+              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36" data-note="Chrome on macOS">Desktop</option>
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome} Safari/537.36 Edg/{chrome}" data-note="Edge on Windows">Desktop</option>
+              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15" data-note="Safari on macOS">Desktop</option>
+              <option value="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0" data-note="Firefox on Linux">Desktop</option>
             </select>
           </label>
           <label class="check">
@@ -421,22 +421,22 @@
           <label>Extra Chromium switches
             <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>
             <span class="note">One per line. Changes apply the next time the app starts.</span>
-            <select id="flag-presets" aria-label="Add a common switch">
+            <select id="flag-presets" class="mono" aria-label="Add a common switch">
               <option value="">Add a common switch…</option>
-              <option value="--enable-features=WebContentsForceDark">Dark mode for sites that have none</option>
-              <option value="--autoplay-policy=no-user-gesture-required">Let sound and video start by themselves</option>
-              <option value="--enable-features=TouchpadOverscrollHistoryNavigation">Two-finger swipe for back and forward</option>
-              <option value="--disable-smooth-scrolling">No smooth scrolling</option>
-              <option value="--enable-wayland-ime">Input methods (IME) on Wayland</option>
-              <option value="--lang=en-US">Language of the app and of sites (edit the code)</option>
-              <option value="--proxy-server=socks5://127.0.0.1:1080">Go through a proxy (edit the address)</option>
-              <option value="--disk-cache-size=104857600">Limit the disk cache to 100 MB</option>
-              <option value="--disable-background-timer-throttling">Keep timers at full speed in the background</option>
-              <option value="--disable-renderer-backgrounding">Keep full priority in the background</option>
-              <option value="--num-raster-threads=4">Four threads for drawing</option>
-              <option value="--enable-unsafe-webgpu">WebGPU</option>
-              <option value="--enable-features=Vulkan">Draw with Vulkan (experimental)</option>
-              <option value="--disable-gpu">No use of the graphics card at all (troubleshooting)</option>
+              <option value="--enable-features=WebContentsForceDark" data-note="Dark mode for sites that have none">--enable-features=WebContentsForceDark</option>
+              <option value="--autoplay-policy=no-user-gesture-required" data-note="Lets sound and video start by themselves">--autoplay-policy</option>
+              <option value="--enable-features=TouchpadOverscrollHistoryNavigation" data-note="Two-finger swipe for back and forward">--enable-features=TouchpadOverscrollHistoryNavigation</option>
+              <option value="--disable-smooth-scrolling" data-note="No smooth scrolling">--disable-smooth-scrolling</option>
+              <option value="--enable-wayland-ime" data-note="Input methods (IME) on Wayland">--enable-wayland-ime</option>
+              <option value="--lang=en-US" data-note="Language of the app and of sites. Edit the code after adding it">--lang</option>
+              <option value="--proxy-server=socks5://127.0.0.1:1080" data-note="Go through a proxy. Edit the address after adding it">--proxy-server</option>
+              <option value="--disk-cache-size=104857600" data-note="Limit of the disk cache, in bytes. Edit the number after adding it">--disk-cache-size</option>
+              <option value="--disable-background-timer-throttling" data-note="Keep timers at full speed in the background">--disable-background-timer-throttling</option>
+              <option value="--disable-renderer-backgrounding" data-note="Keep full priority in the background">--disable-renderer-backgrounding</option>
+              <option value="--num-raster-threads=4" data-note="Number of threads for drawing. Edit the number after adding it">--num-raster-threads</option>
+              <option value="--enable-unsafe-webgpu" data-note="WebGPU">--enable-unsafe-webgpu</option>
+              <option value="--enable-features=Vulkan" data-note="Draw with Vulkan (experimental)">--enable-features=Vulkan</option>
+              <option value="--disable-gpu" data-note="No use of the graphics card at all (troubleshooting)">--disable-gpu</option>
             </select>
           </label>
         </details>
