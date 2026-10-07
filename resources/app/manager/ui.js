@@ -237,7 +237,7 @@ async function saveForm() {
     state = result.state;
     renderSidebar();
     select(result.id);
-    setStatus("Saved. The menu entry is up to date.");
+    setStatus(running.has(result.id) ? "Saved. The app is running: close it and launch it again for the changes to take effect." : "Saved. The menu entry is up to date.");
     return true;
   } catch (e) {
     setStatus(e.message, true);

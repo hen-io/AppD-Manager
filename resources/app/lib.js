@@ -17,8 +17,12 @@ const APP_ACTIONS = {
 };
 const EXTENSIONS = {
   adblock: {
-    name: "Ad blocker",
-    about: "Blocks ads and trackers, also the ads in YouTube videos. Uses the filter lists uBlock Origin uses, refreshed daily."
+    name: "Ad blocker (web and YouTube)",
+    about: "Blocks ads and trackers on websites, and the ads in YouTube videos. Uses the filter lists uBlock Origin uses, refreshed daily."
+  },
+  twitch: {
+    name: "Twitch ad blocker",
+    about: "Removes the ads in Twitch streams, which the general blocker cannot reach. Uses the TwitchAdSolutions script, fetched from its project on GitHub."
   },
   sponsorblock: {
     name: "SponsorBlock",

@@ -129,6 +129,8 @@ ipcMain.on("appd-page-filters", (event, url) => {
   let filters = null;
   try {
     if (cfg.extensions.includes("adblock")) filters = extras.pageFilters(String(url));
+    const twitch = cfg.extensions.includes("twitch") ? extras.twitchPageScript(String(url)) : null;
+    if (twitch) filters = { scripts: [...filters ? filters.scripts : [], twitch], styles: filters ? filters.styles : "" };
   } catch {
   }
   event.returnValue = filters;
@@ -440,6 +442,8 @@ const extension = (name) => cfg.extensions.includes(name);
 async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
+  if (extension("twitch")) await extras.enableTwitchAdBlock().catch(() => {
+  });
   if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
     hideLeftovers: cfg.adBlockHideLeftovers,
     inPageAds: cfg.adBlockInPageAds,
@@ -456,7 +460,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: cfg.backgroundThrottling,
-      ...cfg.actionButton !== "off" || extension("adblock") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
+      ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
