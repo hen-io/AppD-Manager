@@ -246,12 +246,6 @@ const handlers = {
   },
   checkUpdate: () => update.check(),
   async askUpdate(info) {
-    const notes = String(info.notes || "");
-    const about = [
-      info.name && info.name !== info.tag && info.name !== info.latest ? info.name : "",
-      notes.length > 1500 ? `${notes.slice(0, 1500).trimEnd()}…
-(the rest is on the release page)` : notes
-    ].filter(Boolean).join("\n\n");
     const how = info.blocked || `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`;
     const buttons = info.blocked ? ["OK", "Open release page"] : ["Update now", "Later", "Open release page"];
     const response = await ask({
@@ -259,7 +253,8 @@ const handlers = {
       buttons,
       cancel: info.blocked ? 0 : 1,
       message: `AppD-Manager ${info.latest} is available`,
-      detail: [about, how].filter(Boolean).join("\n\n")
+      release: { name: info.name, tag: info.tag, latest: info.latest, notes: info.notes },
+      detail: how
     });
     if (buttons[response] === "Open release page") handlers.openReleasePage(info.url);
     return !info.blocked && response === 0;

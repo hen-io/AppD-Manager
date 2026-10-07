@@ -57,7 +57,7 @@
           <button id="release-page" type="button" data-icon="open-in-new" hidden>Open release page</button>
         </div>
         <p id="update-status" class="note"></p>
-        <pre id="release-notes" class="note" hidden></pre>
+        <div id="release" class="release" hidden></div>
       </section>
     </section>
 
@@ -81,7 +81,11 @@
       <div class="page">
         <header class="title">
           <span id="icon-preview"></span>
-          <h1 id="form-title"></h1>
+          <div class="title-text">
+            <h1 id="form-title"></h1>
+            <span id="form-sub" class="note"></span>
+          </div>
+          <span id="running-badge" class="badge running" hidden>Running</span>
         </header>
 
         <details class="card" open>
@@ -137,7 +141,7 @@
               <option value="bottom-left">Bottom left</option>
               <option value="bottom-right">Bottom right</option>
             </select>
-            <span class="note">A small round button that is always there and opens the app's menu: reload, hard reload, empty cache, back and forward, copy the address, zoom, full screen, developer tools.</span>
+            <span class="note">A small round button that is always there and opens the app's menu: reload, hard reload, empty cache, back and forward, copy the address, zoom, full screen, and the settings of its extensions.</span>
           </label>
           <label>Keys that open the app's menu
             <input name="menuShortcut" placeholder="None">
@@ -461,6 +465,7 @@
 
   <dialog id="ask">
     <h2 id="ask-message"></h2>
+    <div id="ask-release" class="release" hidden></div>
     <p id="ask-detail" class="note"></p>
     <div id="ask-buttons" class="row"></div>
   </dialog>

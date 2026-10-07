@@ -43,11 +43,28 @@ function label(button, icon, text) {
   svg.append(path);
   button.replaceChildren(svg, text);
 }
+function showRelease(box, release) {
+  const named = release && release.name && release.name !== release.tag && release.name !== release.latest;
+  box.hidden = !release || !named && !release.notes;
+  if (box.hidden) return;
+  const title = document.createElement("h4");
+  title.textContent = named ? release.name : `Version ${release.latest}`;
+  const version = document.createElement("span");
+  version.className = "badge";
+  version.textContent = release.tag || release.latest;
+  const head = document.createElement("header");
+  head.append(title, version);
+  const notes = document.createElement("p");
+  notes.className = "notes";
+  notes.textContent = release.notes || "";
+  box.replaceChildren(head, notes);
+}
 let asking = null;
-window.ask = ({ message, detail, buttons, icon, cancel, danger }) => new Promise((resolve) => {
+window.ask = ({ message, detail, buttons, icon, cancel, danger, release }) => new Promise((resolve) => {
   const box = $("ask");
   if (asking) asking();
   label($("ask-message"), icon, message);
+  showRelease($("ask-release"), release);
   $("ask-detail").textContent = detail || "";
   const answer = (index) => {
     asking = null;
@@ -393,6 +410,7 @@ function readForm() {
   return cfg;
 }
 function showLaunchButton() {
+  $("running-badge").hidden = !running.has(selected);
   if (running.has(selected)) label($("launch"), "stop", "Close app");
   else label($("launch"), "launch", "Launch app");
 }
@@ -460,6 +478,7 @@ function select(id) {
     fillForm(cfg);
     loadedForm = JSON.stringify(readForm());
     updateSaveButton();
+    $("form-sub").textContent = isNew ? "Give it a name and an address, then save." : cfg.url;
     showIconPreview(isNew ? null : app.iconUrl, cfg.name);
     $("launch").hidden = isNew;
     showLaunchButton();
@@ -585,10 +604,7 @@ function showUpdate() {
   label($("install-update"), "download", `Install ${update.latest}`);
   if (!update.available) $("update-status").textContent = "You have the newest version.";
   else $("update-status").textContent = `Version ${update.latest} is available. ${update.blocked}`.trim();
-  const name = update.name && update.name !== update.tag && update.name !== update.latest ? update.name : "";
-  const notes = update.available ? [name, update.notes].filter(Boolean).join("\n\n") : "";
-  $("release-notes").textContent = notes;
-  $("release-notes").hidden = !notes;
+  showRelease($("release"), update.available ? update : null);
   $("release-page").hidden = !update.available;
 }
 async function checkUpdate() {
@@ -601,7 +617,7 @@ async function checkUpdate() {
     update = null;
     $("install-update").hidden = true;
     $("release-page").hidden = true;
-    $("release-notes").hidden = true;
+    $("release").hidden = true;
     $("update-status").textContent = `Could not check for updates: ${e.message}`;
   }
   $("check-update").disabled = false;

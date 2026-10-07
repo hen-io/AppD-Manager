@@ -99,11 +99,6 @@ code {
   align-items: center;
   gap: 8px;
 }
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 14px;
-}
 .banner {
   display: block;
   width: 100%;
@@ -346,8 +341,13 @@ form > .page {
   gap: 14px;
   margin-bottom: 18px;
 }
-.title h1 {
+.title-text {
+  flex: 1;
   min-width: 0;
+}
+.title h1,
+.title .note {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -486,13 +486,54 @@ form.global #show-config {
 .extension-settings > :last-child {
   margin-bottom: 12px;
 }
-#release-notes {
-  max-height: 180px;
-  margin: 8px 0 0;
-  overflow: auto;
-  font-family: inherit;
+.release {
+  margin: 4px 0 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.release header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.release h4 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.release .notes,
+#settings .release .notes {
+  max-height: 220px;
+  margin: 0;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.release .notes:empty {
+  display: none;
+}
+.badge {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--selected);
+  color: var(--text);
+}
+.badge.running {
+  background: #27ae60;
+  color: #fff;
 }
 .sponsor-row {
   display: flex;
@@ -591,6 +632,12 @@ select {
 textarea {
   resize: vertical;
 }
+label:not(.check) > input[type=number] {
+  max-width: 180px;
+}
+.size-row label:not(.check) > input[type=number] {
+  max-width: none;
+}
 ::placeholder {
   color: var(--muted);
   opacity: 0.75;
@@ -666,7 +713,19 @@ form.global > .page {
 }
 #settings p,
 #library-card p {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+#settings .row,
+#library-card .row {
+  margin-bottom: 12px;
+}
+#settings .path {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
 }
 #settings p:empty,
 #library-card p:empty {

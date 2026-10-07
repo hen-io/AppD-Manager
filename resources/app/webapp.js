@@ -147,7 +147,7 @@ function extensionMenu() {
       click: () => openExtensionOptions(extension2)
     }))
   ];
-  return items.length ? [{ label: "Extensions", submenu: items }, { type: "separator" }] : [];
+  return items.length ? [{ type: "separator" }, { label: "Extensions", submenu: items }] : [];
 }
 function showActionMenu(wc) {
   if (wc.isDestroyed()) return;
@@ -182,9 +182,7 @@ function showActionMenu(wc) {
       checked: Boolean(window?.isFullScreen()),
       click: () => window?.setFullScreen(!window.isFullScreen())
     },
-    sep,
-    ...extensionMenu(),
-    { label: "Developer tools", accelerator: "F12", click: () => wc.toggleDevTools() }
+    ...extensionMenu()
   ]).popup({ window: window ?? void 0 });
 }
 ipcMain.on("appd-action-button", (event) => {
@@ -261,8 +259,7 @@ function contextMenu(wc, p) {
     { label: `Go to ${cfg.name}`, click: () => wc.loadURL(cfg.url) },
     { label: "Back", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
     { label: "Reload", click: () => wc.reload() },
-    ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
-    { label: "Inspect", click: () => wc.inspectElement(p.x, p.y) }
+    ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) }))
   );
   Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
 }
