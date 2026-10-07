@@ -52,12 +52,22 @@ function author() {
   if (url && !linkText) linkText = url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
   return { name, url, linkText: url ? linkText : "" };
 }
+const previews = /* @__PURE__ */ new Map();
 function iconPreview(file) {
   if (!file) return null;
   try {
-    if (/\.svg$/i.test(file)) return `data:image/svg+xml;base64,${fs.readFileSync(file).toString("base64")}`;
-    const image = nativeImage.createFromPath(file);
-    return image.isEmpty() ? null : image.resize({ width: 96 }).toDataURL();
+    const { mtimeMs, size } = fs.statSync(file);
+    const stamp = `${mtimeMs}:${size}`;
+    const kept = previews.get(file);
+    if (kept && kept.stamp === stamp) return kept.url;
+    let url;
+    if (/\.svg$/i.test(file)) url = `data:image/svg+xml;base64,${fs.readFileSync(file).toString("base64")}`;
+    else {
+      const image = nativeImage.createFromPath(file);
+      url = image.isEmpty() ? null : image.resize({ width: 96 }).toDataURL();
+    }
+    previews.set(file, { stamp, url });
+    return url;
   } catch {
     return null;
   }
@@ -74,6 +84,7 @@ function state() {
   return {
     apps,
     defaults: lib.fresh(),
+    rules: lib.RULES,
     imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
     sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
@@ -186,6 +197,36 @@ const handlers = {
     lib.remove(id);
     lib.sync();
     return { removed: true, state: state() };
+  },
+  duplicate(id) {
+    const copy = lib.duplicate(id);
+    lib.sync();
+    return { id: copy, state: state() };
+  },
+  async clearData(id) {
+    lib.checkId(id);
+    const response = await ask({
+      icon: "delete",
+      danger: true,
+      buttons: ["Delete the data", "Cancel"],
+      message: `Delete the data of "${lib.load(id).name}"?`,
+      detail: "This signs the app out everywhere and deletes its cookies, cache and remembered window size. Its settings and icon stay. The app is closed first if it is running."
+    });
+    if (response !== 0) return false;
+    if (lib.close(id)) {
+      for (let tries = 0; tries < 50 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
+    }
+    lib.clearData(id);
+    return true;
+  },
+  async askUnsaved() {
+    const response = await ask({
+      icon: "save",
+      buttons: ["Save", "Discard", "Cancel"],
+      message: "Save the changes?",
+      detail: "The app you are editing has changes that are not saved."
+    });
+    return ["save", "discard", "stay"][response];
   },
   runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
   close(id) {

@@ -20,6 +20,7 @@
     <button id="new" type="button" class="primary" data-icon="plus" title="New app">New app</button>
 
     <h2 class="caption">Your apps</h2>
+    <input id="filter" type="search" placeholder="Find an app…" aria-label="Find an app" hidden>
     <ul id="apps"></ul>
     <p id="no-apps" class="note" hidden>No apps yet.</p>
 
@@ -121,6 +122,10 @@
           <label>Description
             <input name="description" placeholder="Shown under the name in the menu">
           </label>
+          <label class="check">
+            <input name="autostart" type="checkbox">
+            Start this app when you log in
+          </label>
           <label>Icon
             <span class="row">
               <input name="icon" placeholder="Icon name or image file">
@@ -169,6 +174,11 @@
             <input name="menuShortcut" placeholder="None">
             <span class="note">The same menu from the keyboard. Written like <code>Ctrl+X</code> or <code>Ctrl+Shift+M</code>; empty for none. Ctrl+X no longer cuts text in the app while it is used for this.</span>
           </label>
+          <label class="check">
+            <input name="windowDecorations" type="checkbox">
+            Show window decorations (title bar and borders)
+          </label>
+          <span class="note below-check">Without them the window is bare. Move it with Meta+drag, and minimize, maximize or close it from the app's menu (Ctrl+X by default, or the menu button) or with Alt+F4.</span>
           <label class="check">
             <input name="fixedTitle" type="checkbox">
             Always show the app name as window title
@@ -440,6 +450,10 @@
             Ignore certificate errors (accept invalid, expired and self-signed certificates)
           </label>
           <span class="note below-check">Only for apps on your own network, such as a device with a self-signed certificate. With this on, nothing checks that a site is who it says it is, for every address the app loads.</span>
+          <label>Custom CSS
+            <textarea name="customCss" class="code" rows="3" spellcheck="false" placeholder=".some-banner { display: none !important; }"></textarea>
+            <span class="note">Your own style rules, added to every page of the app: to hide something, change a font, widen a column.</span>
+          </label>
           <label>Extra Chromium switches
             <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>
             <span class="note">One per line. Changes apply the next time the app starts.</span>
@@ -479,7 +493,14 @@
         <button id="save" type="submit" class="primary" data-icon="save">Save</button>
         <button id="launch" type="button">Launch app</button>
         <span id="status" class="note"></span>
-        <button id="show-config" type="button" data-icon="file" title="Shows the app's config.json, which also holds the settings of its extensions, in the file manager">Show config file</button>
+        <span class="more">
+          <select id="more-actions" aria-label="More actions">
+            <option value="">More…</option>
+            <option value="duplicate" data-note="A second app with the same settings and icon, without the logins">Duplicate</option>
+            <option value="showConfig" data-note="Its config.json, in the file manager">Show config file</option>
+            <option value="clearData" data-note="Signs it out everywhere: deletes cookies and cache, keeps the settings">Delete the app's data…</option>
+          </select>
+        </span>
         <button id="remove" type="button" class="danger" data-icon="delete">Remove</button>
       </div>
     </form>
@@ -492,6 +513,14 @@
     <div id="ask-buttons" class="row"></div>
   </dialog>
 
-  <script src="ui.js"></script>
+  <script src="ui/core.js"></script>
+  <script src="ui/icons.js"></script>
+  <script src="ui/picker.js"></script>
+  <script src="ui/dialogs.js"></script>
+  <script src="ui/apps.js"></script>
+  <script src="ui/extensions.js"></script>
+  <script src="ui/form.js"></script>
+  <script src="ui/settings.js"></script>
+  <script src="ui/main.js"></script>
 </body>
 </html>

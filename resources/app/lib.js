@@ -2,7 +2,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawn, spawnSync } = require("child_process");
+const { spawn } = require("child_process");
 const home = os.homedir();
 const root = path.join(home, ".AppD-manager");
 const settingsPath = path.join(root, "settings.json");
@@ -98,6 +98,7 @@ const DEFAULTS = {
   icon: "applications-internet",
   width: 1280,
   height: 800,
+  autostart: false,
   startMaximized: false,
   userAgent: "",
   openLinks: "browser",
@@ -148,6 +149,7 @@ const DEFAULTS = {
   colorScheme: "system",
   actionButton: "off",
   menuShortcut: "Ctrl+X",
+  windowDecorations: true,
   fixedTitle: false,
   defaultZoom: 100,
   allowZoom: true,
@@ -163,6 +165,7 @@ const DEFAULTS = {
   reloadAfterIdleMinutes: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
+  customCss: "",
   ignoreCertificateErrors: false,
   flags: [],
   configVersion: 3
@@ -232,10 +235,35 @@ function newId(name) {
   for (let n = 2; fs.existsSync(appDir(id)); n++) id = `${base}-${n}`;
   return id;
 }
+const RULES = {
+  width: { min: 200, max: 16e3 },
+  height: { min: 150, max: 16e3 },
+  defaultZoom: { min: 25, max: 500 },
+  openLinks: { oneOf: OPEN_LINKS },
+  colorScheme: { oneOf: COLOR_SCHEMES },
+  actionButton: { oneOf: ACTION_BUTTON },
+  youtubeQuality: { oneOf: ["auto", ...Object.keys(YOUTUBE_QUALITIES)] },
+  sponsorBlockNoticeSeconds: { min: 1, max: 60 },
+  sponsorBlockMinSeconds: { min: 0, max: 3600 },
+  darkBrightness: { min: 30, max: 150 },
+  darkContrast: { min: 30, max: 150 },
+  darkSepia: { min: 0, max: 100 },
+  cpuPercent: { min: 0.1, max: 100 },
+  unfocusedCpuPercent: { min: 0.1, max: 100 },
+  slowAfterSeconds: { min: 1, max: 86400 },
+  pauseAfterSeconds: { min: 1, max: 86400 },
+  reloadAfterIdleMinutes: { min: 0, max: 1e5 },
+  jsHeapMb: { min: 0, max: 65536 }
+};
 function validate(cfg) {
   for (const [key, def] of Object.entries(DEFAULTS)) {
     if (typeof cfg[key] !== typeof def || Array.isArray(cfg[key]) !== Array.isArray(def)) {
       throw new Error(`"${key}" must be ${Array.isArray(def) ? "an array" : `a ${typeof def}`}`);
+    }
+    const rule = RULES[key];
+    if (rule?.oneOf && !rule.oneOf.includes(cfg[key])) throw new Error(`"${key}" must be one of: ${rule.oneOf.join(", ")}`);
+    if (rule && "min" in rule && !(cfg[key] >= rule.min && cfg[key] <= rule.max)) {
+      throw new Error(`"${key}" must be a number from ${rule.min} to ${rule.max}`);
     }
   }
   if (!URL.canParse(cfg.url)) throw new Error(`invalid url "${cfg.url}"`);
@@ -253,18 +281,6 @@ function validate(cfg) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
-  if (cfg.youtubeQuality !== "auto" && !(cfg.youtubeQuality in YOUTUBE_QUALITIES)) {
-    throw new Error(`"youtubeQuality" must be one of: auto, ${Object.keys(YOUTUBE_QUALITIES).join(", ")}`);
-  }
-  if (!COLOR_SCHEMES.includes(cfg.colorScheme)) {
-    throw new Error(`"colorScheme" must be one of: ${COLOR_SCHEMES.join(", ")}`);
-  }
-  if (!ACTION_BUTTON.includes(cfg.actionButton)) {
-    throw new Error(`"actionButton" must be one of: ${ACTION_BUTTON.join(", ")}`);
-  }
-  if (!OPEN_LINKS.includes(cfg.openLinks)) {
-    throw new Error(`"openLinks" must be one of: ${OPEN_LINKS.join(", ")}`);
-  }
 }
 function extensionDefaults() {
   const stored = readSettings().extensionSettings || {};
@@ -361,6 +377,9 @@ function withDefaults(file) {
     else stored.unfocusedCpuPercent = Math.min(limit, 10);
   }
   stored.configVersion = DEFAULTS.configVersion;
+  for (const [key, rule] of Object.entries(RULES)) {
+    if ("min" in rule && typeof stored[key] === "number") stored[key] = Math.min(rule.max, Math.max(rule.min, stored[key]));
+  }
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
@@ -419,6 +438,18 @@ function save(id, cfg) {
 function remove(id) {
   checkId(id);
   fs.rmSync(appDir(id), { recursive: true, force: true });
+}
+function clearData(id) {
+  checkId(id);
+  if (runningPid(id)) throw new Error("Close the app first.");
+  fs.rmSync(profileDir(id), { recursive: true, force: true });
+}
+function duplicate(id) {
+  const cfg = load(id);
+  const name = `${cfg.name} (copy)`;
+  const copy = newId(name);
+  save(copy, { ...cfg, name, icon: iconFile(id, cfg) || cfg.icon, autostart: false });
+  return copy;
 }
 function runningPid(id) {
   try {
@@ -504,6 +535,9 @@ function writeShortcut(file, options) {
 function writeWindowsShortcut(id, cfg) {
   const [target, args] = runCommand(id);
   const source = iconFile(id, cfg);
+  const startup = path.join(path.dirname(startMenuDir), "Startup", `AppD ${id}.lnk`);
+  if (!cfg.autostart) fs.rmSync(startup, { force: true });
+  else if (electronShell()) electronShell().shell.writeShortcutLink(startup, fs.existsSync(startup) ? "update" : "create", { target, args: shortcutArgs(args), cwd: path.dirname(launcher) });
   return writeShortcut(shortcutPath(cfg.name), {
     target,
     args: shortcutArgs(args),
@@ -545,6 +579,7 @@ function syncWindows(ids, problems) {
 }
 function writeDesktop(id, cfg) {
   if (WINDOWS) return void writeWindowsShortcut(id, cfg);
+  writeAutostart(id, cfg);
   writeEntry(desktopId(id), [
     `Name=${entryValue(cfg.name)}`,
     `Comment=${entryValue(cfg.description || cfg.url)}`,
@@ -559,6 +594,28 @@ function writeDesktop(id, cfg) {
     `Exec=${execArg(launcher)} run ${id} --appd-action=${action}`,
     ""
   ]));
+}
+const autostartDir = path.join(process.env.XDG_CONFIG_HOME || path.join(home, ".config"), "autostart");
+const autostartPath = (id) => path.join(autostartDir, `${desktopId(id)}.desktop`);
+function writeAutostart(id, cfg) {
+  const file = autostartPath(id);
+  if (!cfg.autostart) return fs.rmSync(file, { force: true });
+  const content = [
+    "[Desktop Entry]",
+    "Type=Application",
+    `Name=${entryValue(cfg.name)}`,
+    `Exec=${execArg(launcher)} run ${id}`,
+    `Icon=${entryValue(iconFile(id, cfg) || cfg.icon)}`,
+    "Terminal=false",
+    "X-GNOME-Autostart-enabled=true",
+    ""
+  ].join("\n");
+  try {
+    if (fs.readFileSync(file, "utf8") === content) return void 0;
+  } catch {
+  }
+  fs.mkdirSync(autostartDir, { recursive: true });
+  return fs.writeFileSync(file, content);
 }
 function writeManagerDesktop() {
   writeEntry(MANAGER_DESKTOP_ID, [
@@ -586,10 +643,18 @@ function sync() {
     const m = /^appd-(.+)\.desktop$/.exec(file);
     if (m && !ids.includes(m[1])) fs.rmSync(path.join(desktopDir, file));
   }
-  spawnSync("kbuildsycoca6", { stdio: "ignore", timeout: 1e4 });
+  for (const file of fs.existsSync(autostartDir) ? fs.readdirSync(autostartDir) : []) {
+    const m = /^appd-(.+)\.desktop$/.exec(file);
+    if (m && !ids.includes(m[1])) fs.rmSync(path.join(autostartDir, file));
+  }
+  spawn("kbuildsycoca6", { stdio: "ignore", detached: true }).on("error", () => {
+  }).unref();
   return problems;
 }
 module.exports = {
+  RULES,
+  clearData,
+  duplicate,
   DEFAULTS,
   APP_ACTIONS,
   EXTENSIONS,

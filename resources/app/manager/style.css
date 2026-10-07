@@ -580,7 +580,23 @@ form.global .below-row,
 form.global #icon-preview,
 form.global #launch,
 form.global #remove,
-form.global #show-config {
+form.global .more {
+  display: none;
+}
+.actions .more .picker {
+  width: auto;
+}
+textarea.code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  white-space: pre;
+}
+#filter {
+  margin: 0 14px 8px;
+  width: auto;
+  padding: 6px 10px;
+}
+body.collapsed #filter {
   display: none;
 }
 .extension-adders {

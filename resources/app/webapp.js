@@ -194,6 +194,12 @@ function showActionMenu(wc) {
       checked: Boolean(window?.isFullScreen()),
       click: () => window?.setFullScreen(!window.isFullScreen())
     },
+    ...cfg.windowDecorations ? [] : [
+      sep,
+      { label: "Minimize", click: () => window?.minimize() },
+      { label: window?.isMaximized() ? "Restore size" : "Maximize", click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
+      { label: "Close window", accelerator: "Alt+F4", click: () => window?.close() }
+    ],
     ...extensionMenu()
   ]).popup({ window: window ?? void 0 });
 }
@@ -285,6 +291,8 @@ app.on("web-contents-created", (_event, wc) => {
     applyZoom(wc);
   });
   wc.on("zoom-changed", (_e, direction) => zoomBy(wc, direction === "in" ? 1 : -1));
+  if (cfg.customCss.trim()) wc.on("dom-ready", () => wc.insertCSS(cfg.customCss).catch(() => {
+  }));
   if (cfg.hideScrollbars) {
     wc.on("frame-created", (_e, { frame }) => {
       frame?.on("dom-ready", () => frame.executeJavaScript(`(() => {
@@ -296,7 +304,7 @@ app.on("web-contents-created", (_event, wc) => {
     });
   }
   wc.setWindowOpenHandler(({ url }) => {
-    const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true } };
+    const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true, frame: cfg.windowDecorations } };
     if (url === "about:blank") return appWindow;
     const web = /^https?:/i.test(url);
     if (web && cfg.openLinks === "window") return appWindow;
@@ -609,6 +617,7 @@ async function createWindow() {
     title: cfg.name,
     icon,
     ...extension("darkreader") || cfg.colorScheme === "dark" ? { backgroundColor: "#181a1b" } : {},
+    frame: cfg.windowDecorations,
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
