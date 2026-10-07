@@ -92,6 +92,41 @@ function parseShortcut(text) {
   return { control: parts.includes("ctrl") || parts.includes("control"), shift: parts.includes("shift"), alt: parts.includes("alt"), key };
 }
 const menuShortcut = parseShortcut(cfg.menuShortcut);
+const customExtensions = [];
+async function loadCustomExtensions() {
+  const loader = session.defaultSession.extensions || session.defaultSession;
+  for (const folder of cfg.customExtensions) {
+    try {
+      const info = lib.describeExtension(folder);
+      const loaded = await loader.loadExtension(folder, { allowFileAccess: true });
+      customExtensions.push({ id: loaded.id, name: info.name, options: info.options });
+    } catch (e) {
+      console.error(`appd: extension ${folder}: ${e.message}`);
+    }
+  }
+}
+function openExtensionSettings(extension2) {
+  const [command, args] = lib.managerCommand([`--appd-edit=${id}:${extension2}`]);
+  const env = { ...process.env };
+  for (const name of ["APPD_ID", "CHROME_DESKTOP", "ELECTRON_RUN_AS_NODE"]) delete env[name];
+  require("child_process").spawn(command, args, { detached: true, stdio: "ignore", env }).on("error", () => {
+  }).unref();
+}
+function openExtensionOptions(extension2) {
+  const options = new BrowserWindow({ width: 900, height: 700, title: extension2.name, icon, autoHideMenuBar: true });
+  options.loadURL(`chrome-extension://${extension2.id}/${extension2.options.replace(/^\/+/, "")}`);
+}
+function extensionMenu() {
+  const items = [
+    ...cfg.extensions.map((name) => ({ label: `${lib.EXTENSIONS[name].name} settings…`, click: () => openExtensionSettings(name) })),
+    ...customExtensions.map((extension2) => ({
+      label: `${extension2.name}${extension2.options ? " options…" : " (no settings page)"}`,
+      enabled: Boolean(extension2.options),
+      click: () => openExtensionOptions(extension2)
+    }))
+  ];
+  return items.length ? [{ label: "Extensions", submenu: items }, { type: "separator" }] : [];
+}
 function showActionMenu(wc) {
   if (wc.isDestroyed()) return;
   const window = BrowserWindow.fromWebContents(wc);
@@ -120,6 +155,7 @@ function showActionMenu(wc) {
       click: () => window?.setFullScreen(!window.isFullScreen())
     },
     sep,
+    ...extensionMenu(),
     { label: "Developer tools", accelerator: "F12", click: () => wc.toggleDevTools() }
   ]).popup({ window: window ?? void 0 });
 }
@@ -467,6 +503,7 @@ async function createWindow() {
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
+  await loadCustomExtensions();
   if (extension("sponsorblock")) {
     extras.enableSponsorBlock(win.webContents, cfg);
   }

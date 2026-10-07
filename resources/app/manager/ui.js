@@ -7,6 +7,8 @@ let selected = null;
 let update = null;
 let running = /* @__PURE__ */ new Set();
 let extensions = [];
+let customExtensions = [];
+const customInfo = {};
 let loadedForm = "";
 async function call(method, ...args) {
   const result = await window.appd[method](...args);
@@ -80,37 +82,82 @@ function tuneCpuStep(el) {
   el.min = fine ? "0.1" : "0.5";
   el.dataset.last = value;
 }
-function renderExtensions() {
-  const rows = extensions.map((name) => {
-    const info = state.extensions[name] || { name, about: "" };
-    const title = document.createElement("strong");
-    title.textContent = info.name;
-    const about = document.createElement("span");
-    about.className = "note";
-    about.textContent = info.about;
-    const text = document.createElement("div");
-    text.append(title, about);
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.textContent = "Remove";
-    removeButton.addEventListener("click", () => {
-      extensions = extensions.filter((other) => other !== name);
-      renderExtensions();
-      updateSaveButton();
-    });
-    const row = document.createElement("li");
-    row.append(text, removeButton);
-    return row;
+const EXTENSION_SETTINGS = { adblock: "adblock-settings", sponsorblock: "sponsor-settings", darkreader: "dark-settings" };
+function extensionBox(title, about, settings, remove2) {
+  const name = document.createElement("strong");
+  name.textContent = title;
+  const note = document.createElement("span");
+  note.className = "note";
+  note.textContent = about;
+  const text = document.createElement("div");
+  text.append(name, note);
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.textContent = "Remove";
+  removeButton.addEventListener("click", () => {
+    remove2();
+    renderExtensions();
+    updateSaveButton();
   });
-  $("extension-list").replaceChildren(...rows);
-  $("no-extensions").hidden = Boolean(rows.length);
+  const head = document.createElement("header");
+  head.append(text, removeButton);
+  const box = document.createElement("section");
+  box.className = "extension";
+  box.append(head);
+  if (settings) box.append(settings);
+  return box;
+}
+function renderExtensions() {
+  for (const id of Object.values(EXTENSION_SETTINGS)) $("extension-store").append($(id));
+  const boxes = extensions.map((name) => {
+    const info = state.extensions[name] || { name, about: "" };
+    const box = extensionBox(info.name, info.about, EXTENSION_SETTINGS[name] ? $(EXTENSION_SETTINGS[name]) : null, () => {
+      extensions = extensions.filter((other) => other !== name);
+    });
+    box.dataset.extension = name;
+    return box;
+  });
+  const imported = customExtensions.map((folder) => {
+    const info = customInfo[folder] || { name: folder, about: "" };
+    return extensionBox(info.name, info.about, null, () => {
+      customExtensions = customExtensions.filter((other) => other !== folder);
+    });
+  });
+  $("extension-list").replaceChildren(...boxes, ...imported);
+  $("no-extensions").hidden = Boolean(boxes.length + imported.length);
   const choices = Object.entries(state.extensions || {}).filter(([name]) => !extensions.includes(name)).map(([name, info]) => new Option(info.name, name));
   $("extension-add").replaceChildren(new Option("Add an extension…", ""), ...choices);
-  $("extension-add").hidden = !choices.length;
-  $("dark-settings").hidden = !extensions.includes("darkreader");
-  $("sponsor-settings").hidden = !extensions.includes("sponsorblock");
-  $("adblock-settings").hidden = !extensions.includes("adblock");
+  $("extension-add").disabled = !choices.length;
 }
+async function describeCustomExtensions() {
+  const unknown = customExtensions.filter((folder) => !customInfo[folder]);
+  if (!unknown.length) return;
+  try {
+    Object.assign(customInfo, await call("describeExtensions", unknown));
+    renderExtensions();
+  } catch {
+  }
+}
+async function importExtension() {
+  try {
+    const picked = await call("pickExtension");
+    if (!picked) return;
+    customInfo[picked.folder] = picked.info;
+    if (!customExtensions.includes(picked.folder)) customExtensions = [...customExtensions, picked.folder];
+    renderExtensions();
+    updateSaveButton();
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+}
+window.editApp = (id, extension) => {
+  if (!state.apps.some((app) => app.id === id && app.cfg)) return;
+  if (selected !== id) select(id);
+  const settings = $(EXTENSION_SETTINGS[extension] || "");
+  const box = form.querySelector(`.extension[data-extension="${extension}"]`);
+  if (settings && box) settings.open = true;
+  (box || $("extension-list")).scrollIntoView({ block: "start" });
+};
 const SPONSOR_ACTIONS = { off: "Off", show: "Show on the seek bar only", ask: "Ask before skipping", skip: "Skip automatically" };
 const SPONSOR_ACTIONS_FOR = {
   poi_highlight: { ask: "Offer a jump to it", skip: "Jump to it at the start" },
@@ -145,8 +192,7 @@ function addExtension() {
   if (!name || extensions.includes(name)) return;
   extensions = [...extensions, name];
   renderExtensions();
-  const settings = { adblock: "adblock-settings", sponsorblock: "sponsor-settings", darkreader: "dark-settings" }[name];
-  if (settings) $(settings).open = true;
+  if (EXTENSION_SETTINGS[name]) $(EXTENSION_SETTINGS[name]).open = true;
   updateSaveButton();
 }
 function fillForm(cfg) {
@@ -158,6 +204,8 @@ function fillForm(cfg) {
   }
   for (const el of form.querySelectorAll(".cpu-limit")) tuneCpuStep(el);
   extensions = [...cfg.extensions];
+  customExtensions = [...cfg.customExtensions];
+  describeCustomExtensions();
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
@@ -182,6 +230,7 @@ function readForm() {
   }
   cfg.url = normalizeUrl(cfg.url);
   cfg.extensions = [...extensions];
+  cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
@@ -414,6 +463,7 @@ form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
 $("agent-presets").addEventListener("change", useAgentPreset);
 $("extension-add").addEventListener("change", addExtension);
+$("extension-import").addEventListener("click", importExtension);
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => select(NEW));
@@ -435,6 +485,7 @@ $("release-page").addEventListener("click", () => update && call("openReleasePag
 (async () => {
   state = await call("state");
   renderSidebar();
+  if (state.edit) window.editApp(state.edit.id, state.edit.extension);
   refreshRunning();
   setInterval(refreshRunning, 2e3);
   checkUpdateOnStart();

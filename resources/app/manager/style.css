@@ -365,35 +365,48 @@ label.check {
 }
 #extension-list {
   margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
 }
-#extension-list li {
+.extension {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.extension > header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  background: var(--bg);
 }
-#extension-list li > div {
+.extension > header > div {
   flex: 1;
   min-width: 0;
 }
-#extension-list strong {
+.extension > header strong {
   display: block;
+  margin-bottom: 2px;
 }
-#extension-add {
+.extension-adders {
+  margin-bottom: 8px;
+}
+.extension-adders select {
+  flex: 1;
+}
+.extension-adders button {
+  flex: none;
+}
+.below-row {
+  display: block;
   margin-bottom: 14px;
 }
 .extension-settings {
-  margin-bottom: 10px;
+  border-top: 1px solid var(--border);
   padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
 .extension-settings > summary {
   margin: 0 -14px;
-  padding: 10px 14px;
+  padding: 9px 14px;
   font-weight: 600;
   cursor: pointer;
 }

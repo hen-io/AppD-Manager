@@ -14,6 +14,13 @@ if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId("manager"));
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
 let win;
+let pendingEdit = null;
+function editRequest(argv) {
+  const arg = argv.find((value) => value.startsWith("--appd-edit="));
+  const [id, extension = ""] = arg ? arg.slice("--appd-edit=".length).split(":") : [];
+  return /^[a-z0-9][a-z0-9_-]*$/.test(id || "") && /^[a-z]*$/.test(extension) ? { id, extension } : null;
+}
+pendingEdit = editRequest(process.argv);
 let unsaved = false;
 function author() {
   const value = require("./package.json").author || {};
@@ -60,7 +67,8 @@ function state() {
     appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
     version: app.getVersion(),
     updateRepo: update.REPO,
-    author: author()
+    author: author(),
+    edit: pendingEdit
   };
 }
 async function changeAppsDir(dir) {
@@ -74,7 +82,11 @@ async function changeAppsDir(dir) {
   return { ...state(), message: parts.join(" "), problem: left.length > 0 };
 }
 const handlers = {
-  state,
+  state() {
+    const value = state();
+    pendingEdit = null;
+    return value;
+  },
   setUnsaved(value) {
     unsaved = Boolean(value);
   },
@@ -145,6 +157,22 @@ const handlers = {
     fs.mkdirSync(lib.appsDir(), { recursive: true });
     const error = await shell.openPath(lib.appsDir());
     if (error) throw new Error(error);
+  },
+  async pickExtension() {
+    const { filePaths } = await dialog.showOpenDialog(win, {
+      title: "Choose the folder of an unpacked extension (it holds manifest.json)",
+      properties: ["openDirectory"]
+    });
+    return filePaths[0] ? { folder: filePaths[0], info: lib.describeExtension(filePaths[0]) } : null;
+  },
+  describeExtensions(folders) {
+    return Object.fromEntries(folders.map((folder) => {
+      try {
+        return [folder, lib.describeExtension(String(folder))];
+      } catch (e) {
+        return [folder, { name: path.basename(String(folder)), about: e.message }];
+      }
+    }));
   },
   showConfig(id) {
     lib.checkId(id);
@@ -239,11 +267,14 @@ function createWindow() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, argv) => {
     if (!win) return;
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+    const edit = editRequest(argv);
+    if (edit) win.webContents.executeJavaScript(`window.editApp(${JSON.stringify(edit.id)}, ${JSON.stringify(edit.extension)})`).catch(() => {
+    });
   });
   app.on("window-all-closed", () => app.quit());
   Menu.setApplicationMenu(null);

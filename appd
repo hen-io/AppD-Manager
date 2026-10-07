@@ -27,7 +27,7 @@ case "${1:-manager}" in
     ;;
   manager)
     unset APPD_ID
-    exec "$electron" "${flags[@]}" "$app"
+    exec "$electron" "${flags[@]}" "$app" "${@:2}"
     ;;
 esac
 

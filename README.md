@@ -31,6 +31,14 @@ curl -fsSL https://raw.githubusercontent.com/hen-io/AppD-Manager/HEAD/appd-manag
 sudo pacman -Sy appd-manager
 ```
 
+### Windows (64-bit)
+
+1. Download `AppD-Manager_v_<version>_windows_x64.zip` from the [latest release](https://github.com/hen-io/AppD-Manager/releases/latest).
+2. Unpack it to a folder of your own, for example `C:\Users\<you>\AppD-Manager`.
+3. Start `AppD-Manager.exe`.
+
+AppD-Manager and the apps you add get shortcuts in the Start menu, in the folder **AppD-Manager**.
+
 ### Any other distribution
 
 Installs for your user only, without root:

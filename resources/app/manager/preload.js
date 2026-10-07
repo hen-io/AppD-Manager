@@ -15,6 +15,8 @@ for (const name of [
   "resetAppsDir",
   "openAppsDir",
   "showConfig",
+  "pickExtension",
+  "describeExtensions",
   "openAuthorLink",
   "openReleasePage",
   "checkUpdate",

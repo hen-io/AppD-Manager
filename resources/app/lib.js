@@ -11,6 +11,24 @@ const defaultAppsDir = path.join(root, "Applications");
 const desktopDir = path.join(process.env.XDG_DATA_HOME || path.join(home, ".local/share"), "applications");
 const WINDOWS = process.platform === "win32";
 const launcher = process.env.APPD_BIN || (WINDOWS ? process.execPath : path.join(__dirname, "appd"));
+function managerCommand(extra = []) {
+  if (!WINDOWS) return [launcher, ["manager", ...extra]];
+  return [launcher, [...runCommand("")[1].filter((arg) => !arg.startsWith("--appd-run=")), ...extra]];
+}
+function describeExtension(folder) {
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(path.join(folder, "manifest.json"), "utf8"));
+  } catch {
+    throw new Error(`${folder} is not an unpacked extension: it has no readable manifest.json.`);
+  }
+  const text = (value) => typeof value === "string" && !value.startsWith("__MSG_") ? value : "";
+  return {
+    name: [text(manifest.name) || path.basename(folder), text(manifest.version)].filter(Boolean).join(" "),
+    about: `${text(manifest.description) || "Imported Chrome extension"} (${folder})`,
+    options: text(manifest.options_ui?.page) || text(manifest.options_page)
+  };
+}
 function runCommand(id, extra = []) {
   if (!WINDOWS) return [launcher, ["run", id, ...extra]];
   const built = path.join(path.dirname(launcher), "resources", "app") === __dirname;
@@ -86,6 +104,7 @@ const DEFAULTS = {
   internalHosts: [],
   homeButton: true,
   extensions: [],
+  customExtensions: [],
   adBlockHideLeftovers: true,
   adBlockInPageAds: true,
   adBlockExceptions: [],
@@ -472,6 +491,8 @@ module.exports = {
   windowsAppId,
   pidFile,
   runCommand,
+  managerCommand,
+  describeExtension,
   root,
   launcher,
   managerDataDir,

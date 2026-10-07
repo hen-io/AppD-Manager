@@ -135,13 +135,18 @@
 
         <details class="card" open>
           <summary>Extensions</summary>
-          <ul id="extension-list"></ul>
+          <div id="extension-list"></div>
           <p id="no-extensions" class="note">None added.</p>
-          <select id="extension-add" aria-label="Add an extension">
-            <option value="">Add an extension…</option>
-          </select>
-          <details id="adblock-settings" class="extension-settings" hidden>
-            <summary>Ad blocker settings</summary>
+          <div class="row extension-adders">
+            <select id="extension-add" aria-label="Add an extension">
+              <option value="">Add an extension…</option>
+            </select>
+            <button id="extension-import" type="button" title="An unpacked Chrome extension: the folder that holds its manifest.json">Import an extension folder…</button>
+          </div>
+          <span class="note below-row">Imported Chrome extensions run on what Electron supports of the extension system: ones that change pages mostly work, ones that need a toolbar button or the full browser do not.</span>
+                    <div id="extension-store" hidden>
+          <details id="adblock-settings" class="extension-settings">
+            <summary>Settings</summary>
             <label class="check">
               <input name="adBlockInPageAds" type="checkbox">
               Remove ads that sites serve themselves (YouTube's video ads)
@@ -156,8 +161,8 @@
               <span class="note">One per line. For a site that breaks with the blocker on.</span>
             </label>
           </details>
-          <details id="sponsor-settings" class="extension-settings" hidden>
-            <summary>SponsorBlock settings</summary>
+          <details id="sponsor-settings" class="extension-settings">
+            <summary>Settings</summary>
             <div id="sponsor-categories"></div>
             <span class="note sponsor-note">What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.</span>
             <label class="check">
@@ -252,8 +257,8 @@
               <span class="note">Every video starts in this quality; one that does not have it gets the next lower one it has. You can still change it in the player.</span>
             </label>
           </details>
-          <details id="dark-settings" class="extension-settings" hidden>
-            <summary>Dark Reader settings</summary>
+          <details id="dark-settings" class="extension-settings">
+            <summary>Settings</summary>
             <div class="size-row">
             <label>Brightness (%)
               <input name="darkBrightness" type="number" min="30" max="150" step="5">
@@ -266,6 +271,7 @@
             </label>
             </div>
           </details>
+          </div>
         </details>
 
         <details class="card" open>
