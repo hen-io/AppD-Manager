@@ -21,12 +21,9 @@ function fillForm(cfg) {
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
-  for (const [key, name] of [["pauseAfterSeconds", "pause"]]) {
-    const seconds = cfg[key];
-    const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
-    $(`${name}-unit`).value = String(unit);
-    $(`${name}-amount`).value = seconds / unit;
-  }
+  $("border-auto").checked = !cfg.windowBorderColor;
+  $("border-colour").value = cfg.windowBorderColor || iconHex();
+  for (const el of form.querySelectorAll("[data-time]")) el.showTime();
 }
 function normalizeUrl(url) {
   url = url.trim();
@@ -47,7 +44,8 @@ function readForm() {
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
-  cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
+  for (const key of ["trayX", "trayY", "trayScreen"]) cfg[key] = Number.isFinite(Number(form.elements[key].value)) ? Number(form.elements[key].value) : state.defaults[key];
+  cfg.windowBorderColor = $("border-auto").checked ? "" : $("border-colour").value;
   return cfg;
 }
 let unsaved = false;
@@ -63,12 +61,25 @@ function showSlowDown() {
     field.disabled = !form.elements.backgroundThrottling.checked;
     field.closest("label").classList.toggle("off", field.disabled);
   }
+  const pause = form.elements.pauseAfterSeconds;
+  pause.disabled = !form.elements.pauseWhenUnfocused.checked;
+  pause.closest("label").classList.toggle("off", pause.disabled);
+}
+function iconHex() {
+  const app = state.apps.find((one) => one.id === selected);
+  return app?.iconUrl && iconLooks.get(app.iconUrl)?.hex || "#7a7f87";
 }
 function showWindowKind() {
   const tray = form.elements.trayApp.checked;
   for (const el of form.querySelectorAll(".not-for-tray")) el.hidden = tray;
   $("tray-settings").hidden = !tray;
   $("bare-look").hidden = !tray && form.elements.windowDecorations.checked;
+  const placed = form.elements.trayPosition.value === "custom";
+  $("tray-at-icon").hidden = placed || Number(form.elements.trayScreen.value) > 0;
+  $("place-now").textContent = placed ? `${Math.round(Number(form.elements.trayX.value))}% across, ${Math.round(Number(form.elements.trayY.value))}% down` : "";
+  $("border-look").hidden = !(Number(form.elements.windowBorderWidth.value) > 0);
+  $("border-own").hidden = $("border-auto").checked;
+  if ($("border-auto").checked) $("border-colour").value = iconHex();
 }
 function updateSaveButton() {
   showSlowDown();

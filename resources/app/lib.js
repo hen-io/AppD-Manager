@@ -112,11 +112,17 @@ const DEFAULTS = {
   trayHeight: 640,
   trayAtIcon: true,
   trayPosition: "bottom-right",
+  trayScreen: 0,
+  trayX: 100,
+  trayY: 100,
+  trayCloseAfterSeconds: 0,
   trayHideOnBlur: true,
   trayShowAtStart: false,
   windowRadius: 0,
   windowBorderWidth: 0,
-  windowBorderColor: "#7a7f87",
+  windowBorderColor: "",
+  windowBorderOpacity: 100,
+  windowBorderStyle: "solid",
   alwaysOnTop: false,
   closeToTray: false,
   unreadBadge: true,
@@ -182,15 +188,18 @@ const DEFAULTS = {
   slowAfterSeconds: 5,
   unfocusedCpuPercent: 10,
   skipMissedUpdates: false,
-  reloadAfterIdleMinutes: 0,
+  reloadAfterIdleSeconds: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
   permissions: "app",
   customCss: "",
   customJs: "",
+  proxy: "",
+  spellcheck: true,
+  spellcheckLanguages: [],
   ignoreCertificateErrors: false,
   flags: [],
-  configVersion: 3
+  configVersion: 4
 };
 const EXTENSION_KEYS = {
   adblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("adBlock")),
@@ -311,9 +320,15 @@ const RULES = {
   defaultZoom: { min: 25, max: 500 },
   trayWidth: { min: 200, max: 2400 },
   trayHeight: { min: 150, max: 2e3 },
-  trayPosition: { oneOf: ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center"] },
+  trayPosition: { oneOf: ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center", "custom"] },
+  trayScreen: { min: 0, max: 16 },
+  trayX: { min: 0, max: 100 },
+  trayY: { min: 0, max: 100 },
+  trayCloseAfterSeconds: { min: 0, max: 86400 },
   windowRadius: { min: 0, max: 40 },
-  windowBorderWidth: { min: 0, max: 8 },
+  windowBorderWidth: { min: 0, max: 12 },
+  windowBorderOpacity: { min: 5, max: 100 },
+  windowBorderStyle: { oneOf: ["solid", "double", "dashed", "dotted", "groove", "ridge", "glow"] },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -328,7 +343,7 @@ const RULES = {
   unfocusedCpuPercent: { min: 0.1, max: 100 },
   slowAfterSeconds: { min: 1, max: 3600 },
   pauseAfterSeconds: { min: 1, max: 86400 },
-  reloadAfterIdleMinutes: { min: 0, max: 60 },
+  reloadAfterIdleSeconds: { min: 0, max: 3600 },
   jsHeapMb: { min: 0, max: 65536 }
 };
 function validate(cfg) {
@@ -356,7 +371,8 @@ function validate(cfg) {
   for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
-  if (!/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error('"windowBorderColor" must be a colour like #7a7f87');
+  if (cfg.proxy && !/^(https?|socks[45]?):\/\/[^\s/]+(:\d+)?\/?$/i.test(cfg.proxy)) throw new Error('"proxy" must be an address like socks5://127.0.0.1:1080 or http://proxy.lan:3128');
+  if (cfg.windowBorderColor && !/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error('"windowBorderColor" must be a colour like #7a7f87, or empty for the colour of the icon');
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
 }
 function extensionDefaults() {
@@ -453,6 +469,9 @@ function withDefaults(file) {
     else if (stored.backgroundThrottling === false) stored.unfocusedCpuPercent = DEFAULTS.unfocusedCpuPercent;
     else stored.unfocusedCpuPercent = Math.min(limit, 10);
   }
+  if (version < 4 && stored.windowBorderColor === "#7a7f87") stored.windowBorderColor = "";
+  if (typeof stored.reloadAfterIdleMinutes === "number" && stored.reloadAfterIdleSeconds === void 0) stored.reloadAfterIdleSeconds = stored.reloadAfterIdleMinutes * 60;
+  delete stored.reloadAfterIdleMinutes;
   for (const key of ["cpuPercent", "unfocusedCpuPercent"]) {
     if (typeof stored[key] === "number" && stored[key] <= 0) stored[key] = 100;
   }

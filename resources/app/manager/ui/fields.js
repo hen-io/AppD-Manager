@@ -2,7 +2,7 @@
 function floatLabel(label) {
   const first = label.firstChild;
   if (!first || first.nodeType !== Node.TEXT_NODE || !first.textContent.trim()) return;
-  const control = label.querySelector(':scope > input:not([type="checkbox"]):not([data-slider]), :scope > textarea, :scope > select, :scope > .row > input');
+  const control = label.querySelector(':scope > input:not([type="checkbox"]):not([type="hidden"]):not([data-slider]), :scope > textarea, :scope > select, :scope > .row > input');
   if (!control) return;
   const field = document.createElement("span");
   field.className = "field";

@@ -192,7 +192,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
       }
       const idleMs = idleSince ? Date.now() - idleSince : 0;
       idleSince = 0;
-      const reloading = cfg.reloadAfterIdleMinutes > 0 && idleMs >= cfg.reloadAfterIdleMinutes * 6e4 && !window.isDestroyed();
+      const reloading = cfg.reloadAfterIdleSeconds > 0 && idleMs >= cfg.reloadAfterIdleSeconds * 1e3 && !window.isDestroyed();
       if (cover) {
         const view = cover;
         cover = null;
@@ -205,7 +205,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
         if (reloading) wc.once("did-finish-load", drop);
         setTimeout(drop, reloading ? 1e4 : 300);
       }
-      if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reloadIgnoringCache();
+      if (reloading) because(`back after ${Math.round(idleMs / 1e3)} s away (reloadAfterIdleSeconds)`) || wc.reloadIgnoringCache();
     };
     const leave = () => {
       clearTimeout(timer);
@@ -259,6 +259,6 @@ module.exports = function createThrottle(cfg, { note, because }) {
     resumePage,
     releasePage,
     isQuitting: () => quitting,
-    wanted: cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || awayPercent < alwaysPercent
+    wanted: cfg.pauseWhenUnfocused || cfg.reloadAfterIdleSeconds > 0 || awayPercent < alwaysPercent
   };
 };

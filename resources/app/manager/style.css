@@ -334,7 +334,7 @@ label:not(.check) > .number-field > input[type=number] {
   inset: 0 0 0 -28px;
   background: var(--primary);
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Cpath d='M-14 7 Q-7 13 0 7 T14 7 T28 7 T42 7' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 0 50% / 28px 14px repeat-x;
-  animation: wave 1.6s linear infinite;
+  animation: wave 2.3s linear infinite;
   will-change: transform;
 }
 .slider .rest {
@@ -476,6 +476,19 @@ label.indented {
 }
 label.indented.off {
   opacity: 0.5;
+}
+.time-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.time-field > .number-field {
+  flex: 1;
+  min-width: 0;
+}
+.time-field > .picker {
+  flex: none;
+  width: 132px;
 }
 .below-check {
   display: block;
@@ -894,6 +907,26 @@ details.card[open] > summary {
 .app-usage:empty {
   display: none;
 }
+.app-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--label-medium);
+  color: var(--on-surface-variant);
+}
+.app-sub .app-usage {
+  display: inline;
+}
+.app-sub .app-usage:not(:empty)::before {
+  content: " · ";
+  color: var(--on-surface-variant);
+}
+.app-sub .app-usage:empty {
+  display: none;
+}
+#apps li.selected .app-sub {
+  color: inherit;
+}
 .app-name .tray-mark {
   margin-left: 8px;
   padding: 2px 8px;
@@ -983,8 +1016,19 @@ details.card[open] > summary {
   scale: 1.12;
   opacity: 1;
 }
+.app-card.glow .app-text {
+  text-shadow: 0 1px 2px light-dark(rgb(255 255 255 / 0.65), rgb(0 0 0 / 0.7)), 0 0 10px light-dark(rgb(255 255 255 / 0.5), rgb(0 0 0 / 0.45));
+}
 .app-card.glow .app-url {
-  color: color-mix(in oklch, var(--on-surface) 78%, transparent);
+  color: color-mix(in oklch, var(--on-surface) 88%, transparent);
+}
+.app-card.glow .app-usage {
+  color: var(--on-surface);
+  font-weight: 600;
+}
+.app-card.glow .app-action {
+  color: var(--on-surface);
+  filter: drop-shadow(0 1px 2px light-dark(rgb(255 255 255 / 0.5), rgb(0 0 0 / 0.55)));
 }
 img.icon,
 .title img.icon {
@@ -1719,6 +1763,77 @@ dialog {
 }
 dialog::backdrop {
   background: var(--scrim);
+}
+dialog#place {
+  width: max-content;
+  max-width: calc(100vw - 48px);
+  overflow: hidden;
+}
+#place p {
+  max-width: 620px;
+}
+#place-map {
+  position: relative;
+  margin: 4px auto 16px;
+  touch-action: none;
+  user-select: none;
+}
+.place-screen {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  border: 2px solid var(--outline-variant);
+  border-radius: 10px;
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+  font: var(--label-medium);
+  cursor: pointer;
+  transition: border-color var(--motion), background var(--motion);
+}
+.place-screen strong {
+  font: var(--headline-small);
+  color: var(--on-surface);
+}
+.place-screen.chosen {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-highest));
+}
+.place-window {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  min-height: 14px;
+  border-radius: 5px;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--elevation-2);
+  cursor: grab;
+  transition: box-shadow var(--motion), scale var(--motion);
+}
+.place-window svg.mdi {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.place-window.held {
+  cursor: grabbing;
+  box-shadow: var(--elevation-3, var(--elevation-2));
+  scale: 1.06;
+}
+.place-window:focus-visible {
+  outline: 2px solid var(--on-surface);
+  outline-offset: 2px;
+}
+#place-where {
+  margin: 0 0 16px;
+  text-align: center;
+  font: var(--title-small);
+  color: var(--on-surface);
 }
 dialog h2 {
   margin: 0 0 16px;

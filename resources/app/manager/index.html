@@ -280,13 +280,34 @@
               <input name="windowRadius" data-slider="0 40 1" data-unit="px" type="number" min="0" max="40" step="1">
             </label>
             <label>Line around the window
-              <input name="windowBorderWidth" data-slider="0 8 1" data-unit="px" type="number" min="0" max="8" step="1">
+              <input name="windowBorderWidth" data-slider="0 12 1" data-unit="px" type="number" min="0" max="12" step="1">
             </label>
-            <label class="check">
-              <input name="windowBorderColor" type="color">
-              Colour of that line
-            </label>
-            <span class="note below-row">For a window without decorations. With round corners the window is see-through where they are cut off, which needs a desktop with compositing (KDE has it).</span>
+            <div id="border-look">
+              <label>Kind of line
+                <select name="windowBorderStyle">
+                  <option value="solid" data-note="One plain line">Solid</option>
+                  <option value="double" data-note="Two fine lines; needs a width of 3 or more">Double</option>
+                  <option value="dashed" data-note="Short strokes">Dashed</option>
+                  <option value="dotted" data-note="Dots">Dotted</option>
+                  <option value="groove" data-note="Looks carved into the window; best from a width of 4">Groove</option>
+                  <option value="ridge" data-note="Looks raised from the window; best from a width of 4">Ridge</option>
+                  <option value="glow" data-note="A fine line whose colour fades into the window; the width is how far">Glow</option>
+                </select>
+              </label>
+              <label class="check">
+                <input id="border-auto" type="checkbox">
+                Give the line the main colour of the app's icon
+              </label>
+              <label class="check" id="border-own">
+                <input id="border-colour" type="color">
+                Colour of the line
+              </label>
+              <input name="windowBorderColor" type="hidden">
+              <label>How solid the line is
+                <input name="windowBorderOpacity" data-slider="5 100 5" data-unit="%" type="number" min="5" max="100" step="1">
+              </label>
+            </div>
+            <span class="note below-row">For a window without decorations. Round corners need a desktop with compositing (KDE has it), as the window is see-through where they are cut off; a window that fills the screen has square ones.</span>
           </div>
           <label class="check">
             <input name="fixedTitle" type="checkbox">
@@ -332,14 +353,28 @@
                 <option value="top-right">Top right</option>
                 <option value="top-center">Top, in the middle</option>
                 <option value="top-left">Top left</option>
+                <option value="custom" data-note="Chosen with &quot;Place it on the screen&quot;">Where you put it</option>
               </select>
-              <span class="note">The corner of the screen your tray is in.</span>
             </label>
-            <label class="check">
-              <input name="trayAtIcon" type="checkbox">
-              Come up right by the icon when the desktop tells where it is
+            <label>On which screen
+              <select name="trayScreen">
+                <option value="0" data-note="As far as the desktop tells the app where the mouse is">The screen the mouse is on</option>
+              </select>
+              <span class="note">Screens are counted from the left. Name the one your tray is on if the window comes up on another.</span>
             </label>
-            <span class="note below-check">Desktops on X11 tell, when the tray sits in a panel. On Wayland a program is not told where its icon is, and the window comes up in the corner chosen above.</span>
+            <div class="row">
+              <button type="button" id="place-open" data-icon="place">Place it on the screen…</button>
+              <span class="note" id="place-now"></span>
+            </div>
+            <input name="trayX" type="hidden">
+            <input name="trayY" type="hidden">
+            <div id="tray-at-icon">
+              <label class="check">
+                <input name="trayAtIcon" type="checkbox">
+                Come up right by the icon when the desktop tells where it is
+              </label>
+              <span class="note below-check">Desktops on X11 tell, when the tray sits in a panel. On Wayland a program is not told where its icon is: there, choose the screen and the corner, or place the window yourself.</span>
+            </div>
             <label class="check">
               <input name="trayHideOnBlur" type="checkbox">
               Hide the window again when something else is clicked
@@ -349,6 +384,10 @@
               Show the window when the app starts
             </label>
             <span class="note below-check">Off: it starts as its icon alone. Its look - round corners, a line around it - is under Window.</span>
+            <label>Close the page when the window has been hidden for
+              <input name="trayCloseAfterSeconds" type="hidden" data-time="0 86400" data-label="Close the page after">
+              <span class="note">0 never closes it. A closed page uses next to nothing; the icon stays, and the page is loaded anew when you open the window again. Not while it is playing sound.</span>
+            </label>
           </div>
         </details>
 
@@ -535,7 +574,7 @@
           </label>
           <span class="note below-check">A window with the mouse over it counts as in use, as a focused one does: it is neither slowed down nor paused.</span>
           <label class="indented">Slow down after this long without focus
-            <input name="slowAfterSeconds" data-slider="1 300 1" data-unit="s" type="number" min="1" max="3600" step="1">
+            <input name="slowAfterSeconds" type="hidden" data-time="1 3600" data-label="Slow down after">
           </label>
           <label class="indented">CPU limit while slowed down
             <input name="unfocusedCpuPercent" data-slider="1 100 1" data-unit="%" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
@@ -547,22 +586,19 @@
           <summary data-icon="pause">Pause when not in use</summary>
           <label class="check">
             <input name="pauseWhenUnfocused" type="checkbox">
-            Pause the page after
-            <input id="pause-amount" type="number" min="1" step="1" aria-label="Pause after">
-            <select id="pause-unit" aria-label="Unit">
-              <option value="1">seconds</option>
-              <option value="60">minutes</option>
-            </select>
-            without focus
+            Pause the page while its window is not in use
           </label>
-          <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you click it again. It keeps showing what was on screen. Until the pause starts, the slow-down above applies.</span>
+          <span class="note below-check">A paused app does nothing at all: no new messages, no notifications, no playback, until you come back to it. It keeps showing what was on screen. Until the pause starts, the slow-down above applies.</span>
+          <label class="indented">Pause after this long without focus
+            <input name="pauseAfterSeconds" type="hidden" data-time="1 86400" data-label="Pause after">
+          </label>
           <label class="check">
             <input name="skipMissedUpdates" type="checkbox">
             Skip what was missed: reconnect when you come back
           </label>
           <span class="note below-check">For apps that show live data. After the app was slowed down or paused for half a minute or more, the updates it missed are dropped instead of played back in a burst; it reconnects and shows the current state. Anything still loading at that moment starts over.</span>
-          <label>Reload when you come back after more than this many minutes
-            <input name="reloadAfterIdleMinutes" data-slider="0 60 1" data-unit="min" type="number" min="0" max="60" step="1">
+          <label>Reload when you come back after more than
+            <input name="reloadAfterIdleSeconds" type="hidden" data-time="0 3600" data-label="Reload after">
             <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
           </label>
         </details>
@@ -589,6 +625,18 @@
               <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15" data-note="Safari on macOS">Desktop</option>
               <option value="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0" data-note="Firefox on Linux">Desktop</option>
             </select>
+          </label>
+          <label>Proxy
+            <input name="proxy" placeholder="socks5://127.0.0.1:1080" spellcheck="false">
+            <span class="note">Send everything this app loads through a proxy (socks5://, socks4:// or http://). Empty: as the system has it. Other apps are not touched.</span>
+          </label>
+          <label class="check">
+            <input name="spellcheck" type="checkbox">
+            Check spelling in text fields
+          </label>
+          <label>Languages to check
+            <textarea name="spellcheckLanguages" rows="2" spellcheck="false" placeholder="en-US"></textarea>
+            <span class="note">One per line, such as en-US, en-GB, nb, de, fr. None: the language of your system. Suggestions for a marked word are in the menu of a right click.</span>
           </label>
           <label class="check">
             <input name="ignoreCertificateErrors" type="checkbox">
@@ -652,6 +700,7 @@
       <div class="actions">
         <button id="save" type="submit" class="primary" data-icon="save">Save</button>
         <button id="launch" type="button">Launch app</button>
+        <button id="restart" type="button" data-icon="restart" hidden>Restart</button>
         <span class="spacer"></span>
         <span class="more">
           <select id="more-actions" aria-label="More actions">
@@ -670,6 +719,17 @@
   <div id="busy" role="progressbar" aria-label="Working" hidden></div>
   <div id="status" role="status"></div>
 
+  <dialog id="place">
+    <h2 id="place-title">Where the window comes up</h2>
+    <p class="note">Drag the window to where it should come up, or click a screen. The arrow keys move it too.</p>
+    <div id="place-map"></div>
+    <p id="place-where" class="note" role="status"></p>
+    <div class="row">
+      <button type="button" id="place-use" class="primary">Use this place</button>
+      <button type="button" id="place-cancel">Cancel</button>
+    </div>
+  </dialog>
+
   <dialog id="ask">
     <h2 id="ask-message"></h2>
     <div id="ask-release" class="release" hidden></div>
@@ -677,15 +737,18 @@
     <div id="ask-buttons" class="row"></div>
   </dialog>
 
+  <script src="ui/colour.js"></script>
   <script src="ui/core.js"></script>
   <script src="ui/icons.js"></script>
   <script src="ui/picker.js"></script>
   <script src="ui/slider.js"></script>
   <script src="ui/fields.js"></script>
+  <script src="ui/time.js"></script>
   <script src="ui/tooltip.js"></script>
   <script src="ui/dialogs.js"></script>
   <script src="ui/apps.js"></script>
   <script src="ui/extensions.js"></script>
+  <script src="ui/place.js"></script>
   <script src="ui/form.js"></script>
   <script src="ui/settings.js"></script>
   <script src="ui/main.js"></script>

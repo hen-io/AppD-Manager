@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const api = {};
 for (const name of [
   "state",
+  "displays",
   "save",
   "saveExtensionDefaults",
   "setUnsaved",

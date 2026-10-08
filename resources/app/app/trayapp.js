@@ -15,10 +15,13 @@ function iconSpot(iconBounds) {
     return null;
   }
 }
+const screens = () => screen.getAllDisplays().sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y);
 function bounds(cfg, spot) {
   let area;
   try {
-    area = (spot?.display ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
+    const all = cfg.trayScreen > 0 ? screens() : [];
+    const named = all.length ? all[Math.min(cfg.trayScreen, all.length) - 1] : null;
+    area = (named ?? spot?.display ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).workArea;
   } catch {
     area = screen.getPrimaryDisplay().workArea;
   }
@@ -33,6 +36,9 @@ function bounds(cfg, spot) {
     if (x < area.x) return { width, height, x: left, y: within(Math.round(y - height / 2), top, bottom) };
     if (x >= area.x + area.width) return { width, height, x: right, y: within(Math.round(y - height / 2), top, bottom) };
     return { width, height, x: within(Math.round(x - width / 2), left, right), y: y < area.y ? top : bottom };
+  }
+  if (cfg.trayPosition === "custom") {
+    return { width, height, x: Math.round(left + (right - left) * cfg.trayX / 100), y: Math.round(top + (bottom - top) * cfg.trayY / 100) };
   }
   const [vertical, horizontal] = cfg.trayPosition.split("-");
   return {
@@ -54,7 +60,7 @@ module.exports = function makeTrayApp(window, cfg, options) {
   };
   const fromIcon = (iconBounds) => {
     if (Date.now() - hidItselfAt < SAME_CLICK) return;
-    if (cfg.trayAtIcon) spot = iconSpot(iconBounds) ?? spot;
+    if (cfg.trayAtIcon && cfg.trayScreen === 0 && cfg.trayPosition !== "custom") spot = iconSpot(iconBounds) ?? spot;
     show();
   };
   const tray = keepInTray(window, { ...options, show: fromIcon });
@@ -71,6 +77,42 @@ module.exports = function makeTrayApp(window, cfg, options) {
       window.hide();
     }, BLUR_WAIT);
   });
+  if (cfg.trayCloseAfterSeconds > 0) {
+    const wc = window.webContents;
+    let closed = "";
+    let timer = null;
+    const close = () => {
+      if (window.isDestroyed() || window.isVisible() || closed) return;
+      if (wc.isCurrentlyAudible() || wc.isLoadingMainFrame()) {
+        timer = setTimeout(close, 3e4);
+        return;
+      }
+      const url = wc.getURL();
+      if (!/^https?:/i.test(url)) return;
+      closed = url;
+      options.note(`page closed: the window was not shown for ${cfg.trayCloseAfterSeconds} s (trayCloseAfterSeconds)`);
+      options.resume?.();
+      wc.loadURL("about:blank").catch(() => {
+      });
+    };
+    const count = () => {
+      clearTimeout(timer);
+      timer = setTimeout(close, cfg.trayCloseAfterSeconds * 1e3);
+    };
+    window.on("hide", count);
+    window.on("show", () => {
+      clearTimeout(timer);
+      if (!closed) return;
+      const url = closed;
+      closed = "";
+      options.because?.("the window is shown again after its page was closed");
+      wc.once("did-finish-load", () => wc.navigationHistory.clear());
+      wc.loadURL(url).catch(() => {
+      });
+    });
+    window.on("closed", () => clearTimeout(timer));
+    if (!cfg.trayShowAtStart) count();
+  }
   if (cfg.trayShowAtStart) show();
   return {
     show,

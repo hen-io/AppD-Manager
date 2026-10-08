@@ -1,4 +1,5 @@
 "use strict";
+const { roundOverlay } = require("./frame");
 module.exports = function coverWindow(window, view) {
   const fit = () => {
     if (window.isDestroyed()) return;
@@ -12,8 +13,10 @@ module.exports = function coverWindow(window, view) {
   window.contentView.on("bounds-changed", fit);
   const watch = setInterval(fit, 250);
   fit();
+  const stopRounding = roundOverlay(window, view);
   return () => {
     clearInterval(watch);
+    stopRounding();
     if (window.isDestroyed()) return;
     for (const name of events) window.removeListener(name, fit);
     window.contentView.removeListener("bounds-changed", fit);

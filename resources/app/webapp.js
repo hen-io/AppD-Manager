@@ -8,12 +8,15 @@ const setUpPermissions = require("./app/permissions");
 const showUnreadCount = require("./app/badge");
 const keepInTray = require("./app/tray");
 const makeTrayApp = require("./app/trayapp");
-const { frameOptions, styleFrame } = require("./app/frame");
+const { frameOptions, styleFrame, isBare, hasLook } = require("./app/frame");
+const iconColour = require("./app/iconcolour");
 const watchForUpdate = require("./app/updated");
 const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
 const showLoadingScreen = require("./app/loading");
+const showDownloads = require("./app/downloads");
+const { openFind, findAgain, isBar } = require("./app/find");
 const storeExtension = require("./app/store-extension");
 const id = process.env.APPD_ID;
 let cfg;
@@ -41,7 +44,8 @@ const HARDWARE_ACCELERATION = [
   "--enable-features=AcceleratedVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxZeroCopyGL,AcceleratedVideoEncoder,VaapiIgnoreDriverChecks"
 ];
 const featureLists = { "enable-features": [], "disable-features": [] };
-for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...cfg.flags]) {
+const FRAME_LOOK = ["--enable-transparent-visuals"];
+for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...hasLook(cfg) ? FRAME_LOOK : [], ...cfg.flags]) {
   const m = /^--([^=]+)(?:=(.*))?$/.exec(flag.trim());
   if (!m) console.error(`appd: ignoring flag "${flag}"`);
   else if (m[1] in featureLists) featureLists[m[1]].push(...(m[2] || "").split(","));
@@ -264,9 +268,19 @@ ipcMain.on("appd-page-filters", (event, url) => {
   event.returnValue = filters;
 });
 function shortcut(wc, input) {
+  if (isBar(wc)) return false;
   const key = input.key.toLowerCase();
   const ctrl = input.control && !input.alt;
   const history = wc.navigationHistory;
+  const window = BrowserWindow.fromWebContents(wc);
+  if (window && ctrl && !input.shift && key === "f") openFind(window);
+  else if (window && (key === "f3" || ctrl && key === "g")) findAgain(window, !input.shift) || openFind(window);
+  else if (ctrl && !input.shift && key === "p") wc.print({}, () => {
+  });
+  else return pageShortcut(wc, input, key, ctrl, history);
+  return true;
+}
+function pageShortcut(wc, input, key, ctrl, history) {
   if (key === "f5" || ctrl && !input.shift && key === "r") because("F5 or Ctrl+R") || wc.reload();
   else if (ctrl && input.shift && key === "r") because("Ctrl+Shift+R") || wc.reloadIgnoringCache();
   else if (ctrl && input.shift && key === "delete") runAction("clear-cache", wc);
@@ -357,7 +371,7 @@ ${cfg.customJs}
   wc.on("before-input-event", (event, input) => {
     if (input.type === "keyDown" && shortcut(wc, input)) event.preventDefault();
   });
-  wc.on("context-menu", (_e, params) => contextMenu(wc, params));
+  wc.on("context-menu", (_e, params) => isBar(wc) || contextMenu(wc, params));
 });
 function readState() {
   try {
@@ -389,7 +403,8 @@ async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
-  const bare = cfg.trayApp || !cfg.windowDecorations;
+  const bare = isBare(cfg);
+  const lineColour = bare && cfg.windowBorderWidth > 0 && !cfg.windowBorderColor ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
   win = new BrowserWindow({
     alwaysOnTop: cfg.alwaysOnTop || cfg.trayApp,
     width: cfg.trayApp ? cfg.trayWidth : state.width || cfg.width,
@@ -405,13 +420,17 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: cfg.backgroundThrottling,
+      spellcheck: cfg.spellcheck,
       v8CacheOptions: "bypassHeatCheck",
       ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
-  if (bare) styleFrame(win, cfg);
+  const frame = styleFrame(win, cfg, lineColour);
   if (!cfg.trayApp && (cfg.startMaximized || state.maximized)) win.maximize();
-  if (cfg.loadingScreen && (!cfg.trayApp || cfg.trayShowAtStart)) showLoadingScreen(win, cfg, iconFile);
+  if (!cfg.trayApp || cfg.trayShowAtStart) {
+    if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
+    else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
+  }
   note(`started, opening ${plain(startUrl)}`);
   let showing = "";
   win.webContents.on("did-start-navigation", (details) => {
@@ -435,6 +454,13 @@ async function createWindow() {
   });
   win.webContents.on("unresponsive", () => note("the page does not respond"));
   if (cfg.unreadBadge) showUnreadCount(win, app);
+  showDownloads(session.defaultSession, win, { name: cfg.name, note });
+  if (cfg.spellcheck && cfg.spellcheckLanguages.length) {
+    const known = session.defaultSession.availableSpellCheckerLanguages;
+    const wanted = cfg.spellcheckLanguages.map((code) => known.find((one) => one.toLowerCase() === code.trim().toLowerCase())).filter(Boolean);
+    if (wanted.length) session.defaultSession.setSpellCheckerLanguages([...new Set(wanted)]);
+    if (wanted.length < cfg.spellcheckLanguages.length) note(`spelling: not every language is known (known: ${known.join(", ")})`);
+  }
   const trayOptions = {
     name: cfg.name,
     icon,
@@ -442,7 +468,9 @@ async function createWindow() {
     isQuitting: throttle.isQuitting,
     quit: () => app.quit(),
     menu: () => win.isDestroyed() ? [] : appMenu(win.webContents, true),
-    isBusy: () => menusOpen > 0
+    isBusy: () => menusOpen > 0,
+    because,
+    resume: throttle.resumePage
   };
   if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
@@ -495,6 +523,8 @@ async function createWindow() {
       });
     });
   }
+  if (cfg.proxy) await session.defaultSession.setProxy({ proxyRules: cfg.proxy }).catch((e) => note(`proxy not set (${e.message})`));
+  if (win.isDestroyed()) return;
   win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
   throttle.runLimiter();
 }

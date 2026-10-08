@@ -15,6 +15,8 @@ form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => go(NEW));
 $("home-new").addEventListener("click", () => go(NEW));
 $("launch").addEventListener("click", launchOrClose);
+$("restart").addEventListener("click", () => appAction("restart", selected));
+$("place-open").addEventListener("click", placeTrayWindow);
 $("remove").addEventListener("click", remove);
 $("more-actions").addEventListener("change", async () => {
   const action = $("more-actions").value;
@@ -143,6 +145,7 @@ window.addEventListener("focus", rest);
 document.addEventListener("visibilitychange", rest);
 for (const el of document.querySelectorAll("[data-icon]")) label(el, el.dataset.icon, el.textContent);
 for (const summary of document.querySelectorAll("summary")) summary.append(iconSvg("chevron", "chevron"));
+document.querySelectorAll("input[data-time]").forEach(addTimeField);
 document.querySelectorAll("label:not(.check)").forEach(floatLabel);
 document.querySelectorAll("select").forEach(enhance);
 document.querySelectorAll("input[data-slider]").forEach(addSlider);
@@ -161,6 +164,11 @@ new MutationObserver((changes) => {
     const el = form.elements[key];
     if (el && "min" in rule && el.type === "number") Object.assign(el, { min: rule.min, max: rule.max });
   }
+  form.elements.trayScreen.append(...state.displays.map((display, index) => {
+    const option = new Option(`Screen ${index + 1}`, String(index + 1));
+    option.dataset.note = `${display.bounds.width} × ${display.bounds.height}${display.primary ? ", the main screen" : ""}`;
+    return option;
+  }));
   $("template").append(...state.templates.map((template, index) => {
     const option = new Option(template.name, String(index));
     option.dataset.note = template.about;

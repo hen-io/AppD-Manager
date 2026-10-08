@@ -18,12 +18,21 @@ function renderList() {
       broken.className = "app-url error";
       broken.textContent = "Broken config file";
       text.append(broken);
-    } else if (running.has(app.id)) {
-      const use = document.createElement("div");
-      use.className = "app-usage";
-      use.dataset.usage = app.id;
-      use.textContent = usageText(app.id);
-      text.append(use);
+    } else {
+      const sub = document.createElement("div");
+      sub.className = "app-sub";
+      const kind = document.createElement("span");
+      kind.className = "app-kind";
+      kind.textContent = app.cfg.trayApp ? "Tray app" : "App";
+      sub.append(kind);
+      if (running.has(app.id)) {
+        const use = document.createElement("span");
+        use.className = "app-usage";
+        use.dataset.usage = app.id;
+        use.textContent = usageText(app.id);
+        sub.append(use);
+      }
+      text.append(sub);
     }
     const button = document.createElement("button");
     button.type = "button";
@@ -131,6 +140,7 @@ function renderSidebar() {
 }
 function showLaunchButton() {
   $("running-badge").hidden = !running.has(selected);
+  $("restart").hidden = !running.has(selected) || $("launch").hidden;
   showUsage();
   if (running.has(selected)) label($("launch"), "stop", "Close app");
   else label($("launch"), "launch", "Launch app");
