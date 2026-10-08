@@ -14,6 +14,7 @@ for (const name of [
   "clearData",
   "exportApps",
   "importApps",
+  "setAppearance",
   "askUnsaved",
   "runningApps",
   "pickIcon",

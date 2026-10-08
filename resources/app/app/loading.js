@@ -2,6 +2,7 @@
 const { WebContentsView, nativeTheme } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const coverWindow = require("./overlay");
 module.exports = function showLoadingScreen(window, cfg, iconFile) {
   const dark = nativeTheme.shouldUseDarkColors || cfg.extensions.includes("darkreader");
   const text = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -30,13 +31,8 @@ module.exports = function showLoadingScreen(window, cfg, iconFile) {
   </style><body><div class="box">${logo}<div class="name">${text(cfg.name)}</div><div class="track"><div class="bar"></div></div></div>`;
   const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
   view.setBackgroundColor(dark ? "#15171b" : "#f4f5f8");
-  const fit = () => {
-    const [width, height] = window.getContentSize();
-    view.setBounds({ x: 0, y: 0, width, height });
-  };
-  fit();
-  window.on("resize", fit);
   window.contentView.addChildView(view);
+  const stopCovering = coverWindow(window, view);
   view.webContents.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(page));
   const shown = Date.now();
   let gone = false;
@@ -51,7 +47,7 @@ module.exports = function showLoadingScreen(window, cfg, iconFile) {
       });
       setTimeout(() => {
         if (window.isDestroyed()) return;
-        window.removeListener("resize", fit);
+        stopCovering();
         window.contentView.removeChildView(view);
         view.webContents.close();
       }, 320);

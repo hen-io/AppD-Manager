@@ -4,6 +4,7 @@ form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
 $("agent-presets").addEventListener("change", useAgentPreset);
 $("template").addEventListener("change", useTemplate);
+$("appearance-mode").addEventListener("change", () => changeAppearance({ mode: $("appearance-mode").value }));
 $("export-apps").addEventListener("click", () => backup("exportApps"));
 $("import-apps").addEventListener("click", () => backup("importApps"));
 $("extension-add").addEventListener("change", addExtension);
@@ -108,6 +109,7 @@ new MutationObserver((changes) => {
     option.dataset.note = template.about;
     return option;
   }));
+  renderAppearance();
   renderSidebar();
   select(null);
   if (state.edit) window.editApp(state.edit.id, state.edit.extension);

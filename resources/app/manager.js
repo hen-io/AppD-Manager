@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, nativeTheme, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -13,6 +13,7 @@ app.setDesktopName?.(desktopFile);
 if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId("manager"));
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
+nativeTheme.themeSource = lib.appearance().mode;
 let win;
 let pendingEdit = null;
 function editRequest(argv) {
@@ -85,6 +86,9 @@ function state() {
     apps,
     defaults: lib.fresh(),
     rules: lib.RULES,
+    appearance: lib.appearance(),
+    modes: lib.MODES,
+    palettes: lib.PALETTES,
     templates: require("./templates"),
     imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
@@ -198,6 +202,11 @@ const handlers = {
     lib.remove(id);
     lib.sync();
     return { removed: true, state: state() };
+  },
+  setAppearance(next) {
+    const now = lib.setAppearance({ ...next.mode ? { mode: String(next.mode) } : {}, ...next.palette ? { palette: String(next.palette) } : {} });
+    nativeTheme.themeSource = now.mode;
+    return now;
   },
   async exportApps() {
     const { filePath } = await dialog.showSaveDialog(win, {
@@ -412,7 +421,7 @@ function createWindow() {
     leaving = true;
     win.close();
   });
-  win.loadFile(path.join(__dirname, "manager", "index.html"));
+  win.loadFile(path.join(__dirname, "manager", "index.html"), { query: { palette: lib.appearance().palette } });
 }
 if (!app.requestSingleInstanceLock()) {
   app.quit();

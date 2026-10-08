@@ -1,7 +1,7 @@
 {
   "name": "AppD-Manager",
-  "version": "0.3.0.RC.3",
-  "description": "Easily create standalone applications for webapps on your *nix system on wayland!",
+  "version": "0.3.0.RC.4",
+  "description": "Easily create standalone container applications for your webapps on Linux and Windows!",
   "author": {
     "name": "hen-io",
     "linkText": "isefjaer-it.no",

@@ -14,6 +14,31 @@ async function folderAction(method) {
     $("folder-status").classList.add("error");
   }
 }
+function renderAppearance() {
+  $("appearance-mode").replaceChildren(...Object.entries(state.modes).map(([mode, name]) => new Option(name, mode)));
+  $("appearance-mode").value = state.appearance.mode;
+  $("palettes").replaceChildren(...Object.entries(state.palettes).map(([palette, name]) => {
+    const swatch = document.createElement("span");
+    swatch.className = "swatch";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.palette = palette;
+    button.classList.toggle("selected", palette === state.appearance.palette);
+    button.setAttribute("aria-pressed", String(palette === state.appearance.palette));
+    button.append(swatch, name);
+    button.addEventListener("click", () => changeAppearance({ palette }));
+    return button;
+  }));
+}
+async function changeAppearance(next) {
+  try {
+    state.appearance = await call("setAppearance", next);
+    document.documentElement.dataset.palette = state.appearance.palette;
+    renderAppearance();
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+}
 async function backup(method) {
   $("backup-status").textContent = "";
   $("backup-status").classList.remove("error");

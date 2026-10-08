@@ -1,5 +1,6 @@
 "use strict";
 const { app, BrowserWindow, WebContentsView, session } = require("electron");
+const coverWindow = require("./overlay");
 module.exports = function createThrottle(cfg, { note, because }) {
   let stoppedPids = [];
   function pagePids() {
@@ -109,6 +110,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
     };
     const dropCover = (view) => {
       try {
+        view.stopCovering?.();
         if (!window.isDestroyed()) window.contentView.removeChildView(view);
         view.webContents.close();
       } catch {
@@ -133,6 +135,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
         view.setBounds({ x: 0, y: 0, width, height });
         cover = view;
         window.contentView.addChildView(view);
+        view.stopCovering = coverWindow(window, view);
         await withinMoment(showPicture(view, picture, width));
         if (overtaken()) return;
       }
@@ -205,11 +208,6 @@ module.exports = function createThrottle(cfg, { note, because }) {
     });
     window.on("focus", back);
     window.on("restore", back);
-    window.on("resize", () => {
-      if (!cover) return;
-      const [width, height] = window.getContentSize();
-      cover.setBounds({ x: 0, y: 0, width, height });
-    });
     window.on("close", resumePage);
     window.on("closed", () => {
       clearTimeout(timer);

@@ -11,6 +11,7 @@ const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
 const showLoadingScreen = require("./app/loading");
+const storeExtension = require("./app/store-extension");
 const id = process.env.APPD_ID;
 let cfg;
 try {
@@ -124,6 +125,16 @@ const zoom = createZoom(cfg);
 const customExtensions = [];
 async function loadCustomExtensions() {
   const loader = session.defaultSession.extensions || session.defaultSession;
+  for (const [name, storeId] of Object.entries(lib.STORE_EXTENSIONS)) {
+    if (!cfg.extensions.includes(name)) continue;
+    try {
+      storeExtension.adoptRefreshed(storeId, lib.root);
+      await loader.loadExtension(await storeExtension(storeId, lib.root, note), { allowFileAccess: false });
+    } catch (e) {
+      note(`the extension "${lib.EXTENSIONS[name].name}" could not be loaded: ${e.message}`);
+      console.error(`appd: ${lib.EXTENSIONS[name].name}: ${e.message}`);
+    }
+  }
   for (const entry of cfg.customExtensions) {
     const folder = lib.extensionFolder(entry);
     try {

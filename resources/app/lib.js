@@ -58,7 +58,14 @@ const EXTENSIONS = {
   darkreader: {
     name: "Dark Reader",
     about: "Gives sites a dark look, also those without one of their own."
+  },
+  ambientlight: {
+    name: "Ambient light for YouTube",
+    about: "A glow around YouTube videos in the colours of the picture. The official extension by Wessel Kroos, fetched from the Chrome Web Store and checked to be that one; its settings are in the YouTube player."
   }
+};
+const STORE_EXTENSIONS = {
+  ambientlight: "paponcgjfojgemddooebbgniglhkajkj"
 };
 const COLOR_SCHEMES = ["system", "light", "dark"];
 const ACTION_BUTTON = ["off", "top-left", "top-right", "bottom-left", "bottom-right"];
@@ -180,12 +187,26 @@ const EXTENSION_KEYS = {
   sponsorblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("sponsorBlock") || key === "youtubeQuality"),
   darkreader: ["darkBrightness", "darkContrast", "darkSepia"]
 };
+const MODES = { system: "As the desktop", light: "Light", dark: "Dark" };
+const PALETTES = { indigo: "Indigo", violet: "Violet", ocean: "Ocean", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose" };
 function readSettings() {
   try {
     return JSON.parse(fs.readFileSync(settingsPath, "utf8"));
   } catch {
     return {};
   }
+}
+function appearance() {
+  const kept = readSettings().appearance || {};
+  return { mode: kept.mode in MODES ? kept.mode : "system", palette: kept.palette in PALETTES ? kept.palette : "indigo" };
+}
+function setAppearance(next) {
+  const settings = readSettings();
+  settings.appearance = { ...appearance(), ...next };
+  if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES)) throw new Error("unknown mode or palette");
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  return appearance();
 }
 function appsDir() {
   const dir = process.env.APPD_APPS_DIR || readSettings().appsDir;
@@ -697,6 +718,11 @@ function sync() {
   return problems;
 }
 module.exports = {
+  MODES,
+  PALETTES,
+  appearance,
+  setAppearance,
+  STORE_EXTENSIONS,
   RULES,
   clearData,
   duplicate,

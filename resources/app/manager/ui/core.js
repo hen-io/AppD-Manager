@@ -1,4 +1,5 @@
 "use strict";
+document.documentElement.dataset.palette = new URLSearchParams(location.search).get("palette") || "indigo";
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const NEW = "";
