@@ -61,56 +61,97 @@ function setStatus(text, isError = false, action = null) {
   }, 30);
   statusTimer = setTimeout(() => bar.replaceChildren(), isError || action ? UNDO_MS : 6e3);
 }
-const hues = /* @__PURE__ */ new Map();
+const iconLooks = /* @__PURE__ */ new Map();
+const SIDE = 32;
+const BINS = 24;
 function hueOfName(name) {
   let sum = 0;
   for (const letter of String(name)) sum = (sum * 31 + letter.codePointAt(0)) % 360;
   return sum;
 }
-function hueOfPicture(image) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 24;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  context.drawImage(image, 0, 0, 24, 24);
-  const { data } = context.getImageData(0, 0, 24, 24);
-  let x = 0;
-  let y = 0;
-  let weight = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const [r, g, b] = [data[i] / 255, data[i + 1] / 255, data[i + 2] / 255];
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const strength = (max - min) * (data[i + 3] / 255);
-    if (strength < 0.15) continue;
-    let hue = max === r ? (g - b) / (max - min) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
-    hue *= Math.PI / 3;
-    x += Math.cos(hue) * strength;
-    y += Math.sin(hue) * strength;
-    weight += strength;
-  }
-  if (weight < 12) return null;
-  const hsl = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+function themeHue(hsl) {
   const from = [0, 60, 120, 180, 240, 300, 360];
   const to = [29, 100, 142, 195, 264, 328, 389];
   const at = Math.min(5, Math.floor(hsl / 60));
   return (to[at] + (hsl - from[at]) / 60 * (to[at + 1] - to[at])) % 360;
 }
-function tint(el, iconUrl, name) {
-  const apply = (hue) => {
-    el.classList.toggle("tinted", hue !== null);
-    if (hue !== null) el.style.setProperty("--app-hue", String(Math.round(hue)));
+function lookOfPicture(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SIDE;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(image, 0, 0, SIDE, SIDE);
+  const { data } = context.getImageData(0, 0, SIDE, SIDE);
+  const bins = Array.from({ length: BINS }, () => ({ weight: 0, r: 0, g: 0, b: 0 }));
+  const grey = { weight: 0, r: 0, g: 0, b: 0 };
+  const add = (to, weight, r, g, b) => {
+    to.weight += weight;
+    to.r += r * weight;
+    to.g += g * weight;
+    to.b += b * weight;
   };
-  if (!iconUrl) return apply(hueOfName(name));
-  if (hues.has(iconUrl)) return apply(hues.get(iconUrl));
+  for (let i = 0; i < data.length; i += 4) {
+    const solid = data[i + 3] / 255;
+    if (solid < 0.4) continue;
+    const [r, g, b] = [data[i] / 255, data[i + 1] / 255, data[i + 2] / 255];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const spread = max - min;
+    if (spread < 0.16 || max < 0.22 || spread / max < 0.2) {
+      add(grey, solid, r, g, b);
+      continue;
+    }
+    let hue = max === r ? (g - b) / spread % 6 : max === g ? (b - r) / spread + 2 : (r - g) / spread + 4;
+    hue = (hue * 60 + 360) % 360;
+    add(bins[Math.floor(hue / (360 / BINS)) % BINS], spread * (spread / max) * solid, r, g, b);
+  }
+  const css = ({ weight, r, g, b }) => `rgb(${[r, g, b].map((part) => Math.round(part / weight * 255)).join(" ")})`;
+  const total = bins.reduce((sum, bin) => sum + bin.weight, 0);
+  if (total < SIDE * SIDE * 0.012) {
+    return { hue: null, plain: true, colours: grey.weight ? [css(grey)] : [] };
+  }
+  const apart = (a, b) => Math.min(Math.abs(a - b), BINS - Math.abs(a - b));
+  const order = bins.map((bin, at) => ({ ...bin, at })).sort((a, b) => b.weight - a.weight);
+  const taken = [];
+  for (const bin of order) {
+    if (taken.length === 3 || bin.weight < order[0].weight * 0.08) break;
+    if (taken.every((other) => apart(other.at, bin.at) >= 2)) taken.push(bin);
+  }
+  let x = 0;
+  let y = 0;
+  for (const step of [-1, 0, 1]) {
+    const at = (taken[0].at + step + BINS) % BINS;
+    const angle = (at + 0.5) * 2 * Math.PI / BINS;
+    x += Math.cos(angle) * bins[at].weight;
+    y += Math.sin(angle) * bins[at].weight;
+  }
+  return { hue: themeHue((Math.atan2(y, x) * 180 / Math.PI + 360) % 360), plain: false, colours: taken.map(css) };
+}
+function tint(el, iconUrl, name) {
+  const apply = ({ hue, colours, plain }) => {
+    el.classList.toggle("tinted", hue !== null);
+    el.classList.toggle("plain", plain);
+    el.classList.toggle("glow", colours.length > 0);
+    if (hue !== null) el.style.setProperty("--app-hue", String(Math.round(hue)));
+    if (!colours.length) return;
+    for (const at of [0, 1, 2]) {
+      el.style.setProperty(`--c${at + 1}`, colours[at] ?? colours[0]);
+      el.style.setProperty(`--turn${at + 1}`, colours[at] || plain ? "0" : String(at === 1 ? 20 : -16));
+    }
+  };
+  if (!iconUrl) {
+    const hue = hueOfName(name);
+    return apply({ hue, plain: false, colours: [`oklch(0.7 0.15 ${hue})`] });
+  }
+  if (iconLooks.has(iconUrl)) return apply(iconLooks.get(iconUrl));
   const image = new Image();
   image.onload = () => {
-    let hue = null;
+    let look = { hue: null, plain: true, colours: [] };
     try {
-      hue = hueOfPicture(image);
+      look = lookOfPicture(image);
     } catch {
     }
-    hues.set(iconUrl, hue);
-    apply(hue);
+    iconLooks.set(iconUrl, look);
+    apply(look);
   };
   image.src = iconUrl;
   return void 0;

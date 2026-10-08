@@ -924,11 +924,50 @@ details.card[open] > summary {
 .tinted {
   --tint: oklch(62% 0.17 var(--app-hue));
 }
-.app-card.tinted {
-  background: color-mix(in oklch, var(--tint) 13%, var(--surface-container-low));
+.app-card.glow {
+  --strong: 0.075;
+  --a: light-dark(oklch(from var(--c1) 0.78 clamp(var(--strong), c * 1.2, 0.17) calc(h + var(--turn1, 0))), oklch(from var(--c1) 0.42 clamp(var(--strong), c, 0.15) calc(h + var(--turn1, 0))));
+  --b: light-dark(oklch(from var(--c2) 0.82 clamp(var(--strong), c * 1.2, 0.16) calc(h + var(--turn2, 0))), oklch(from var(--c2) 0.36 clamp(var(--strong), c, 0.14) calc(h + var(--turn2, 0))));
+  --c: light-dark(oklch(from var(--c3) 0.87 clamp(var(--strong), c * 1.2, 0.14) calc(h + var(--turn3, 0))), oklch(from var(--c3) 0.30 clamp(var(--strong), c, 0.12) calc(h + var(--turn3, 0))));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--a) 55%, var(--surface-container-low));
 }
-.app-card.tinted:hover {
-  background: color-mix(in oklch, var(--tint) 21%, var(--surface-container-low));
+.app-card.glow.plain {
+  --strong: 0;
+}
+.app-card.glow::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  background:
+    radial-gradient(
+      ellipse 42% 85% at 14% 38%,
+      var(--a) 25%,
+      transparent),
+    radial-gradient(
+      ellipse 40% 90% at 88% 70%,
+      var(--b) 25%,
+      transparent),
+    radial-gradient(
+      ellipse 36% 80% at 56% 18%,
+      var(--c) 20%,
+      transparent);
+  filter: blur(20px) saturate(1.2);
+  transition: scale var(--motion), opacity var(--motion);
+  opacity: 0.92;
+}
+.app-card.glow:hover {
+  background: color-mix(in oklch, var(--a) 55%, var(--surface-container-low));
+}
+.app-card.glow:hover::before {
+  scale: 1.12;
+  opacity: 1;
+}
+.app-card.glow .app-url {
+  color: color-mix(in oklch, var(--on-surface) 78%, transparent);
 }
 img.icon,
 .title img.icon,
@@ -938,6 +977,9 @@ img.icon,
 .tinted span.icon {
   background: color-mix(in oklch, var(--tint) 38%, var(--surface-container-high));
   color: var(--on-surface);
+}
+.app-card.glow span.icon {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
 }
 form .title {
   padding: 18px 22px;
