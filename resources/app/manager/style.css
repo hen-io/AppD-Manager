@@ -1027,24 +1027,10 @@ details.card[open] > summary {
   opacity: 1;
 }
 .app-card.glow .app-text {
-  position: relative;
-  isolation: isolate;
-}
-.app-card.glow .app-text::before {
-  content: "";
-  position: absolute;
-  inset: -10px -18px -10px -12px;
-  z-index: -1;
-  border-radius: 20px;
-  background: light-dark(rgb(255 255 255 / 0.5), rgb(0 0 0 / 0.42));
-  filter: blur(12px);
-  pointer-events: none;
-}
-.app-card.glow .app-text {
   text-shadow:
-    0 1px 2px light-dark(rgb(255 255 255 / 0.9), rgb(0 0 0 / 0.9)),
-    0 0 6px light-dark(rgb(255 255 255 / 0.7), rgb(0 0 0 / 0.65)),
-    0 0 14px light-dark(rgb(255 255 255 / 0.5), rgb(0 0 0 / 0.5));
+    0 0 1px light-dark(rgb(255 255 255 / 0.9), rgb(0 0 0 / 0.85)),
+    0 1px 2px light-dark(rgb(255 255 255 / 0.8), rgb(0 0 0 / 0.7)),
+    0 0 5px light-dark(rgb(255 255 255 / 0.55), rgb(0 0 0 / 0.45));
 }
 .app-card.glow .app-url {
   color: color-mix(in oklch, var(--on-surface) 88%, transparent);
@@ -1113,14 +1099,14 @@ form .title.tinted {
   border-radius: 36% 64% 58% 42% / 46% 40% 60% 54%;
   background: var(--primary-container);
   color: var(--on-primary-container);
-  animation: drift 7s ease-in-out infinite;
+  animation: wobble 7s ease-in-out infinite;
 }
 .empty-art svg.mdi {
   width: 56px;
   height: 56px;
   margin: 0;
 }
-@keyframes drift {
+@keyframes wobble {
   50% {
     border-radius: 58% 42% 40% 60% / 56% 62% 38% 44%;
     rotate: 6deg;
