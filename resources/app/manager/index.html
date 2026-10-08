@@ -4,12 +4,15 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
   <title>AppD-Manager</title>
+  <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <aside>
     <div class="side-head">
       <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+      <p id="side-version"></p>
+      <p id="side-author" class="note" hidden></p>
       <button id="collapse" type="button" class="side-toggle" title="Make the sidebar smaller" aria-label="Make the sidebar smaller"></button>
     </div>
     <nav id="views">
@@ -52,6 +55,16 @@
       </section>
 
       <section class="card">
+        <h3>Backup</h3>
+        <p class="note">Every app's settings and icon, and the extension settings for all apps, in one file. Logins are not part of it: after importing, sign in again.</p>
+        <div class="row">
+          <button id="export-apps" type="button" data-icon="download">Export the apps…</button>
+          <button id="import-apps" type="button" data-icon="upload">Import apps…</button>
+        </div>
+        <p id="backup-status" class="note"></p>
+      </section>
+
+      <section class="card">
         <h3>Updates</h3>
         <p id="installed-version"></p>
         <p class="note">AppD-Manager looks for a new version every time it starts.</p>
@@ -66,11 +79,6 @@
     </section>
 
     <section id="home" class="page">
-      <div class="home-head">
-        <img class="banner" src="../include/banner.png" alt="AppD-Manager">
-        <p id="home-version"></p>
-        <p id="home-author" class="note" hidden></p>
-      </div>
       <header class="title">
         <div class="title-text">
           <h1>Your apps</h1>
@@ -118,6 +126,12 @@
 
         <details class="card" open>
           <summary>General</summary>
+          <label id="template-row">Start from a template
+            <select id="template" aria-label="Start from a template">
+              <option value="">Choose a site…</option>
+            </select>
+            <span class="note">Fills in the name, the address and the settings that suit the site. Everything can still be changed.</span>
+          </label>
           <label>Name
             <input name="name" required placeholder="App name...">
           </label>
@@ -130,6 +144,14 @@
           <label class="check">
             <input name="autostart" type="checkbox">
             Start this app when you log in
+          </label>
+          <label class="check">
+            <input name="closeToTray" type="checkbox">
+            Keep running in the system tray when the window is closed
+          </label>
+          <label class="check">
+            <input name="unreadBadge" type="checkbox">
+            Show the site's unread count on the app's icon in the taskbar
           </label>
           <label>Icon
             <span class="row">
@@ -180,6 +202,10 @@
             <span class="note">The same menu from the keyboard. Written like <code>Ctrl+X</code> or <code>Ctrl+Shift+M</code>; empty for none. Ctrl+X no longer cuts text in the app while it is used for this.</span>
           </label>
           <label class="check">
+            <input name="alwaysOnTop" type="checkbox">
+            Keep the window above all others
+          </label>
+          <label class="check">
             <input name="windowDecorations" type="checkbox">
             Show window decorations (title bar and borders)
           </label>
@@ -198,7 +224,7 @@
             </label>
             <label class="check">
               <input name="allowZoom" type="checkbox">
-              Allow zooming by hand (Ctrl with +, - or the wheel, and the menu)
+              Allow zooming by hand (Ctrl +, Ctrl -, wheel, menu)
             </label>
           </div>
           <span class="note size-note">A zoom set by hand lasts until the page is reloaded or the app is started again; "Reset zoom" in the app's menu (Ctrl+0) goes back to the default at once.</span>
@@ -455,9 +481,21 @@
             Ignore certificate errors (accept invalid, expired and self-signed certificates)
           </label>
           <span class="note below-check">Only for apps on your own network, such as a device with a self-signed certificate. With this on, nothing checks that a site is who it says it is, for every address the app loads.</span>
+          <label>Permissions: camera, microphone, location, notifications, clipboard, devices
+            <select name="permissions">
+              <option value="app" data-note="And the hosts that stay in the app. Advertisements and other embedded sites get nothing">Only the app's own site</option>
+              <option value="all" data-note="Also sites embedded in a page, and sites the app goes on to">Every site the app shows</option>
+              <option value="none" data-note="No camera, microphone, location or notifications for this app at all">Nobody</option>
+            </select>
+            <span class="note">Sites are not asked about one by one: who is allowed here gets what it asks for.</span>
+          </label>
           <label>Custom CSS
             <textarea name="customCss" class="code" rows="3" spellcheck="false" placeholder=".some-banner { display: none !important; }"></textarea>
             <span class="note">Your own style rules, added to every page of the app: to hide something, change a font, widen a column.</span>
+          </label>
+          <label>Custom JavaScript
+            <textarea name="customJs" class="code" rows="3" spellcheck="false" placeholder="document.querySelector('.some-button')?.click();"></textarea>
+            <span class="note">Your own script, run in every page of the app once it has loaded. It can do whatever the site itself can: only put in code you understand.</span>
           </label>
           <label>Extra Chromium switches
             <textarea name="flags" rows="3" placeholder="--some-switch=value"></textarea>

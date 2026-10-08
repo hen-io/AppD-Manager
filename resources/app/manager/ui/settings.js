@@ -14,6 +14,25 @@ async function folderAction(method) {
     $("folder-status").classList.add("error");
   }
 }
+async function backup(method) {
+  $("backup-status").textContent = "";
+  $("backup-status").classList.remove("error");
+  try {
+    const result = await call(method);
+    if (!result) return;
+    if (typeof result === "string") {
+      $("backup-status").textContent = result;
+      return;
+    }
+    state = result.state;
+    renderSidebar();
+    $("backup-status").textContent = result.message;
+    $("backup-status").classList.toggle("error", Boolean(result.problem));
+  } catch (e) {
+    $("backup-status").textContent = e.message;
+    $("backup-status").classList.add("error");
+  }
+}
 function showUpdate() {
   const canInstall = update.available && !update.blocked;
   $("install-update").hidden = !canInstall;

@@ -12,6 +12,8 @@ for (const name of [
   "restart",
   "duplicate",
   "clearData",
+  "exportApps",
+  "importApps",
   "askUnsaved",
   "runningApps",
   "pickIcon",

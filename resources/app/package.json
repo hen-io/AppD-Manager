@@ -1,11 +1,11 @@
 {
   "name": "AppD-Manager",
-  "version": "0.3.0.RC.2",
+  "version": "0.3.0.RC.4",
   "description": "Easily create standalone applications for webapps on your *nix system on wayland!",
   "author": {
     "name": "hen-io",
-    "linkText": "github.com/hen-io",
-    "url": "https://github.com/hen-io"
+    "linkText": "isefjaer-it.no",
+    "url": "https://www.isefjaer-it.no"
   },
   "private": true,
   "main": "main.js",

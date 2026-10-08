@@ -85,6 +85,7 @@ function state() {
     apps,
     defaults: lib.fresh(),
     rules: lib.RULES,
+    templates: require("./templates"),
     imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
     sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
@@ -197,6 +198,36 @@ const handlers = {
     lib.remove(id);
     lib.sync();
     return { removed: true, state: state() };
+  },
+  async exportApps() {
+    const { filePath } = await dialog.showSaveDialog(win, {
+      title: "Export the apps",
+      defaultPath: `appd-manager-apps-${(/* @__PURE__ */ new Date()).toLocaleDateString("sv")}.json`,
+      filters: [{ name: "AppD-Manager apps", extensions: ["json"] }]
+    });
+    if (!filePath) return null;
+    const data = lib.exportApps();
+    fs.writeFileSync(filePath, JSON.stringify(data));
+    return `${data.apps.length} ${data.apps.length === 1 ? "app" : "apps"} exported to ${filePath}.`;
+  },
+  async importApps() {
+    const { filePaths } = await dialog.showOpenDialog(win, {
+      title: "Import apps",
+      properties: ["openFile"],
+      filters: [{ name: "AppD-Manager apps", extensions: ["json"] }]
+    });
+    if (!filePaths[0]) return null;
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+    } catch {
+      throw new Error("That file cannot be read as exported apps.");
+    }
+    const { added, skipped } = lib.importApps(data);
+    lib.sync();
+    const parts = [`${added.length} ${added.length === 1 ? "app" : "apps"} imported${added.length ? `: ${added.join(", ")}` : ""}.`];
+    if (skipped.length) parts.push(`Left out: ${skipped.join("; ")}.`);
+    return { state: state(), message: parts.join(" "), problem: skipped.length > 0 };
   },
   duplicate(id) {
     const copy = lib.duplicate(id);

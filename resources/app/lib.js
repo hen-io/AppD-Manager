@@ -99,6 +99,9 @@ const DEFAULTS = {
   width: 1280,
   height: 800,
   autostart: false,
+  alwaysOnTop: false,
+  closeToTray: false,
+  unreadBadge: true,
   startMaximized: false,
   userAgent: "",
   openLinks: "browser",
@@ -165,7 +168,9 @@ const DEFAULTS = {
   reloadAfterIdleMinutes: 0,
   hardwareAcceleration: true,
   jsHeapMb: 0,
+  permissions: "app",
   customCss: "",
+  customJs: "",
   ignoreCertificateErrors: false,
   flags: [],
   configVersion: 3
@@ -240,6 +245,7 @@ const RULES = {
   height: { min: 150, max: 16e3 },
   defaultZoom: { min: 25, max: 500 },
   openLinks: { oneOf: OPEN_LINKS },
+  permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
   actionButton: { oneOf: ACTION_BUTTON },
   youtubeQuality: { oneOf: ["auto", ...Object.keys(YOUTUBE_QUALITIES)] },
@@ -451,6 +457,45 @@ function duplicate(id) {
   save(copy, { ...cfg, name, icon: iconFile(id, cfg) || cfg.icon, autostart: false });
   return copy;
 }
+function exportApps() {
+  const apps = [];
+  for (const id of list()) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
+      const icon = iconFile(id, load(id));
+      const own = icon && path.dirname(icon) === appDir(id);
+      apps.push({ id, config, icon: own ? { name: path.basename(icon), data: fs.readFileSync(icon).toString("base64") } : null });
+    } catch {
+    }
+  }
+  return { what: "AppD-Manager apps", version: 1, extensionSettings: readSettings().extensionSettings || null, apps };
+}
+function importApps(data) {
+  if (!data || data.what !== "AppD-Manager apps" || !Array.isArray(data.apps)) throw new Error("This is not a file of exported AppD-Manager apps.");
+  const result = { added: [], skipped: [] };
+  try {
+    if (data.extensionSettings && !readSettings().extensionSettings) setExtensionDefaults(data.extensionSettings);
+  } catch {
+  }
+  for (const entry of data.apps) {
+    try {
+      const cfg = withDefaults(entry.config || {});
+      cfg.name ||= String(entry.id || "App");
+      validate(cfg);
+      const id = ID_RE.test(entry.id || "") && !fs.existsSync(appDir(entry.id)) ? entry.id : newId(cfg.name);
+      fs.mkdirSync(appDir(id), { recursive: true });
+      if (entry.icon && /^[\w.-]+$/.test(entry.icon.name || "")) {
+        fs.writeFileSync(path.join(appDir(id), entry.icon.name), Buffer.from(String(entry.icon.data), "base64"));
+        cfg.icon = entry.icon.name;
+      }
+      save(id, cfg);
+      result.added.push(cfg.name);
+    } catch (e) {
+      result.skipped.push(`${entry && entry.id || "?"}: ${e.message}`);
+    }
+  }
+  return result;
+}
 function runningPid(id) {
   try {
     if (WINDOWS) {
@@ -655,6 +700,8 @@ module.exports = {
   RULES,
   clearData,
   duplicate,
+  exportApps,
+  importApps,
   DEFAULTS,
   APP_ACTIONS,
   EXTENSIONS,

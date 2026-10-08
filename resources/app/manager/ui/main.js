@@ -3,6 +3,9 @@ for (const el of form.querySelectorAll(".cpu-limit")) el.addEventListener("input
 form.addEventListener("submit", save);
 $("flag-presets").addEventListener("change", addFlagPreset);
 $("agent-presets").addEventListener("change", useAgentPreset);
+$("template").addEventListener("change", useTemplate);
+$("export-apps").addEventListener("click", () => backup("exportApps"));
+$("import-apps").addEventListener("click", () => backup("importApps"));
 $("extension-add").addEventListener("change", addExtension);
 $("extension-import").addEventListener("click", () => changeLibrary("importExtension"));
 form.addEventListener("input", updateSaveButton);
@@ -100,6 +103,11 @@ new MutationObserver((changes) => {
     const el = form.elements[key];
     if (el && "min" in rule && el.type === "number") Object.assign(el, { min: rule.min, max: rule.max });
   }
+  $("template").append(...state.templates.map((template, index) => {
+    const option = new Option(template.name, String(index));
+    option.dataset.note = template.about;
+    return option;
+  }));
   renderSidebar();
   select(null);
   if (state.edit) window.editApp(state.edit.id, state.edit.extension);

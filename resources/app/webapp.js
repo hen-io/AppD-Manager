@@ -1,9 +1,16 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
 const extras = require("./extras");
+const setUpPermissions = require("./app/permissions");
+const showUnreadCount = require("./app/badge");
+const keepInTray = require("./app/tray");
+const openLog = require("./app/log");
+const createZoom = require("./app/zoom");
+const createThrottle = require("./app/throttle");
+const showLoadingScreen = require("./app/loading");
 const id = process.env.APPD_ID;
 let cfg;
 try {
@@ -73,33 +80,13 @@ function isInternal(url) {
 function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 }
-const logFile = path.join(lib.appDir(id), "events.log");
-try {
-  const kept = fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean);
-  if (kept.length > 300) fs.writeFileSync(logFile, `${kept.slice(-200).join("\n")}
-`);
-} catch {
-}
-function note(text) {
-  const now = /* @__PURE__ */ new Date();
-  const stamp = `${now.toLocaleDateString("sv")} ${now.toLocaleTimeString("sv")}`;
-  fs.appendFile(logFile, `${stamp}  ${text}
-`, () => {
-  });
-}
-let loadReason = "";
-const because = (reason) => {
-  loadReason = reason;
-  setTimeout(() => {
-    if (loadReason === reason) loadReason = "";
-  }, 3e3);
-};
+const { note, because, takeReason, plain } = openLog(path.join(lib.appDir(id), "events.log"));
 function restartApp(wc) {
   const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
   const args = process.argv.slice(1).filter((arg) => !/^--appd-(url|action)=/.test(arg));
   if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
   note("restarting (hard reload, or asked for by the manager)");
-  releasePage();
+  throttle.releasePage();
   app.relaunch({ args });
   app.quit();
 }
@@ -133,21 +120,7 @@ function parseShortcut(text) {
   return { control: parts.includes("ctrl") || parts.includes("control"), shift: parts.includes("shift"), alt: parts.includes("alt"), key };
 }
 const menuShortcut = parseShortcut(cfg.menuShortcut);
-const DEFAULT_ZOOM = Math.min(5, Math.max(0.25, cfg.defaultZoom / 100));
-let manualZoom = null;
-const applyZoom = (wc) => wc.setZoomFactor(manualZoom ?? DEFAULT_ZOOM);
-const everyPage = (run) => BrowserWindow.getAllWindows().forEach((window) => run(window.webContents));
-function zoomBy(wc, step) {
-  if (!cfg.allowZoom) return;
-  wc.setZoomLevel(Math.min(8, Math.max(-7, wc.getZoomLevel() + step * 0.5)));
-  manualZoom = wc.getZoomFactor();
-  everyPage(applyZoom);
-}
-function resetZoom(wc) {
-  manualZoom = null;
-  applyZoom(wc);
-  everyPage(applyZoom);
-}
+const zoom = createZoom(cfg);
 const customExtensions = [];
 async function loadCustomExtensions() {
   const loader = session.defaultSession.extensions || session.defaultSession;
@@ -155,7 +128,7 @@ async function loadCustomExtensions() {
     const folder = lib.extensionFolder(entry);
     try {
       const info = lib.describeExtension(folder);
-      const loaded = await loader.loadExtension(folder, { allowFileAccess: true });
+      const loaded = await loader.loadExtension(folder, { allowFileAccess: false });
       customExtensions.push({ id: loaded.id, name: info.name, options: info.options });
     } catch (e) {
       console.error(`appd: extension ${folder}: ${e.message}`);
@@ -201,13 +174,13 @@ function showActionMenu(wc) {
     { label: "Open page in browser", click: () => openExternal(wc.getURL()) },
     sep,
     ...cfg.allowZoom ? [
-      { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoomBy(wc, 1) },
-      { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoomBy(wc, -1) },
+      { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoom.zoomBy(wc, 1) },
+      { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoom.zoomBy(wc, -1) },
       {
-        label: `Reset zoom (${Math.round(DEFAULT_ZOOM * 100)}%)`,
+        label: `Reset zoom (${zoom.normalPercent}%)`,
         accelerator: "Ctrl+0",
-        enabled: manualZoom !== null && Math.abs(manualZoom - DEFAULT_ZOOM) > 1e-3,
-        click: () => resetZoom(wc)
+        enabled: zoom.isChanged(),
+        click: () => zoom.reset(wc)
       }
     ] : [],
     {
@@ -255,9 +228,9 @@ function shortcut(wc, input) {
   else if (key === "f11") {
     const w = BrowserWindow.fromWebContents(wc);
     w?.setFullScreen(!w.isFullScreen());
-  } else if (ctrl && (key === "=" || key === "+")) zoomBy(wc, 1);
-  else if (ctrl && key === "-") zoomBy(wc, -1);
-  else if (ctrl && key === "0") resetZoom(wc);
+  } else if (ctrl && (key === "=" || key === "+")) zoom.zoomBy(wc, 1);
+  else if (ctrl && key === "-") zoom.zoomBy(wc, -1);
+  else if (ctrl && key === "0") zoom.reset(wc);
   else if (input.alt && !input.control && key === "arrowleft") history.goBack();
   else if (input.alt && !input.control && key === "arrowright") history.goForward();
   else if (input.alt && !input.control && key === "home") wc.loadURL(cfg.url);
@@ -306,16 +279,17 @@ function contextMenu(wc, p) {
 }
 app.on("web-contents-created", (_event, wc) => {
   if (!cfg.userAgent) followGoogleSignIn(wc);
-  let shown = "";
-  wc.on("did-navigate", (_e, url) => {
-    if (!/^(https?|file):/i.test(url)) return;
-    if (url === shown) manualZoom = null;
-    shown = url;
-    applyZoom(wc);
-  });
-  wc.on("zoom-changed", (_e, direction) => zoomBy(wc, direction === "in" ? 1 : -1));
+  zoom.follow(wc);
   if (cfg.customCss.trim()) wc.on("dom-ready", () => wc.insertCSS(cfg.customCss).catch(() => {
   }));
+  if (cfg.customJs.trim()) {
+    wc.on("dom-ready", () => {
+      if (/^https?:/i.test(wc.getURL())) wc.executeJavaScript(`try {
+${cfg.customJs}
+} catch (error) { console.error('Custom JavaScript:', error); }`).catch(() => {
+      });
+    });
+  }
   if (cfg.hideScrollbars) {
     wc.on("frame-created", (_e, { frame }) => {
       frame?.on("dom-ready", () => frame.executeJavaScript(`(() => {
@@ -351,223 +325,7 @@ function readState() {
     return {};
   }
 }
-let stoppedPids = [];
-function pagePids() {
-  const pids = /* @__PURE__ */ new Set();
-  for (const window of BrowserWindow.getAllWindows()) {
-    for (const frame of window.webContents.mainFrame.framesInSubtree) pids.add(frame.osProcessId);
-  }
-  return [...pids].filter((pid) => pid > 0);
-}
-function signalAll(pids, signal) {
-  for (const pid of pids) {
-    try {
-      process.kill(pid, signal);
-    } catch {
-    }
-  }
-}
-function pausePage() {
-  if (stoppedPids.length) return;
-  stopLimiter();
-  stoppedPids = pagePids();
-  signalAll(stoppedPids, "SIGSTOP");
-}
-function resumePage() {
-  signalAll(stoppedPids, "SIGCONT");
-  stoppedPids = [];
-  runLimiter();
-}
-const LIMIT_PERIOD_MS = 100;
-const LIMIT_MIN_RUN_MS = 2;
-const percent = (value) => value > 0 && value < 100 ? value : 100;
-const alwaysPercent = percent(cfg.cpuPercent);
-const awayPercent = cfg.backgroundThrottling ? Math.min(alwaysPercent, percent(cfg.unfocusedCpuPercent)) : alwaysPercent;
-let cpuPercentNow = alwaysPercent;
-let limiterTimer = null;
-let limitedPids = [];
-let quitting = false;
-function stopLimiter() {
-  clearTimeout(limiterTimer);
-  limiterTimer = null;
-  signalAll(limitedPids, "SIGCONT");
-  limitedPids = [];
-}
-function runLimiter() {
-  stopLimiter();
-  if (quitting || cpuPercentNow >= 100 || stoppedPids.length) return;
-  const runMs = Math.max(LIMIT_MIN_RUN_MS, LIMIT_PERIOD_MS * cpuPercentNow / 100);
-  const periodMs = Math.max(LIMIT_PERIOD_MS, runMs * 100 / cpuPercentNow);
-  const slice = () => {
-    signalAll(limitedPids, "SIGCONT");
-    limitedPids = pagePids();
-    limiterTimer = setTimeout(() => {
-      signalAll(limitedPids, "SIGSTOP");
-      limiterTimer = setTimeout(slice, periodMs - runMs);
-    }, runMs);
-  };
-  slice();
-}
-function setCpuPercent(value) {
-  if (value === cpuPercentNow) return;
-  cpuPercentNow = value;
-  runLimiter();
-}
-function releasePage() {
-  quitting = true;
-  stopLimiter();
-  signalAll(stoppedPids, "SIGCONT");
-  stoppedPids = [];
-}
-app.on("before-quit", releasePage);
-process.on("exit", releasePage);
-function watchFocus(window) {
-  const wc = window.webContents;
-  const GRACE_MS = 3e3;
-  let timer = null;
-  let pauseTimer = null;
-  let slowTimer = null;
-  let watchdog = null;
-  let idleSince = 0;
-  let throttled = false;
-  let soundCheck = null;
-  let cover = null;
-  let round = 0;
-  const SETTLE_MS = 1e4;
-  const LOAD_MAX_MS = 6e4;
-  let busyUntil = Date.now() + LOAD_MAX_MS;
-  const busy = () => Date.now() < busyUntil;
-  wc.on("did-start-navigation", (details) => {
-    if (!details.isMainFrame || details.isSameDocument) return;
-    busyUntil = Date.now() + LOAD_MAX_MS;
-    if (throttled) setCpuPercent(alwaysPercent);
-  });
-  wc.on("did-stop-loading", () => {
-    busyUntil = Date.now() + SETTLE_MS;
-  });
-  const COVER_STEP_MS = 1500;
-  const withinMoment = (promise) => Promise.race([
-    promise.catch(() => null),
-    new Promise((resolve) => setTimeout(() => resolve(null), COVER_STEP_MS))
-  ]);
-  const showPicture = async (view, picture, width) => {
-    const page = '<body style="margin:0;overflow:hidden"><img id="picture" style="display:block">';
-    await view.webContents.loadURL(`data:text/html,${encodeURIComponent(page)}`);
-    await view.webContents.executeJavaScript(
-      `picture.style.width = '${width}px'; picture.src = ${JSON.stringify(picture.toDataURL())}; picture.decode()`
-    );
-  };
-  const dropCover = (view) => {
-    try {
-      if (!window.isDestroyed()) window.contentView.removeChildView(view);
-      view.webContents.close();
-    } catch {
-    }
-  };
-  const pause = async () => {
-    if (wc.isDevToolsOpened()) return;
-    if (busy()) {
-      pauseTimer = setTimeout(pause, Math.max(1e3, busyUntil - Date.now()));
-      return;
-    }
-    clearTimeout(slowTimer);
-    const mine = ++round;
-    const overtaken = () => mine !== round || window.isDestroyed();
-    stopLimiter();
-    const picture = await withinMoment(wc.capturePage());
-    if (overtaken()) return;
-    if (picture && !picture.isEmpty()) {
-      const [width, height] = window.getContentSize();
-      const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-      view.setBackgroundColor("#00000000");
-      view.setBounds({ x: 0, y: 0, width, height });
-      cover = view;
-      window.contentView.addChildView(view);
-      await withinMoment(showPicture(view, picture, width));
-      if (overtaken()) return;
-    }
-    pausePage();
-    note("paused (pauseWhenUnfocused)");
-    if (cfg.skipMissedUpdates) dropBacklog();
-    watchdog = setInterval(() => {
-      if (window.isDestroyed()) clearInterval(watchdog);
-      else if (BrowserWindow.getFocusedWindow()) back();
-    }, 1e3);
-  };
-  const away = () => {
-    idleSince = Date.now() - GRACE_MS;
-    if (awayPercent < alwaysPercent) {
-      slowTimer = setTimeout(() => {
-        throttled = true;
-        const apply = () => setCpuPercent(wc.isCurrentlyAudible() || busy() ? alwaysPercent : awayPercent);
-        apply();
-        soundCheck = setInterval(apply, 3e3);
-      }, Math.max(0, cfg.slowAfterSeconds * 1e3 - GRACE_MS));
-    }
-    if (cfg.pauseWhenUnfocused) {
-      pauseTimer = setTimeout(pause, Math.max(0, cfg.pauseAfterSeconds * 1e3 - GRACE_MS));
-    }
-  };
-  const dropBacklog = () => session.defaultSession.closeAllConnections().catch(() => {
-  });
-  const SKIP_AFTER_MS = 3e4;
-  const back = async () => {
-    clearTimeout(timer);
-    clearTimeout(pauseTimer);
-    clearTimeout(slowTimer);
-    clearInterval(watchdog);
-    watchdog = null;
-    const mine = ++round;
-    clearInterval(soundCheck);
-    const awayMs = idleSince ? Date.now() - idleSince : 0;
-    if (cfg.skipMissedUpdates && awayMs >= SKIP_AFTER_MS && (stoppedPids.length || throttled)) {
-      note(`back after ${Math.round(awayMs / 1e3)} s: connections closed so the app reconnects (skipMissedUpdates)`);
-      await dropBacklog();
-      if (mine !== round || window.isDestroyed()) return;
-    }
-    resumePage();
-    if (throttled) {
-      throttled = false;
-      setCpuPercent(alwaysPercent);
-    }
-    const idleMs = idleSince ? Date.now() - idleSince : 0;
-    idleSince = 0;
-    const reloading = cfg.reloadAfterIdleMinutes > 0 && idleMs >= cfg.reloadAfterIdleMinutes * 6e4 && !window.isDestroyed();
-    if (cover) {
-      const view = cover;
-      cover = null;
-      let dropped = false;
-      const drop = () => {
-        if (dropped) return;
-        dropped = true;
-        dropCover(view);
-      };
-      if (reloading) wc.once("did-finish-load", drop);
-      setTimeout(drop, reloading ? 1e4 : 300);
-    }
-    if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reload();
-  };
-  window.on("blur", () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      if (!window.isDestroyed() && !BrowserWindow.getFocusedWindow()) away();
-    }, GRACE_MS);
-  });
-  window.on("focus", back);
-  window.on("restore", back);
-  window.on("resize", () => {
-    if (!cover) return;
-    const [width, height] = window.getContentSize();
-    cover.setBounds({ x: 0, y: 0, width, height });
-  });
-  window.on("close", resumePage);
-  window.on("closed", () => {
-    clearTimeout(timer);
-    clearTimeout(pauseTimer);
-    clearInterval(watchdog);
-    clearInterval(soundCheck);
-  });
-}
+const throttle = createThrottle(cfg, { note, because });
 const homeButtonScript = `(() => {
   if (document.getElementById('appd-home-button')) return;
   const host = document.createElement('div');
@@ -586,64 +344,6 @@ const homeButtonScript = `(() => {
   document.documentElement.append(host);
 })()`;
 const extension = (name) => cfg.extensions.includes(name);
-function showLoadingScreen(window) {
-  const dark = nativeTheme.shouldUseDarkColors || cfg.extensions.includes("darkreader");
-  const text = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const types = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon" };
-  let logo = `<div class="logo letter">${text((cfg.name.trim()[0] || "?").toUpperCase())}</div>`;
-  try {
-    const type = iconFile && types[path.extname(iconFile).toLowerCase()];
-    if (type) logo = `<img class="logo" alt="" src="data:${type};base64,${fs.readFileSync(iconFile).toString("base64")}">`;
-  } catch {
-  }
-  const page = `<!doctype html><meta charset="utf-8"><style>
-    html, body { height: 100%; margin: 0; background: transparent; }
-    body { display: grid; place-items: center; background: ${dark ? "#15171b" : "#f4f5f8"}; color: ${dark ? "#e8eaf0" : "#22252b"};
-      font: 500 15px system-ui, sans-serif; transition: opacity .3s ease; user-select: none; }
-    body.out { opacity: 0; }
-    .box { display: grid; justify-items: center; gap: 22px; animation: in .45s ease both; }
-    .logo { width: 96px; height: 96px; object-fit: contain; border-radius: 22px; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, .28)); animation: float 2.4s ease-in-out infinite; }
-    .letter { display: grid; place-items: center; background: linear-gradient(135deg, #5b8cff, #8a5bff); color: #fff; font-size: 44px; font-weight: 700; }
-    .name { max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .02em; opacity: .85; }
-    .track { width: 220px; height: 4px; border-radius: 4px; background: ${dark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.1)"}; overflow: hidden; }
-    .bar { width: 40%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #5b8cff, #8a5bff); animation: slide 1.25s cubic-bezier(.65, 0, .35, 1) infinite; }
-    @keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-    @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-    @media (prefers-reduced-motion: reduce) { .logo, .box { animation: none; } }
-  </style><body><div class="box">${logo}<div class="name">${text(cfg.name)}</div><div class="track"><div class="bar"></div></div></div>`;
-  const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-  view.setBackgroundColor(dark ? "#15171b" : "#f4f5f8");
-  const fit = () => {
-    const [width, height] = window.getContentSize();
-    view.setBounds({ x: 0, y: 0, width, height });
-  };
-  fit();
-  window.on("resize", fit);
-  window.contentView.addChildView(view);
-  view.webContents.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(page));
-  const shown = Date.now();
-  let gone = false;
-  const remove = () => {
-    if (gone) return;
-    gone = true;
-    clearTimeout(tooLong);
-    setTimeout(() => {
-      if (window.isDestroyed()) return;
-      view.setBackgroundColor("#00000000");
-      view.webContents.executeJavaScript('document.body.classList.add("out")').catch(() => {
-      });
-      setTimeout(() => {
-        if (window.isDestroyed()) return;
-        window.removeListener("resize", fit);
-        window.contentView.removeChildView(view);
-        view.webContents.close();
-      }, 320);
-    }, Math.max(0, 500 - (Date.now() - shown)));
-  };
-  const tooLong = setTimeout(remove, 2e4);
-  window.webContents.once("did-stop-loading", remove);
-}
 async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
@@ -654,7 +354,9 @@ async function createWindow() {
     inPageAds: cfg.adBlockInPageAds,
     exceptions: cfg.adBlockExceptions
   }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
+  setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   win = new BrowserWindow({
+    alwaysOnTop: cfg.alwaysOnTop,
     width: state.width || cfg.width,
     height: state.height || cfg.height,
     title: cfg.name,
@@ -670,21 +372,20 @@ async function createWindow() {
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
-  note(`started, opening ${startUrl}`);
+  note(`started, opening ${plain(startUrl)}`);
   let showing = "";
   win.webContents.on("did-start-navigation", (details) => {
     if (!details.isMainFrame || details.isSameDocument || !/^https?:/i.test(details.url)) return;
     const again = details.url === showing;
-    const why = loadReason || (again ? "asked for by the page itself, or by the server" : "");
-    note(`${again ? "reloading" : "loading"} ${details.url}${why ? ` - ${why}` : ""}`);
-    loadReason = "";
+    const why = takeReason() || (again ? "asked for by the page itself, or by the server" : "");
+    note(`${again ? "reloading" : "loading"} ${plain(details.url)}${why ? ` - ${why}` : ""}`);
   });
   win.webContents.on("did-navigate", (_e, url) => {
     showing = url;
   });
   let revivals = [];
   win.webContents.on("render-process-gone", (_e, details) => {
-    if (quitting || details.reason === "clean-exit") return;
+    if (throttle.isQuitting() || details.reason === "clean-exit") return;
     revivals = revivals.filter((time) => Date.now() - time < 6e4);
     note(`the page's process is gone (${details.reason})${revivals.length < 3 ? ": loading the page again" : ""}`);
     if (revivals.length >= 3 || win.isDestroyed()) return;
@@ -693,6 +394,8 @@ async function createWindow() {
     win.webContents.reload();
   });
   win.webContents.on("unresponsive", () => note("the page does not respond"));
+  if (cfg.unreadBadge) showUnreadCount(win, app);
+  if (cfg.closeToTray) keepInTray(win, { name: cfg.name, icon, isQuitting: throttle.isQuitting, quit: () => app.quit(), note });
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
   await loadCustomExtensions();
   if (extension("sponsorblock")) {
@@ -701,7 +404,7 @@ async function createWindow() {
   if (extension("darkreader")) {
     extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
   }
-  if (cfg.pauseWhenUnfocused || cfg.reloadAfterIdleMinutes > 0 || awayPercent < alwaysPercent) watchFocus(win);
+  if (throttle.wanted) throttle.watchFocus(win);
   win.on("close", () => {
     const { width, height } = win.getNormalBounds();
     try {
@@ -711,7 +414,7 @@ async function createWindow() {
   });
   win.webContents.on("did-fail-load", (_e, code, description, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || url.startsWith("data:")) return;
-    note(`could not load ${url}: ${description} (${code}); trying again in 5 seconds`);
+    note(`could not load ${plain(url)}: ${description} (${code}); trying again in 5 seconds`);
     because("another try after it could not be loaded");
     const target = JSON.stringify(url).replace(/</g, "\\u003c");
     win.webContents.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(
@@ -729,9 +432,9 @@ async function createWindow() {
       });
     });
   }
-  if (cfg.loadingScreen) showLoadingScreen(win);
+  if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile);
   win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
-  runLimiter();
+  throttle.runLimiter();
 }
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -739,7 +442,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", (_event, argv) => {
     if (argv.includes("--appd-action=quit")) return app.quit();
     if (!win) return;
-    resumePage();
+    throttle.resumePage();
     const action = actionIn(argv);
     if (action) runAction(action, win.webContents);
     if (win.isMinimized()) win.restore();

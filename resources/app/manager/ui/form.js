@@ -107,6 +107,7 @@ function select(id) {
     updateSaveButton();
     $("form-sub").textContent = isNew ? "Give it a name and an address, then save." : cfg.url;
     showIconPreview(isNew ? null : app.iconUrl, cfg.name);
+    $("template-row").hidden = id !== NEW;
     $("launch").hidden = isNew;
     showLaunchButton();
     $("remove").hidden = isNew;
@@ -209,6 +210,18 @@ async function fetchIcons() {
     setStatus(e.message, true);
   }
   button.disabled = false;
+}
+function useTemplate() {
+  const template = state.templates[Number($("template").value)];
+  $("template").value = "";
+  if (!template) return;
+  const { about, ...settings } = template;
+  const major = (/Chrome\/(\d+)/.exec(navigator.userAgent) || [])[1] || "140";
+  if (settings.userAgent) settings.userAgent = settings.userAgent.replace(/Chrome\/[\d.]+/, `Chrome/${major}.0.0.0`);
+  fillForm({ ...state.defaults, ...settings });
+  $("form-title").textContent = template.name;
+  updateSaveButton();
+  setStatus(`"${template.name}" filled in. Change what you like, then save. "Get from site" fetches its icon.`);
 }
 function useAgentPreset() {
   const preset = $("agent-presets").value;
