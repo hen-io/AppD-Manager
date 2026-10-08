@@ -8,6 +8,7 @@ body {
   height: 100vh;
   display: grid;
   grid-template-columns: 304px 1fr;
+  transition: grid-template-columns var(--enter);
   font: var(--body-medium);
   color: var(--on-surface);
   background: var(--surface);
@@ -656,17 +657,53 @@ main {
 .card h3 {
   margin-bottom: 16px;
 }
-details.card > summary {
-  margin: 0 0 16px 18px;
-  font: var(--title-medium);
+summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   cursor: pointer;
-  list-style-position: outside;
+  list-style: none;
+  user-select: none;
 }
-details.card > summary::marker {
+summary::-webkit-details-marker {
+  display: none;
+}
+summary > svg.mdi {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  color: var(--primary);
+}
+summary > svg.chevron {
+  margin-left: auto;
   color: var(--on-surface-variant);
+  transition: transform var(--motion);
+}
+details[open] > summary > svg.chevron {
+  transform: rotate(180deg);
+}
+details[open] > :not(summary) {
+  animation: arrive var(--enter) both;
+}
+details.card > summary {
+  margin: 0 0 16px;
+  font: var(--title-medium);
 }
 details.card[open] > summary {
   margin-bottom: 20px;
+}
+.card h3 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.card h3 > svg.mdi {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  color: var(--primary);
 }
 #home .title .note {
   white-space: normal;
@@ -699,6 +736,10 @@ details.card[open] > summary {
 }
 .app-card .app-name {
   font: var(--title-medium);
+}
+.app-usage {
+  font: var(--label-medium);
+  color: var(--tertiary);
 }
 .app-card.running .app-name::after {
   content: "";
@@ -764,9 +805,31 @@ form > .page {
   background: var(--surface-container);
   box-shadow: var(--elevation-2);
 }
-.actions #status {
+.actions .spacer {
   flex: 1;
-  min-width: 0;
+}
+#status {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  z-index: 40;
+  translate: -50% 0;
+  min-width: 280px;
+  max-width: min(640px, calc(100vw - 48px));
+  padding: 14px 16px;
+  border-radius: var(--shape-xs);
+  background: var(--inverse-surface);
+  color: var(--inverse-on-surface);
+  font: var(--body-medium);
+  box-shadow: var(--elevation-3);
+  animation: rise var(--enter) both;
+}
+#status:empty {
+  display: none;
+}
+#status.error {
+  background: var(--error-container);
+  color: var(--on-error-container);
 }
 .actions .more .picker {
   width: auto;
@@ -835,10 +898,8 @@ form:not(.global) #library-card {
 }
 .extension-settings > summary {
   margin: 0 -16px;
-  padding: 12px 16px 12px 34px;
+  padding: 12px 16px;
   font: var(--title-small);
-  cursor: pointer;
-  list-style-position: outside;
 }
 .extension-settings[open] > summary {
   margin-bottom: 18px;
@@ -1046,6 +1107,61 @@ form.global > .page {
 }
 .release .notes:empty {
   display: none;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: -50% 12px;
+  }
+}
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: scaleY(0.9);
+  }
+}
+@keyframes grow {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes dim {
+  from {
+    opacity: 0;
+  }
+}
+main > section:not([hidden]),
+main > nav:not([hidden]),
+form:not([hidden]) > .page {
+  animation: arrive var(--enter) both;
+}
+.app-card {
+  animation: arrive var(--enter) both;
+}
+.picker-menu {
+  transform-origin: top;
+  animation: unfold 0.15s cubic-bezier(0.05, 0.7, 0.1, 1) both;
+}
+dialog[open] {
+  animation: grow var(--enter) both;
+}
+dialog[open]::backdrop {
+  animation: dim var(--enter) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 select.picked {
   display: none;

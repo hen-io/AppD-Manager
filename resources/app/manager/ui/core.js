@@ -1,5 +1,5 @@
 "use strict";
-document.documentElement.dataset.palette = new URLSearchParams(location.search).get("palette") || "indigo";
+document.documentElement.dataset.palette = new URLSearchParams(location.search).get("palette") || "ocean";
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const NEW = "";
@@ -9,6 +9,7 @@ const GLOBAL = "*";
 let state = { apps: [], defaults: {} };
 let selected = null;
 let update = null;
+let usage = {};
 let running = /* @__PURE__ */ new Set();
 let extensions = [];
 let customExtensions = [];
@@ -19,9 +20,19 @@ async function call(method, ...args) {
   if (result.error) throw new Error(result.error);
   return result.value;
 }
+let statusTimer = null;
 function setStatus(text, isError = false) {
-  $("status").textContent = text;
-  $("status").classList.toggle("error", isError);
+  clearTimeout(statusTimer);
+  const bar = $("status");
+  bar.textContent = "";
+  bar.classList.toggle("error", isError);
+  if (!text) return;
+  setTimeout(() => {
+    bar.textContent = text;
+  }, 30);
+  statusTimer = setTimeout(() => {
+    bar.textContent = "";
+  }, isError ? 12e3 : 6e3);
 }
 const lines = (text) => text.split("\n").map((line) => line.trim()).filter(Boolean);
 function iconElement(url, name) {

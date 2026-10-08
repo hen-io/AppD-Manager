@@ -1,8 +1,8 @@
 :root {
   color-scheme: light dark;
-  --hue: 262;
-  --hue-3: calc(var(--hue) + 70);
-  --vivid: 1;
+  --hue: 248;
+  --hue-3: 205;
+  --vivid: 1.4;
   --primary: oklch(50% calc(0.21 * var(--vivid)) var(--hue));
   --on-primary: #ffffff;
   --primary-container: oklch(90% calc(0.075 * var(--vivid)) var(--hue));
@@ -26,6 +26,8 @@
   --on-surface-variant: oklch(43% calc(0.035 * var(--vivid)) var(--hue));
   --outline: oklch(60% calc(0.035 * var(--vivid)) var(--hue));
   --outline-variant: oklch(84% calc(0.03 * var(--vivid)) var(--hue));
+  --inverse-surface: oklch(31% calc(0.02 * var(--vivid)) var(--hue));
+  --inverse-on-surface: oklch(95% calc(0.01 * var(--vivid)) var(--hue));
   --scrim: rgb(0 0 0 / 40%);
   --shape-xs: 4px;
   --shape-s: 8px;
@@ -62,6 +64,7 @@
   --disabled-container: color-mix(in srgb, var(--on-surface) 12%, transparent);
   --disabled-content: color-mix(in srgb, var(--on-surface) 38%, transparent);
   --motion: 0.2s cubic-bezier(0.2, 0, 0, 1);
+  --enter: 0.3s cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -88,6 +91,8 @@
     --on-surface-variant: oklch(79% calc(0.028 * var(--vivid)) var(--hue));
     --outline: oklch(63% calc(0.03 * var(--vivid)) var(--hue));
     --outline-variant: oklch(35% calc(0.03 * var(--vivid)) var(--hue));
+    --inverse-surface: oklch(91% calc(0.012 * var(--vivid)) var(--hue));
+    --inverse-on-surface: oklch(30% calc(0.02 * var(--vivid)) var(--hue));
     --scrim: rgb(0 0 0 / 60%);
   }
 }

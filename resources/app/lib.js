@@ -187,7 +187,8 @@ const EXTENSION_KEYS = {
   darkreader: ["darkBrightness", "darkContrast", "darkSepia"]
 };
 const MODES = { system: "As the desktop", light: "Light", dark: "Dark" };
-const PALETTES = { indigo: "Indigo", violet: "Violet", ocean: "Ocean", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose" };
+const DEFAULT_PALETTE = "ocean";
+const PALETTES = { ocean: "Ocean", indigo: "Indigo", violet: "Violet", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose" };
 function readSettings() {
   try {
     return JSON.parse(fs.readFileSync(settingsPath, "utf8"));
@@ -197,7 +198,7 @@ function readSettings() {
 }
 function appearance() {
   const kept = readSettings().appearance || {};
-  return { mode: kept.mode in MODES ? kept.mode : "system", palette: kept.palette in PALETTES ? kept.palette : "indigo" };
+  return { mode: kept.mode in MODES ? kept.mode : "system", palette: kept.palette in PALETTES ? kept.palette : DEFAULT_PALETTE };
 }
 function setAppearance(next) {
   const settings = readSettings();
@@ -402,6 +403,9 @@ function withDefaults(file) {
     else if (stored.backgroundThrottling === false) stored.unfocusedCpuPercent = DEFAULTS.unfocusedCpuPercent;
     else stored.unfocusedCpuPercent = Math.min(limit, 10);
   }
+  for (const key of ["cpuPercent", "unfocusedCpuPercent"]) {
+    if (typeof stored[key] === "number" && stored[key] <= 0) stored[key] = 100;
+  }
   stored.configVersion = DEFAULTS.configVersion;
   for (const [key, rule] of Object.entries(RULES)) {
     if ("min" in rule && typeof stored[key] === "number") stored[key] = Math.min(rule.max, Math.max(rule.min, stored[key]));
@@ -533,6 +537,34 @@ function runningPid(id) {
   } catch {
     return 0;
   }
+}
+function memoryUse() {
+  const use = {};
+  if (WINDOWS) return use;
+  const parent = {};
+  const resident = {};
+  try {
+    for (const name of fs.readdirSync("/proc")) {
+      if (!/^\d+$/.test(name)) continue;
+      try {
+        const stat = fs.readFileSync(`/proc/${name}/stat`, "utf8");
+        const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+        parent[name] = rest[1];
+        resident[name] = Number(rest[21]) * 4096;
+      } catch {
+      }
+    }
+  } catch {
+    return use;
+  }
+  const children = {};
+  for (const [pid, of] of Object.entries(parent)) (children[of] ||= []).push(pid);
+  const total = (pid) => (resident[pid] || 0) + (children[pid] || []).reduce((sum, child) => sum + total(child), 0);
+  for (const id of list()) {
+    const pid = runningPid(id);
+    if (pid) use[id] = total(String(pid));
+  }
+  return use;
 }
 function close(id) {
   const pid = runningPid(id);
@@ -717,6 +749,8 @@ function sync() {
   return problems;
 }
 module.exports = {
+  memoryUse,
+  DEFAULT_PALETTE,
   MODES,
   PALETTES,
   appearance,

@@ -43,7 +43,7 @@
 
     <section id="settings" class="page" hidden>
       <section class="card">
-        <h3>Appearance</h3>
+        <h3 data-icon="palette">Appearance</h3>
         <label>Light or dark
           <select id="appearance-mode" aria-label="Light or dark"></select>
         </label>
@@ -52,7 +52,7 @@
       </section>
 
       <section class="card">
-        <h3>Apps folder</h3>
+        <h3 data-icon="folder">Apps folder</h3>
         <p id="apps-dir" class="path"></p>
         <p class="note">Each app has its own folder in here. Changing the location moves your apps there, with their settings and logins. Close running apps first: they stay behind.</p>
         <div class="row">
@@ -64,7 +64,7 @@
       </section>
 
       <section class="card">
-        <h3>Backup</h3>
+        <h3 data-icon="backup">Backup</h3>
         <p class="note">Every app's settings and icon, and the extension settings for all apps, in one file. Logins are not part of it: after importing, sign in again.</p>
         <div class="row">
           <button id="export-apps" type="button" data-icon="download">Export the apps…</button>
@@ -74,7 +74,7 @@
       </section>
 
       <section class="card">
-        <h3>Updates</h3>
+        <h3 data-icon="update">Updates</h3>
         <p id="installed-version"></p>
         <p class="note">AppD-Manager looks for a new version every time it starts.</p>
         <div class="row">
@@ -134,7 +134,7 @@
         </header>
 
         <details class="card" open>
-          <summary>General</summary>
+          <summary data-icon="app-settings">General</summary>
           <label id="template-row">Start from a template
             <select id="template" aria-label="Start from a template">
               <option value="">Choose a site…</option>
@@ -174,7 +174,7 @@
         </details>
 
         <details class="card" open>
-          <summary>Window</summary>
+          <summary data-icon="window">Window</summary>
           <div class="size-row">
             <label>Width
               <input name="width" type="number" min="200" step="1">
@@ -238,7 +238,7 @@
         </details>
 
         <details class="card" open>
-          <summary>Links</summary>
+          <summary data-icon="link">Links</summary>
           <label>Links that open a new window or tab
             <select name="openLinks">
               <option value="browser">Open in the default browser</option>
@@ -257,7 +257,7 @@
         </details>
 
         <details id="extensions-card" class="card" open>
-          <summary>Extensions</summary>
+          <summary data-icon="puzzle">Extensions</summary>
           <p id="global-note" class="note" hidden>These settings apply to every app that has the extension added, except for what an app sets differently itself. Running apps they change something for can be restarted when you save.</p>
           <div id="extension-list"></div>
           <p id="no-extensions" class="note">None added.</p>
@@ -396,7 +396,7 @@
         </details>
 
         <details class="card" open>
-          <summary>Performance</summary>
+          <summary data-icon="speed">Performance</summary>
           <label class="check">
             <input name="hardwareAcceleration" type="checkbox">
             Hardware acceleration
@@ -413,7 +413,7 @@
         </details>
 
         <details class="card" open>
-          <summary>Slow down when not in use</summary>
+          <summary data-icon="slow">Slow down when not in use</summary>
           <label class="check">
             <input name="backgroundThrottling" type="checkbox">
             Slow the page down after
@@ -431,7 +431,7 @@
         </details>
 
         <details class="card" open>
-          <summary>Pause when not in use</summary>
+          <summary data-icon="pause">Pause when not in use</summary>
           <label class="check">
             <input name="pauseWhenUnfocused" type="checkbox">
             Pause the page after
@@ -455,7 +455,7 @@
         </details>
 
         <details class="card">
-          <summary>Advanced</summary>
+          <summary data-icon="code">Advanced</summary>
           <label>User agent
             <input name="userAgent" placeholder="Default: same as Chrome">
             <span class="note">What the app tells sites it is. Sites pick their phone, tablet or TV layout by it. Empty is Chrome on a desktop. Some sites also need their own address for it: YouTube's TV interface is youtube.com/tv with a TV user agent.</span>
@@ -522,7 +522,7 @@
         </details>
 
         <section id="library-card" class="card">
-          <h3>Imported extensions</h3>
+          <h3 data-icon="puzzle">Imported extensions</h3>
           <ul id="imported-list" class="plain-list"></ul>
           <p id="no-imported" class="note">None imported.</p>
           <p class="note">Unpacked Chrome extensions (the folder that holds <code>manifest.json</code>) are copied into AppD-Manager's library; add them to an app in its Extensions section. They run on what Electron supports of the extension system: ones that change pages mostly work, ones that need a toolbar button or the full browser do not.</p>
@@ -536,7 +536,7 @@
       <div class="actions">
         <button id="save" type="submit" class="primary" data-icon="save">Save</button>
         <button id="launch" type="button">Launch app</button>
-        <span id="status" class="note"></span>
+        <span class="spacer"></span>
         <span class="more">
           <select id="more-actions" aria-label="More actions">
             <option value="">More…</option>
@@ -550,6 +550,8 @@
       </div>
     </form>
   </main>
+
+  <div id="status" role="status"></div>
 
   <dialog id="ask">
     <h2 id="ask-message"></h2>

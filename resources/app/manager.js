@@ -268,6 +268,7 @@ const handlers = {
     });
     return ["save", "discard", "stay"][response];
   },
+  memoryUse: () => lib.memoryUse(),
   runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
   close(id) {
     lib.checkId(id);

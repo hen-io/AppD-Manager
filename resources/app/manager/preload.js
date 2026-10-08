@@ -17,6 +17,7 @@ for (const name of [
   "setAppearance",
   "askUnsaved",
   "runningApps",
+  "memoryUse",
   "pickIcon",
   "fetchIcons",
   "pickAppsDir",

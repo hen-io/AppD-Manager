@@ -51,6 +51,12 @@ function renderList() {
     const text = document.createElement("div");
     text.className = "app-text";
     text.append(name, url);
+    if (running.has(app.id) && usageText(app.id)) {
+      const use = document.createElement("div");
+      use.className = "app-usage";
+      use.textContent = `Running · ${usageText(app.id)}`;
+      text.append(use);
+    }
     const card = document.createElement("div");
     card.className = "app-card";
     card.classList.toggle("running", running.has(app.id));
@@ -101,13 +107,30 @@ function renderSidebar() {
 }
 function showLaunchButton() {
   $("running-badge").hidden = !running.has(selected);
+  $("running-badge").textContent = usageText(selected) ? `Running · ${usageText(selected)}` : "Running";
   if (running.has(selected)) label($("launch"), "stop", "Close app");
   else label($("launch"), "launch", "Launch app");
 }
+function usageText(id) {
+  const bytes = usage[id];
+  if (!bytes) return "";
+  const mb = bytes / 1048576;
+  return mb >= 1e3 ? `about ${(mb / 1024).toFixed(1)} GB` : `about ${Math.round(mb / 10) * 10} MB`;
+}
+let looks = 0;
 async function refreshRunning() {
   let ids;
   try {
     ids = await call("runningApps");
+    const moved = ids.length !== running.size || ids.some((id) => !running.has(id));
+    if (ids.length && (moved || looks++ % 5 === 0)) {
+      const before = Object.keys(usage).map(usageText).join();
+      usage = await call("memoryUse");
+      if (!moved && Object.keys(usage).map(usageText).join() !== before) {
+        renderList();
+        showLaunchButton();
+      }
+    } else if (!ids.length) usage = {};
   } catch {
     return;
   }

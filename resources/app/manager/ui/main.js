@@ -87,7 +87,8 @@ for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) {
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
-for (const button of document.querySelectorAll("button[data-icon]")) label(button, button.dataset.icon, button.textContent);
+for (const el of document.querySelectorAll("[data-icon]")) label(el, el.dataset.icon, el.textContent);
+for (const summary of document.querySelectorAll("summary")) summary.append(iconSvg("chevron", "chevron"));
 document.querySelectorAll("select").forEach(enhance);
 document.querySelectorAll("input[data-slider]").forEach(addSlider);
 new MutationObserver((changes) => {
