@@ -22,6 +22,9 @@ function editRequest(argv) {
   return /^[a-z0-9][a-z0-9_-]*$/.test(id || "") && /^[a-z]*$/.test(extension) ? { id, extension } : null;
 }
 pendingEdit = editRequest(process.argv);
+let lastUse = { at: 0, apps: {} };
+const UNDO_MS = 12e3;
+lib.emptyTrash();
 let unsaved = false;
 let leaving = false;
 async function mayLeave() {
@@ -199,9 +202,15 @@ const handlers = {
     if (lib.close(id)) {
       for (let tries = 0; tries < 30 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
     }
-    lib.remove(id);
+    const undo = lib.remove(id);
     lib.sync();
-    return { removed: true, state: state() };
+    if (undo) setTimeout(() => lib.emptyTrash(id), UNDO_MS + 3e3);
+    return { removed: true, undo, state: state() };
+  },
+  undoRemove(id) {
+    lib.restore(id);
+    lib.sync();
+    return { state: state() };
   },
   setAppearance(next) {
     const now = lib.setAppearance({ ...next.mode ? { mode: String(next.mode) } : {}, ...next.palette ? { palette: String(next.palette) } : {} });
@@ -268,7 +277,18 @@ const handlers = {
     });
     return ["save", "discard", "stay"][response];
   },
-  memoryUse: () => lib.memoryUse(),
+  usage() {
+    const now = Date.now();
+    const use = lib.resourceUse();
+    const result = {};
+    for (const [id, { memory, cpuSeconds }] of Object.entries(use)) {
+      const last = lastUse.apps[id];
+      const seconds = (now - lastUse.at) / 1e3;
+      result[id] = { memory, cpu: last !== void 0 && seconds > 0.5 ? Math.max(0, (cpuSeconds - last) / seconds * 100) : null };
+    }
+    lastUse = { at: now, apps: Object.fromEntries(Object.entries(use).map(([id, { cpuSeconds }]) => [id, cpuSeconds])) };
+    return result;
+  },
   runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
   close(id) {
     lib.checkId(id);

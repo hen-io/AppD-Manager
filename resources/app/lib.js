@@ -277,9 +277,9 @@ const RULES = {
   darkSepia: { min: 0, max: 100 },
   cpuPercent: { min: 0.1, max: 100 },
   unfocusedCpuPercent: { min: 0.1, max: 100 },
-  slowAfterSeconds: { min: 1, max: 86400 },
+  slowAfterSeconds: { min: 1, max: 3600 },
   pauseAfterSeconds: { min: 1, max: 86400 },
-  reloadAfterIdleMinutes: { min: 0, max: 1e5 },
+  reloadAfterIdleMinutes: { min: 0, max: 60 },
   jsHeapMb: { min: 0, max: 65536 }
 };
 function validate(cfg) {
@@ -465,9 +465,29 @@ function save(id, cfg) {
   Object.assign(stored, differing(cfg, extensionDefaults()));
   fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
 }
+const trashDir = path.join(root, "Trash");
 function remove(id) {
   checkId(id);
-  fs.rmSync(appDir(id), { recursive: true, force: true });
+  const kept = path.join(trashDir, id);
+  fs.rmSync(kept, { recursive: true, force: true });
+  try {
+    fs.mkdirSync(trashDir, { recursive: true });
+    fs.renameSync(appDir(id), kept);
+    return true;
+  } catch {
+    fs.rmSync(appDir(id), { recursive: true, force: true });
+    return false;
+  }
+}
+function restore(id) {
+  checkId(id);
+  if (fs.existsSync(appDir(id))) throw new Error(`There is an app "${id}" again already.`);
+  fs.mkdirSync(appsDir(), { recursive: true });
+  fs.renameSync(path.join(trashDir, id), appDir(id));
+}
+function emptyTrash(id) {
+  if (id) checkId(id);
+  fs.rmSync(id ? path.join(trashDir, id) : trashDir, { recursive: true, force: true });
 }
 function clearData(id) {
   checkId(id);
@@ -538,11 +558,12 @@ function runningPid(id) {
     return 0;
   }
 }
-function memoryUse() {
+function resourceUse() {
   const use = {};
   if (WINDOWS) return use;
   const parent = {};
   const resident = {};
+  const ticks = {};
   try {
     for (const name of fs.readdirSync("/proc")) {
       if (!/^\d+$/.test(name)) continue;
@@ -551,6 +572,7 @@ function memoryUse() {
         const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
         parent[name] = rest[1];
         resident[name] = Number(rest[21]) * 4096;
+        ticks[name] = Number(rest[11]) + Number(rest[12]);
       } catch {
       }
     }
@@ -559,10 +581,10 @@ function memoryUse() {
   }
   const children = {};
   for (const [pid, of] of Object.entries(parent)) (children[of] ||= []).push(pid);
-  const total = (pid) => (resident[pid] || 0) + (children[pid] || []).reduce((sum, child) => sum + total(child), 0);
+  const total = (of, pid) => (of[pid] || 0) + (children[pid] || []).reduce((sum, child) => sum + total(of, child), 0);
   for (const id of list()) {
     const pid = runningPid(id);
-    if (pid) use[id] = total(String(pid));
+    if (pid) use[id] = { memory: total(resident, String(pid)), cpuSeconds: total(ticks, String(pid)) / 100 };
   }
   return use;
 }
@@ -749,8 +771,10 @@ function sync() {
   return problems;
 }
 module.exports = {
-  memoryUse,
+  resourceUse,
   DEFAULT_PALETTE,
+  restore,
+  emptyTrash,
   MODES,
   PALETTES,
   appearance,

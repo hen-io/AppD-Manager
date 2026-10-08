@@ -23,7 +23,9 @@ function openMenu(select, button) {
     item.className = "picker-item";
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(option.selected && select.value !== ""));
-    label(item, "check", "");
+    label(item, option.dataset.icon || "check", "");
+    item.classList.toggle("lead", Boolean(option.dataset.icon));
+    item.classList.toggle("divided", "divider" in option.dataset);
     item.append(text);
     item.addEventListener("click", () => choose(option));
     item.addEventListener("mousemove", () => activate(items.indexOf(item)));

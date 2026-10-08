@@ -173,22 +173,14 @@ function extensionMenu() {
 }
 function appMenu(wc) {
   const window = BrowserWindow.fromWebContents(wc);
-  const history = wc.navigationHistory;
   const sep = { type: "separator" };
   return [
     { label: "Reload", accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
     { label: `Go to ${cfg.name}`, accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
-    { label: "Back", accelerator: "Alt+Left", enabled: history.canGoBack(), click: () => history.goBack() },
-    { label: "Forward", accelerator: "Alt+Right", enabled: history.canGoForward(), click: () => history.goForward() },
-    sep,
-    { label: "Copy page address", click: () => clipboard.writeText(wc.getURL()) },
-    { label: "Open page in browser", click: () => openExternal(wc.getURL()) },
     sep,
     ...cfg.allowZoom ? [
-      { label: "Zoom in", accelerator: "Ctrl+Plus", click: () => zoom.zoomBy(wc, 1) },
-      { label: "Zoom out", accelerator: "Ctrl+-", click: () => zoom.zoomBy(wc, -1) },
       {
         label: `Reset zoom (${zoom.normalPercent}%)`,
         accelerator: "Ctrl+0",

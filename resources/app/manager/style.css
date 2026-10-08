@@ -366,10 +366,6 @@ label:not(.check) > .number-field > input[type=number] {
   width: 2px;
   margin-left: -1px;
 }
-.slider:hover .wave,
-.slider:active .wave {
-  animation-duration: 0.8s;
-}
 .slider.off {
   opacity: 0.45;
 }
@@ -879,6 +875,13 @@ details.card[open] > summary {
 .app-usage {
   font: var(--label-medium);
   color: var(--tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.app-usage:empty {
+  display: none;
+}
+#apps li.selected .app-usage {
+  color: inherit;
 }
 .app-card.running .app-name::after {
   content: "";
@@ -888,6 +891,67 @@ details.card[open] > summary {
   margin-left: 8px;
   border-radius: 50%;
   background: var(--success);
+}
+.tinted {
+  --tint: oklch(62% 0.17 var(--app-hue));
+}
+.app-card.tinted {
+  background: color-mix(in oklch, var(--tint) 13%, var(--surface-container-low));
+}
+.app-card.tinted:hover {
+  background: color-mix(in oklch, var(--tint) 21%, var(--surface-container-low));
+}
+img.icon,
+.title img.icon,
+.app-card img.icon {
+  border-radius: 0;
+}
+.tinted span.icon {
+  background: color-mix(in oklch, var(--tint) 38%, var(--surface-container-high));
+  color: var(--on-surface);
+}
+form .title {
+  padding: 18px 22px;
+  border-radius: var(--shape-xl);
+  background: var(--surface-container-low);
+  transition: background var(--enter);
+}
+form .title.tinted {
+  background: color-mix(in oklch, var(--tint) 17%, var(--surface-container-low));
+}
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 8vh auto 0;
+  max-width: 420px;
+  text-align: center;
+  animation: arrive var(--enter) both;
+}
+.empty h3 {
+  margin: 8px 0 0;
+  font: var(--title-large);
+}
+.empty-art {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 36% 64% 58% 42% / 46% 40% 60% 54%;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  animation: drift 7s ease-in-out infinite;
+}
+.empty-art svg.mdi {
+  width: 56px;
+  height: 56px;
+  margin: 0;
+}
+@keyframes drift {
+  50% {
+    border-radius: 58% 42% 40% 60% / 56% 62% 38% 44%;
+    rotate: 6deg;
+  }
 }
 #about .banner {
   max-width: 340px;
@@ -962,6 +1026,21 @@ form > .page {
   font: var(--body-medium);
   box-shadow: var(--elevation-3);
   animation: rise var(--enter) both;
+}
+#status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#status button {
+  margin: -8px -8px -8px auto;
+  padding: 8px 12px;
+  background: none;
+  color: color-mix(in oklch, var(--primary) 45%, var(--inverse-on-surface));
+}
+#status button:hover {
+  background: color-mix(in srgb, var(--inverse-on-surface) 10%, transparent);
+  box-shadow: none;
 }
 #status:empty {
   display: none;
@@ -1322,8 +1401,38 @@ main > nav:not([hidden]),
 form:not([hidden]) > .page {
   animation: arrive var(--enter) both;
 }
-.app-card {
+.stagger .app-card {
   animation: arrive var(--enter) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+form:not([hidden]) > .page > .card {
+  animation: arrive var(--enter) both;
+}
+form > .page > .card:nth-of-type(2) {
+  animation-delay: 30ms;
+}
+form > .page > .card:nth-of-type(3) {
+  animation-delay: 60ms;
+}
+form > .page > .card:nth-of-type(4) {
+  animation-delay: 90ms;
+}
+form > .page > .card:nth-of-type(5) {
+  animation-delay: 120ms;
+}
+form > .page > .card:nth-of-type(n+6) {
+  animation-delay: 150ms;
+}
+form:not(.global) .title {
+  view-transition-name: hero;
+}
+::view-transition-group(hero) {
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
 }
 .picker-menu {
   transform-origin: top;
@@ -1334,6 +1443,11 @@ dialog[open] {
 }
 dialog[open]::backdrop {
   animation: dim var(--enter) both;
+}
+body.away *,
+body.away *::before,
+body.away *::after {
+  animation-play-state: paused !important;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1459,6 +1573,29 @@ label.check .picker {
 }
 .picker-item[aria-selected=true] svg.mdi {
   visibility: visible;
+}
+.picker-item.lead svg.mdi {
+  visibility: visible;
+  width: 22px;
+  height: 22px;
+  color: var(--on-surface-variant);
+}
+.picker-item.divided {
+  margin-top: 8px;
+  border-top: 1px solid var(--outline-variant);
+  padding-top: 12px;
+}
+#tooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 300px;
+  padding: 5px 9px;
+  border-radius: var(--shape-xs);
+  background: var(--inverse-surface);
+  color: var(--inverse-on-surface);
+  font: var(--body-small);
+  pointer-events: none;
+  animation: dim 0.15s both;
 }
 .picker-menu.mono strong,
 .picker.mono > span {

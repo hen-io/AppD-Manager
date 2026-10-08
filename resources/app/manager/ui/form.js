@@ -21,7 +21,7 @@ function fillForm(cfg) {
   for (const part of form.querySelectorAll(".extension-settings")) part.open = false;
   renderExtensions();
   renderSponsorCategories(cfg.sponsorBlockActions, cfg.sponsorBlockColors);
-  for (const [key, name] of [["pauseAfterSeconds", "pause"], ["slowAfterSeconds", "slow"]]) {
+  for (const [key, name] of [["pauseAfterSeconds", "pause"]]) {
     const seconds = cfg[key];
     const unit = seconds >= 60 && seconds % 60 === 0 ? 60 : 1;
     $(`${name}-unit`).value = String(unit);
@@ -47,7 +47,6 @@ function readForm() {
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
-  cfg.slowAfterSeconds = Math.max(1, Math.round(Number($("slow-amount").value) || 0)) * Number($("slow-unit").value);
   cfg.pauseAfterSeconds = Math.max(1, Math.round(Number($("pause-amount").value) || 0)) * Number($("pause-unit").value);
   return cfg;
 }
@@ -59,9 +58,11 @@ function reportUnsaved(value) {
   });
 }
 function showSlowDown() {
-  const limit = form.elements.unfocusedCpuPercent;
-  limit.disabled = !form.elements.backgroundThrottling.checked;
-  limit.closest("label").classList.toggle("off", limit.disabled);
+  for (const name of ["slowAfterSeconds", "unfocusedCpuPercent"]) {
+    const field = form.elements[name];
+    field.disabled = !form.elements.backgroundThrottling.checked;
+    field.closest("label").classList.toggle("off", field.disabled);
+  }
 }
 function updateSaveButton() {
   showSlowDown();
@@ -76,7 +77,15 @@ async function go(id) {
     const answer = await call("askUnsaved").catch(() => "stay");
     if (answer === "stay" || answer === "save" && !await saveForm()) return;
   }
-  select(id);
+  const app = id === null ? selected : id;
+  const card = document.querySelector(`.app-card[data-id="${CSS.escape(String(app))}"]`);
+  for (const other of document.querySelectorAll(".app-card")) other.style.viewTransitionName = other === card ? "hero" : "";
+  hero = app;
+  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return select(id);
+  const transition = document.startViewTransition(() => select(id));
+  for (const step of [transition.ready, transition.finished]) step.catch(() => {
+  });
+  return void 0;
 }
 function select(id) {
   selected = id;
@@ -90,6 +99,11 @@ function select(id) {
   for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) tab.classList.toggle("active", tab.dataset.tab === "extensions" === isGlobal);
   $("global-note").hidden = !isGlobal;
   $("home").hidden = id !== null;
+  if (id === null) {
+    renderList();
+    $("home-apps").classList.add("stagger");
+    setTimeout(() => $("home-apps").classList.remove("stagger"), 900);
+  }
   $("about").hidden = id !== ABOUT;
   $("broken").hidden = !app || Boolean(app.cfg);
   const view = id === null ? "home" : isGlobal || id === SETTINGS ? "settings" : id === ABOUT ? "about" : "";
@@ -107,6 +121,8 @@ function select(id) {
     updateSaveButton();
     $("form-sub").textContent = isNew ? "Give it a name and an address, then save." : cfg.url;
     showIconPreview(isNew ? null : app.iconUrl, cfg.name);
+    if (id === NEW || isGlobal) form.querySelector(".title").classList.remove("tinted");
+    else tint(form.querySelector(".title"), app.iconUrl, cfg.name);
     $("template-row").hidden = id !== NEW;
     $("launch").hidden = isNew;
     showLaunchButton();
@@ -153,11 +169,23 @@ function save(event) {
 window.saveBeforeClose = () => saveForm();
 async function remove() {
   try {
-    const result = await call("remove", selected);
+    const id = selected;
+    const name = state.apps.find((app) => app.id === id)?.cfg?.name || id;
+    const result = await call("remove", id);
     if (!result.removed) return;
     state = result.state;
     renderSidebar();
     select(null);
+    setStatus(`"${name}" was removed.`, false, result.undo ? { label: "Undo", run: async () => {
+      try {
+        state = (await call("undoRemove", id)).state;
+        renderSidebar();
+        select(id);
+        setStatus(`"${name}" is back.`);
+      } catch (e) {
+        setStatus(e.message, true);
+      }
+    } } : null);
   } catch (e) {
     setStatus(e.message, true);
   }

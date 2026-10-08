@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'">
   <title>AppD-Manager</title>
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="style.css">
@@ -95,7 +95,12 @@
         </div>
       </header>
       <div id="home-apps" class="app-grid"></div>
-      <p id="home-empty" class="note" hidden>No apps yet. "New app" on the left makes the first one.</p>
+      <div id="home-empty" class="empty" hidden>
+        <span class="empty-art" data-icon="grid-plus"></span>
+        <h3 id="home-empty-title"></h3>
+        <p id="home-empty-text" class="note"></p>
+        <button id="home-new" type="button" class="primary" data-icon="plus">New app</button>
+      </div>
     </section>
 
     <section id="about" class="page" hidden>
@@ -198,13 +203,13 @@
           </label>
           <label>Menu button in the window
             <select name="actionButton">
-              <option value="off">Not shown</option>
+              <option value="off" data-note="The menu opens with a right click in the page only">Hidden</option>
               <option value="top-left">Top left</option>
               <option value="top-right">Top right</option>
               <option value="bottom-left">Bottom left</option>
               <option value="bottom-right">Bottom right</option>
             </select>
-            <span class="note">A small round button that is always there and opens the app's menu, the same one a right click in the page ends with: reload, hard reload, empty cache, back and forward, copy the address, zoom, full screen, and the settings of its extensions.</span>
+            <span class="note">A small round button in a corner of the window that opens the app's menu. Hidden, the menu is still there with a right click in the page: reload, hard reload, empty cache, back to the app's own page, reset zoom, full screen, and the settings of its extensions.</span>
           </label>
           <label class="check">
             <input name="alwaysOnTop" type="checkbox">
@@ -416,13 +421,10 @@
           <summary data-icon="slow">Slow down when not in use</summary>
           <label class="check">
             <input name="backgroundThrottling" type="checkbox">
-            Slow the page down after
-            <input id="slow-amount" type="number" min="1" step="1" aria-label="Slow down after">
-            <select id="slow-unit" aria-label="Unit">
-              <option value="1">seconds</option>
-              <option value="60">minutes</option>
-            </select>
-            without focus (saves CPU)
+            Slow the page down while its window is not focused (saves CPU)
+          </label>
+          <label class="indented">Slow down after this long without focus
+            <input name="slowAfterSeconds" data-slider="1 300 1" data-unit="s" type="number" min="1" max="3600" step="1">
           </label>
           <label class="indented">CPU limit while slowed down
             <input name="unfocusedCpuPercent" data-slider="1 100 1" data-unit="%" class="cpu-limit" type="number" min="0.1" max="100" step="0.1">
@@ -449,7 +451,7 @@
           </label>
           <span class="note below-check">For apps that show live data. After the app was slowed down or paused for half a minute or more, the updates it missed are dropped instead of played back in a burst; it reconnects and shows the current state. Anything still loading at that moment starts over.</span>
           <label>Reload when you come back after more than this many minutes
-            <input name="reloadAfterIdleMinutes" data-slider="0 240 5" data-unit="min" type="number" min="0" step="1">
+            <input name="reloadAfterIdleMinutes" data-slider="0 60 1" data-unit="min" type="number" min="0" max="60" step="1">
             <span class="note">Counted from when the window lost the focus. 0 never reloads.</span>
           </label>
         </details>
@@ -540,10 +542,10 @@
         <span class="more">
           <select id="more-actions" aria-label="More actions">
             <option value="">More…</option>
-            <option value="duplicate" data-note="A second app with the same settings and icon, without the logins">Duplicate</option>
-            <option value="showConfig" data-note="Its config.json, in the file manager">Show config file</option>
-            <option value="showLog" data-note="What the app did and when: pages loaded and why, reloads, failures, pauses">Open the event log</option>
-            <option value="clearData" data-note="Signs it out everywhere: deletes cookies and cache, keeps the settings">Delete the app's data…</option>
+            <option value="duplicate" data-icon="copy" data-note="A second app with the same settings and icon, without the logins">Duplicate</option>
+            <option value="showConfig" data-icon="file" data-note="Its config.json, in the file manager">Show config file</option>
+            <option value="showLog" data-icon="log" data-note="What the app did and when: pages loaded and why, reloads, failures, pauses">Open the event log</option>
+            <option value="clearData" data-icon="sweep" data-divider data-note="Signs it out everywhere: deletes cookies and cache, keeps the settings">Delete the app's data…</option>
           </select>
         </span>
         <button id="remove" type="button" class="danger" data-icon="delete">Remove</button>
@@ -566,6 +568,7 @@
   <script src="ui/picker.js"></script>
   <script src="ui/slider.js"></script>
   <script src="ui/fields.js"></script>
+  <script src="ui/tooltip.js"></script>
   <script src="ui/dialogs.js"></script>
   <script src="ui/apps.js"></script>
   <script src="ui/extensions.js"></script>

@@ -12,6 +12,7 @@ $("extension-import").addEventListener("click", () => changeLibrary("importExten
 form.addEventListener("input", updateSaveButton);
 form.addEventListener("change", updateSaveButton);
 $("new").addEventListener("click", () => go(NEW));
+$("home-new").addEventListener("click", () => go(NEW));
 $("launch").addEventListener("click", launchOrClose);
 $("remove").addEventListener("click", remove);
 $("more-actions").addEventListener("change", async () => {
@@ -87,6 +88,11 @@ for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) {
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
+const rest = () => document.body.classList.toggle("away", !document.hasFocus() || document.hidden);
+window.addEventListener("blur", rest);
+window.addEventListener("focus", rest);
+document.addEventListener("visibilitychange", rest);
+rest();
 for (const el of document.querySelectorAll("[data-icon]")) label(el, el.dataset.icon, el.textContent);
 for (const summary of document.querySelectorAll("summary")) summary.append(iconSvg("chevron", "chevron"));
 document.querySelectorAll("label:not(.check)").forEach(floatLabel);
