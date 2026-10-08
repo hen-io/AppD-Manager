@@ -159,10 +159,12 @@ label {
 }
 label.check {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   font: var(--body-medium);
+}
+label.check:has(input[type=number]) {
+  flex-wrap: wrap;
 }
 input:not([type=checkbox]),
 textarea {
@@ -203,10 +205,80 @@ textarea.code {
   color: var(--on-surface-variant);
   opacity: 0.8;
 }
-label:not(.check) > input[type=number] {
+.field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.row > .field {
+  flex: 1;
+}
+.field > input,
+.field > textarea,
+.field > .picker {
+  min-height: 56px;
+  padding: 16px;
+}
+.field > .float {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  translate: 0 -50%;
+  max-width: calc(100% - 24px);
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  font: var(--body-small);
+  pointer-events: none;
+  transition:
+    top var(--motion),
+    font-size var(--motion),
+    color var(--motion),
+    background var(--motion);
+}
+.field > input:placeholder-shown:not(:focus) ~ .float,
+.field > textarea:placeholder-shown:not(:focus) ~ .float {
+  top: 28px;
+  background: transparent;
+  font-size: 16px;
+}
+.field > :focus ~ .float,
+.field > .picker[aria-expanded=true] ~ .float {
+  color: var(--primary);
+}
+.field > input:not(:focus)::placeholder,
+.field > textarea:not(:focus)::placeholder {
+  color: transparent;
+}
+.field > input:disabled ~ .float {
+  color: var(--disabled-content);
+}
+label:has(> .field),
+label:has(> .row > .field) {
+  margin-top: 8px;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.16;
+  transform: scale(0);
+  pointer-events: none;
+  animation: ripple 0.55s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+@keyframes ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+label:not(.check) > .field:has(> input[type=number]) {
   max-width: 180px;
 }
-.size-row label:not(.check) > input[type=number] {
+.size-row label:not(.check) > .field {
   max-width: none;
 }
 label.check input[type=number] {
@@ -236,48 +308,94 @@ label.check input[type=number] {
 label:not(.check) > .number-field > input[type=number] {
   max-width: none;
 }
-input[type=range] {
-  appearance: none;
+.slider {
+  position: relative;
   flex: 1;
-  min-width: 80px;
+  min-width: 90px;
   height: 44px;
+  --fill: 0%;
+}
+.slider .wave,
+.slider .rest {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+}
+.slider .wave {
+  left: 0;
+  width: max(0px, calc(var(--fill) - 8px));
+  height: 14px;
+  background: var(--primary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Cpath d='M-14 7 Q-7 13 0 7 T14 7 T28 7 T42 7' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 0 50% / 28px 14px repeat-x;
+  animation: wave 1.6s linear infinite;
+  transition: width 0.12s ease-out;
+}
+.slider .rest {
+  left: calc(var(--fill) + 8px);
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--secondary-container);
+  transition: left 0.12s ease-out;
+}
+.slider .rest::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.slider .handle {
+  position: absolute;
+  left: var(--fill);
+  top: 0;
+  width: 4px;
+  height: 44px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--primary);
+  transition:
+    left 0.12s ease-out,
+    width var(--motion),
+    margin var(--motion);
+}
+.slider:active .handle {
+  width: 2px;
+  margin-left: -1px;
+}
+.slider:hover .wave,
+.slider:active .wave {
+  animation-duration: 0.8s;
+}
+.slider.off {
+  opacity: 0.45;
+}
+.slider.off .wave {
+  animation: none;
+}
+.slider input[type=range] {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: none;
+  opacity: 0;
   cursor: pointer;
-  --fill: 0%;
 }
-input[type=range]:hover,
-input[type=range]:focus {
-  border: 0;
-  box-shadow: none;
-}
-input[type=range]::-webkit-slider-runnable-track {
-  height: 16px;
-  border-radius: var(--shape-s);
-  background:
-    linear-gradient(
-      to right,
-      var(--primary) 0 calc(var(--fill) - 6px),
-      transparent calc(var(--fill) - 6px) calc(var(--fill) + 6px),
-      var(--secondary-container) calc(var(--fill) + 6px) 100%);
-}
-input[type=range]::-webkit-slider-thumb {
-  appearance: none;
-  width: 4px;
-  height: 44px;
-  margin-top: -14px;
-  border-radius: 2px;
-  background: var(--primary);
-  transition: width var(--motion);
-}
-input[type=range]:active::-webkit-slider-thumb {
-  width: 2px;
-}
-input[type=range]:disabled {
+.slider input[type=range]:disabled {
   cursor: default;
-  opacity: 0.45;
+}
+@keyframes wave {
+  to {
+    mask-position: 28px 50%;
+  }
 }
 input[type=checkbox] {
   appearance: none;
@@ -317,6 +435,23 @@ input[type=checkbox]:checked::before {
   width: 24px;
   height: 24px;
   background: var(--on-primary);
+}
+input[type=checkbox]::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 26px;
+  width: 16px;
+  height: 16px;
+  background: var(--primary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: 0;
+  scale: 0.4;
+  transition: opacity var(--motion), scale var(--motion);
+}
+input[type=checkbox]:checked::after {
+  opacity: 1;
+  scale: 1;
 }
 input[type=checkbox]:checked:hover::before {
   background: var(--primary-container);
@@ -443,6 +578,10 @@ aside > #new svg.mdi {
   width: 24px;
   height: 24px;
   margin: -6px 12px -6px 0;
+  transition: rotate var(--enter);
+}
+aside > #new:hover svg.mdi {
+  rotate: 90deg;
 }
 aside > .caption {
   padding: 0 28px 8px;
@@ -1008,6 +1147,7 @@ form:not(.global) #library-card {
   height: 3px;
   border-radius: 3px 3px 0 0;
   background: var(--primary);
+  animation: spread var(--enter) both;
 }
 #settings.page,
 form.global > .page {
@@ -1137,6 +1277,46 @@ form.global > .page {
     opacity: 0;
   }
 }
+@keyframes spread {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 0%, transparent);
+  }
+}
+@keyframes travel {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 250% 0;
+  }
+}
+#apps button.running::after,
+.app-card.running .app-name::after {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent);
+  animation: pulse 2.4s ease-out infinite;
+}
+.side-toggle:active svg.mdi,
+.app-action:active svg.mdi {
+  scale: 0.85;
+}
+.side-toggle svg.mdi,
+.app-action svg.mdi {
+  transition: scale var(--motion), rotate var(--enter);
+}
+body.collapsed .side-toggle svg.mdi {
+  rotate: 180deg;
+}
+.app-card:hover .icon {
+  scale: 1.06;
+}
+.icon {
+  transition: scale var(--motion);
+}
 main > section:not([hidden]),
 main > nav:not([hidden]),
 form:not([hidden]) > .page {
@@ -1162,6 +1342,25 @@ dialog[open]::backdrop {
     animation: none !important;
     transition: none !important;
   }
+}
+#busy {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  height: 4px;
+  overflow: hidden;
+  background: var(--secondary-container);
+}
+#busy::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--primary);
+  animation: travel 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 select.picked {
   display: none;

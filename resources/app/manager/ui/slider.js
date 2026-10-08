@@ -7,10 +7,18 @@ function addSlider(input) {
   Object.assign(slider, { min: from, max: to, step: step || 1 });
   slider.tabIndex = -1;
   slider.setAttribute("aria-hidden", "true");
+  const drawn = document.createElement("div");
+  drawn.className = "slider";
+  for (const part of ["wave", "rest", "handle"]) {
+    const el = document.createElement("span");
+    el.className = part;
+    drawn.append(el);
+  }
+  drawn.append(slider);
   const field = document.createElement("div");
   field.className = "number-field";
   input.before(field);
-  field.append(slider, input);
+  field.append(drawn, input);
   if (input.dataset.unit) {
     const unit = document.createElement("span");
     unit.className = "unit";
@@ -20,8 +28,9 @@ function addSlider(input) {
   const show = () => {
     const value2 = Math.min(to, Math.max(from, Number(input.value) || 0));
     slider.value = value2;
-    slider.style.setProperty("--fill", `${(value2 - from) / (to - from) * 100}%`);
+    drawn.style.setProperty("--fill", `${(value2 - from) / (to - from) * 100}%`);
     slider.disabled = input.disabled;
+    drawn.classList.toggle("off", input.disabled);
   };
   slider.addEventListener("input", () => {
     input.value = slider.value;

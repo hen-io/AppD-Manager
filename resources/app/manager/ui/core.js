@@ -15,10 +15,24 @@ let extensions = [];
 let customExtensions = [];
 let filter = "";
 let loadedForm = "";
+const SLOW = /* @__PURE__ */ new Set(["save", "saveExtensionDefaults", "fetchIcons", "checkUpdate", "installUpdate", "importApps", "exportApps", "importExtension", "duplicate", "clearData", "restart"]);
+let working = 0;
 async function call(method, ...args) {
-  const result = await window.appd[method](...args);
-  if (result.error) throw new Error(result.error);
-  return result.value;
+  const slow = SLOW.has(method);
+  const showing = slow && setTimeout(() => {
+    $("busy").hidden = false;
+  }, 250);
+  if (slow) working++;
+  try {
+    const result = await window.appd[method](...args);
+    if (result.error) throw new Error(result.error);
+    return result.value;
+  } finally {
+    if (slow) {
+      clearTimeout(showing);
+      if (--working === 0) $("busy").hidden = true;
+    }
+  }
 }
 let statusTimer = null;
 function setStatus(text, isError = false) {
