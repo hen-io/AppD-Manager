@@ -925,14 +925,14 @@ details.card[open] > summary {
   --tint: oklch(62% 0.17 var(--app-hue));
 }
 .app-card.glow {
-  --strong: 0.075;
-  --a: light-dark(oklch(from var(--c1) 0.78 clamp(var(--strong), c * 1.2, 0.17) calc(h + var(--turn1, 0))), oklch(from var(--c1) 0.42 clamp(var(--strong), c, 0.15) calc(h + var(--turn1, 0))));
-  --b: light-dark(oklch(from var(--c2) 0.82 clamp(var(--strong), c * 1.2, 0.16) calc(h + var(--turn2, 0))), oklch(from var(--c2) 0.36 clamp(var(--strong), c, 0.14) calc(h + var(--turn2, 0))));
-  --c: light-dark(oklch(from var(--c3) 0.87 clamp(var(--strong), c * 1.2, 0.14) calc(h + var(--turn3, 0))), oklch(from var(--c3) 0.30 clamp(var(--strong), c, 0.12) calc(h + var(--turn3, 0))));
+  --strong: 0.08;
+  --a: light-dark(oklch(from var(--app-colour) 0.74 clamp(var(--strong), c * 1.2, 0.18) h), oklch(from var(--app-colour) 0.46 clamp(var(--strong), c, 0.16) h));
+  --b: light-dark(oklch(from var(--app-colour) 0.84 clamp(var(--strong), c, 0.13) h), oklch(from var(--app-colour) 0.33 clamp(var(--strong), c, 0.13) h));
+  --c: light-dark(oklch(from var(--app-colour) 0.91 clamp(var(--strong), c * 0.7, 0.08) h), oklch(from var(--app-colour) 0.22 clamp(var(--strong), c * 0.8, 0.09) h));
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: color-mix(in oklch, var(--a) 55%, var(--surface-container-low));
+  background: var(--b);
 }
 .app-card.glow.plain {
   --strong: 0;
@@ -960,7 +960,7 @@ details.card[open] > summary {
   opacity: 0.92;
 }
 .app-card.glow:hover {
-  background: color-mix(in oklch, var(--a) 55%, var(--surface-container-low));
+  background: var(--b);
 }
 .app-card.glow:hover::before {
   scale: 1.12;
@@ -970,16 +970,30 @@ details.card[open] > summary {
   color: color-mix(in oklch, var(--on-surface) 78%, transparent);
 }
 img.icon,
-.title img.icon,
-.app-card img.icon {
+.title img.icon {
   border-radius: 0;
+}
+.app-card img.icon {
+  border-radius: var(--shape-m);
 }
 .tinted span.icon {
   background: color-mix(in oklch, var(--tint) 38%, var(--surface-container-high));
   color: var(--on-surface);
 }
-.app-card.glow span.icon {
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+.app-card .icon {
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  padding: 8px;
+  border-radius: var(--shape-m);
+  background: light-dark(rgb(255 255 255 / 0.72), rgb(8 10 14 / 0.5));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.22), inset 0 0 0 1px light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.1));
+  object-fit: contain;
+}
+.app-card span.icon {
+  padding: 0;
+  color: var(--on-surface);
+  background: light-dark(rgb(255 255 255 / 0.72), rgb(8 10 14 / 0.5));
 }
 form .title {
   padding: 18px 22px;

@@ -9,6 +9,7 @@ const showUnreadCount = require("./app/badge");
 const keepInTray = require("./app/tray");
 const makeTrayApp = require("./app/trayapp");
 const { frameOptions, styleFrame } = require("./app/frame");
+const watchForUpdate = require("./app/updated");
 const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
@@ -87,11 +88,11 @@ function openExternal(url) {
   if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
 }
 const { note, because, takeReason, plain } = openLog(path.join(lib.appDir(id), "events.log"));
-function restartApp(wc) {
+function restartApp(wc, why = "hard reload, or asked for by the manager") {
   const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
   const args = process.argv.slice(1).filter((arg) => !/^--appd-(url|action)=/.test(arg));
   if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
-  note("restarting (hard reload, or asked for by the manager)");
+  note(`restarting (${why})`);
   throttle.releasePage();
   app.relaunch({ args });
   app.quit();
@@ -101,6 +102,22 @@ const startUrl = (() => {
   const url = arg ? arg.slice("--appd-url=".length) : "";
   return /^https?:\/\//i.test(url) && URL.canParse(url) ? url : cfg.url;
 })();
+const REFRESH_SERVER_SIDE = `(async () => {
+  const hass = document.querySelector('home-assistant')?.hass;
+  if (!hass?.callWS || !hass.panels) return 0;
+  const boards = Object.values(hass.panels).filter((panel) => panel.component_name === 'lovelace');
+  const done = await Promise.allSettled(boards.map((panel) => hass.callWS({
+    type: 'lovelace/config', url_path: panel.url_path === 'lovelace' ? null : panel.url_path, force: true,
+  })));
+  return done.filter((one) => one.status === 'fulfilled').length;
+})()`;
+async function refreshServerSide(wc) {
+  const count = await Promise.race([
+    wc.executeJavaScript(REFRESH_SERVER_SIDE).catch(() => 0),
+    new Promise((resolve) => setTimeout(() => resolve(0), 4e3))
+  ]);
+  if (count) note(`Home Assistant asked to read its dashboards anew (${count})`);
+}
 async function runAction(action, wc) {
   if (!wc || wc.isDestroyed()) return;
   if (action === "clear-cache") {
@@ -111,6 +128,8 @@ async function runAction(action, wc) {
     });
     await ses.clearStorageData({ storages: ["cachestorage", "shadercache", "serviceworkers"] }).catch(() => {
     });
+    await refreshServerSide(wc);
+    if (wc.isDestroyed()) return;
   }
   if (action !== "clear-cache" && action !== "hard-reload") return;
   let settings = startedWith;
@@ -444,6 +463,10 @@ async function createWindow() {
     extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
   }
   if (throttle.wanted) throttle.watchFocus(win);
+  watchForUpdate((version) => {
+    if (throttle.isQuitting() || win.isDestroyed()) return;
+    restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
+  });
   win.on("close", () => {
     if (cfg.trayApp) return;
     const { width, height } = win.getNormalBounds();

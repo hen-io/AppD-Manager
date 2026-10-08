@@ -102,50 +102,48 @@ function lookOfPicture(image) {
     }
     let hue = max === r ? (g - b) / spread % 6 : max === g ? (b - r) / spread + 2 : (r - g) / spread + 4;
     hue = (hue * 60 + 360) % 360;
-    add(bins[Math.floor(hue / (360 / BINS)) % BINS], spread * (spread / max) * solid, r, g, b);
+    add(bins[Math.floor(hue / (360 / BINS)) % BINS], solid, r, g, b);
   }
   const css = ({ weight, r, g, b }) => `rgb(${[r, g, b].map((part) => Math.round(part / weight * 255)).join(" ")})`;
   const total = bins.reduce((sum, bin) => sum + bin.weight, 0);
-  if (total < SIDE * SIDE * 0.012) {
-    return { hue: null, plain: true, colours: grey.weight ? [css(grey)] : [] };
+  if (total < SIDE * SIDE * 0.02) {
+    return { hue: null, plain: true, colour: grey.weight ? css(grey) : null };
   }
-  const apart = (a, b) => Math.min(Math.abs(a - b), BINS - Math.abs(a - b));
-  const order = bins.map((bin, at) => ({ ...bin, at })).sort((a, b) => b.weight - a.weight);
-  const taken = [];
-  for (const bin of order) {
-    if (taken.length === 3 || bin.weight < order[0].weight * 0.08) break;
-    if (taken.every((other) => apart(other.at, bin.at) >= 2)) taken.push(bin);
-  }
+  const beside = (at, step) => bins[(at + step + BINS) % BINS];
+  let most = 0;
+  let mostOf = -1;
+  bins.forEach((bin, at) => {
+    const amount = bin.weight + (beside(at, -1).weight + beside(at, 1).weight) / 2;
+    if (amount > mostOf) [most, mostOf] = [at, amount];
+  });
+  const mixed = { weight: 0, r: 0, g: 0, b: 0 };
   let x = 0;
   let y = 0;
   for (const step of [-1, 0, 1]) {
-    const at = (taken[0].at + step + BINS) % BINS;
-    const angle = (at + 0.5) * 2 * Math.PI / BINS;
-    x += Math.cos(angle) * bins[at].weight;
-    y += Math.sin(angle) * bins[at].weight;
+    const bin = beside(most, step);
+    for (const part of ["weight", "r", "g", "b"]) mixed[part] += bin[part];
+    const angle = ((most + step + BINS) % BINS + 0.5) * 2 * Math.PI / BINS;
+    x += Math.cos(angle) * bin.weight;
+    y += Math.sin(angle) * bin.weight;
   }
-  return { hue: themeHue((Math.atan2(y, x) * 180 / Math.PI + 360) % 360), plain: false, colours: taken.map(css) };
+  return { hue: themeHue((Math.atan2(y, x) * 180 / Math.PI + 360) % 360), plain: false, colour: css(mixed) };
 }
 function tint(el, iconUrl, name) {
-  const apply = ({ hue, colours, plain }) => {
+  const apply = ({ hue, colour, plain }) => {
     el.classList.toggle("tinted", hue !== null);
     el.classList.toggle("plain", plain);
-    el.classList.toggle("glow", colours.length > 0);
+    el.classList.toggle("glow", Boolean(colour));
     if (hue !== null) el.style.setProperty("--app-hue", String(Math.round(hue)));
-    if (!colours.length) return;
-    for (const at of [0, 1, 2]) {
-      el.style.setProperty(`--c${at + 1}`, colours[at] ?? colours[0]);
-      el.style.setProperty(`--turn${at + 1}`, colours[at] || plain ? "0" : String(at === 1 ? 20 : -16));
-    }
+    if (colour) el.style.setProperty("--app-colour", colour);
   };
   if (!iconUrl) {
     const hue = hueOfName(name);
-    return apply({ hue, plain: false, colours: [`oklch(0.7 0.15 ${hue})`] });
+    return apply({ hue, plain: false, colour: `oklch(0.7 0.15 ${hue})` });
   }
   if (iconLooks.has(iconUrl)) return apply(iconLooks.get(iconUrl));
   const image = new Image();
   image.onload = () => {
-    let look = { hue: null, plain: true, colours: [] };
+    let look = { hue: null, plain: true, colour: null };
     try {
       look = lookOfPicture(image);
     } catch {
