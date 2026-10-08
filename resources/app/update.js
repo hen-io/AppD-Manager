@@ -70,25 +70,72 @@ async function check() {
   const { tag = null, name = "", notes = "", url = releasesUrl } = release || {};
   const latest = tag ? tag.replace(/^v/, "") : current;
   const available = isNewer(latest, current);
-  let blocked = "";
-  if (available && !isBuild) {
-    blocked = "This copy runs from the source folder and cannot update itself.";
-  } else if (available && lib.WINDOWS && !writable()) {
-    blocked = `AppD-Manager cannot write to its own folder (${installDir}): move it to a folder of your own, or download the new version from the release page.`;
-  } else if (available && packaged()) {
-    blocked = `This copy was installed by the system's package manager, so it is updated there: ${packageCommand()}`;
-  } else if (available) {
-    const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
-    if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {
-      blocked = `Version ${latest} needs a newer runtime (Electron ${runtime.trim()}); run the install script again.`;
-    }
-  }
+  const blocked = available ? await whyNot(tag) : "";
   return { current, latest, tag, name, notes, url, available, blocked };
 }
-async function install() {
-  const info = await check();
-  if (!info.available) throw new Error("AppD-Manager is already up to date.");
+async function whyNot(tag) {
+  if (!isBuild) return "This copy runs from the source folder and cannot install another version of itself.";
+  if (lib.WINDOWS && !writable()) {
+    return `AppD-Manager cannot write to its own folder (${installDir}): move it to a folder of your own, or download the version from the release page.`;
+  }
+  if (packaged()) return `This copy was installed by the system's package manager, so its version is changed there: ${packageCommand()}`;
+  const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
+  if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {
+    return `Version ${tag.replace(/^v/, "")} needs another runtime (Electron ${runtime.trim()}; this one is ${process.versions.electron}): run the install script of that version.`;
+  }
+  return "";
+}
+async function releases() {
+  const list = await (await download(`${API}/releases?per_page=30`)).json();
+  const current = app.getVersion();
+  return list.filter((release) => !release.draft && /^[\w.+-]+$/.test(release.tag_name || "")).map((release) => ({
+    tag: release.tag_name,
+    version: release.tag_name.replace(/^v/, ""),
+    name: String(release.name || "").trim(),
+    date: String(release.published_at || "").slice(0, 10),
+    current: release.tag_name.replace(/^v/, "") === current
+  }));
+}
+const backupsDir = path.join(lib.root, "Backups");
+function backup() {
+  const now = /* @__PURE__ */ new Date();
+  const stamp = `${now.toLocaleDateString("sv")}_${now.toLocaleTimeString("sv").replace(/:/g, "-")}`;
+  const folder = path.join(backupsDir, `${stamp}_v${app.getVersion()}`);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.cpSync(__dirname, path.join(folder, "program", "resources", "app"), { recursive: true });
+  if (!lib.WINDOWS) fs.copyFileSync(lib.launcher, path.join(folder, "program", path.basename(lib.launcher)));
+  fs.writeFileSync(path.join(folder, "apps.json"), JSON.stringify(lib.exportApps()));
+  if (fs.existsSync(lib.settingsPath)) fs.copyFileSync(lib.settingsPath, path.join(folder, "settings.json"));
+  fs.writeFileSync(path.join(folder, "README.txt"), [
+    `AppD-Manager ${app.getVersion()}, as it was on ${stamp.replace("_", " at ").replace(/-(\d\d)-(\d\d)$/, ":$1:$2")}.`,
+    "",
+    "apps.json      every app (settings and icon, not logins): Settings > General > Backup > Import apps",
+    "settings.json  the manager's own settings: goes to ~/.AppD-manager/settings.json",
+    `program/       the program itself: its contents go over ${installDir}`,
+    ""
+  ].join("\n"));
+  purgeBackups();
+  return folder;
+}
+function purgeBackups() {
+  let names = [];
+  try {
+    names = fs.readdirSync(backupsDir).filter((name) => /^\d{4}-\d\d-\d\d_/.test(name)).sort();
+  } catch {
+    return 0;
+  }
+  const old = names.slice(0, Math.max(0, names.length - lib.prefs().backupsKept));
+  for (const name of old) fs.rmSync(path.join(backupsDir, name), { recursive: true, force: true });
+  return old.length;
+}
+async function install(tag) {
+  const info = tag ? { tag: String(tag) } : await check();
+  if (tag) {
+    if (!/^[\w.+-]+$/.test(info.tag)) throw new Error(`"${info.tag}" is not a version.`);
+    info.blocked = await whyNot(info.tag);
+  } else if (!info.available) throw new Error("AppD-Manager is already up to date.");
   if (info.blocked) throw new Error(info.blocked);
+  if (lib.prefs().backupBeforeUpdate) backup();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "appd-update-"));
   const staged = `${__dirname}.new`;
   const previous = `${__dirname}.old`;
@@ -128,4 +175,4 @@ async function install() {
     fs.rmSync(stagedLauncher, { force: true });
   }
 }
-module.exports = { REPO, releasesUrl, check, install };
+module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir };

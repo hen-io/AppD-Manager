@@ -325,10 +325,17 @@ label:not(.check) > .number-field > input[type=number] {
   left: 0;
   width: max(0px, calc(var(--fill) - 8px));
   height: 14px;
+  overflow: hidden;
+  transition: width 0.12s ease-out;
+}
+.slider .wave::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 -28px;
   background: var(--primary);
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Cpath d='M-14 7 Q-7 13 0 7 T14 7 T28 7 T42 7' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 0 50% / 28px 14px repeat-x;
   animation: wave 1.6s linear infinite;
-  transition: width 0.12s ease-out;
+  will-change: transform;
 }
 .slider .rest {
   left: calc(var(--fill) + 8px);
@@ -369,7 +376,7 @@ label:not(.check) > .number-field > input[type=number] {
 .slider.off {
   opacity: 0.45;
 }
-.slider.off .wave {
+.slider.off .wave::before {
   animation: none;
 }
 .slider input[type=range] {
@@ -390,7 +397,7 @@ label:not(.check) > .number-field > input[type=number] {
 }
 @keyframes wave {
   to {
-    mask-position: 28px 50%;
+    transform: translateX(28px);
   }
 }
 input[type=checkbox] {
@@ -1372,7 +1379,7 @@ form.global > .page {
 }
 @keyframes pulse {
   50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 0%, transparent);
+    opacity: 0.4;
   }
 }
 @keyframes travel {
@@ -1385,8 +1392,7 @@ form.global > .page {
 }
 #apps button.running::after,
 .app-card.running .app-name::after {
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent);
-  animation: pulse 2.4s ease-out infinite;
+  animation: pulse 2.4s ease-in-out infinite;
 }
 .side-toggle:active svg.mdi,
 .app-action:active svg.mdi {
@@ -1453,7 +1459,7 @@ dialog[open] {
 dialog[open]::backdrop {
   animation: dim var(--enter) both;
 }
-body.away .slider .wave,
+body.away .slider .wave::before,
 body.away .empty-art,
 body.away #busy::before,
 body.away #apps button.running::after,

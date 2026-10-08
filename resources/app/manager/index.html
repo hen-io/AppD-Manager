@@ -116,6 +116,34 @@
         <div id="release" class="release" hidden></div>
       </section>
 
+      <section class="card" data-tab="updates">
+        <h3 data-icon="backup">Backup before updating</h3>
+        <label class="check">
+          <input data-pref="backupBeforeUpdate" type="checkbox">
+          Keep a copy before another version is installed
+        </label>
+        <span class="note below-check">The program as it is, every app's settings and icon, and the manager's settings, in a folder named after the date, time and version.</span>
+        <label>Copies to keep
+          <input data-pref="backupsKept" data-slider="1 20 1" type="number" min="1" max="50" step="1">
+          <span class="note">Older ones are deleted when a new copy is made, and every time AppD-Manager starts.</span>
+        </label>
+        <div class="row">
+          <button id="open-backups" type="button" data-icon="folder-open">Open the backups folder</button>
+        </div>
+      </section>
+
+      <section class="card" data-tab="updates">
+        <h3 data-icon="history">Another version</h3>
+        <p class="note">Go back to an earlier release, or to any other one. Your apps stay; settings that the older version does not know are left alone by it.</p>
+        <label>Version
+          <select id="release-pick" aria-label="Version"></select>
+        </label>
+        <div class="row">
+          <button id="install-release" type="button" data-icon="download" disabled>Install this version</button>
+        </div>
+        <p id="release-status" class="note"></p>
+      </section>
+
       <section id="about" class="card" data-tab="about">
         <img class="banner" src="../include/banner.png" alt="AppD-Manager">
         <h3 id="version"></h3>
@@ -543,6 +571,9 @@
               <option value="--disk-cache-size=104857600" data-note="Limit of the disk cache, in bytes. Edit the number after adding it">--disk-cache-size</option>
               <option value="--disable-background-timer-throttling" data-note="Keep timers at full speed in the background">--disable-background-timer-throttling</option>
               <option value="--disable-renderer-backgrounding" data-note="Keep full priority in the background">--disable-renderer-backgrounding</option>
+              <option value="--process-per-site" data-note="One process per site instead of one per tab or frame: less memory for apps that open many windows">--process-per-site</option>
+              <option value="--enable-features=SkiaGraphite" data-note="The new drawing engine on the graphics card (experimental): can be smoother, can glitch">--enable-features=SkiaGraphite</option>
+              <option value="--enable-features=ParallelDownloading" data-note="Large downloads in several parts at once">--enable-features=ParallelDownloading</option>
               <option value="--num-raster-threads=4" data-note="Number of threads for drawing. Edit the number after adding it">--num-raster-threads</option>
               <option value="--enable-unsafe-webgpu" data-note="WebGPU">--enable-unsafe-webgpu</option>
               <option value="--enable-features=Vulkan" data-note="Draw with Vulkan (experimental)">--enable-features=Vulkan</option>

@@ -200,6 +200,8 @@ const PREFS = {
   checkUpdates: true,
   confirmRemove: true,
   restartOnSave: "ask",
+  backupBeforeUpdate: true,
+  backupsKept: 5,
   showUsage: true,
   motion: true
 };
@@ -211,6 +213,7 @@ function prefs() {
     if (typeof kept[key] === typeof PREFS[key]) result[key] = kept[key];
   }
   if (!RESTART_ON_SAVE.includes(result.restartOnSave)) result.restartOnSave = PREFS.restartOnSave;
+  result.backupsKept = Math.min(50, Math.max(1, Math.round(result.backupsKept) || PREFS.backupsKept));
   return result;
 }
 function setPrefs(next) {
@@ -218,6 +221,7 @@ function setPrefs(next) {
   for (const key of Object.keys(PREFS)) {
     if (key in next && typeof next[key] === typeof PREFS[key]) now[key] = next[key];
   }
+  now.backupsKept = Math.min(50, Math.max(1, Math.round(now.backupsKept) || PREFS.backupsKept));
   if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(`"restartOnSave" must be one of: ${RESTART_ON_SAVE.join(", ")}`);
   const settings = readSettings();
   settings.manager = now;

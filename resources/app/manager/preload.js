@@ -34,6 +34,8 @@ for (const name of [
   "exit",
   "openReleasePage",
   "checkUpdate",
+  "releases",
+  "openBackups",
   "askUpdate",
   "installUpdate"
 ]) {

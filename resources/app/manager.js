@@ -22,9 +22,11 @@ function editRequest(argv) {
   return /^[a-z0-9][a-z0-9_-]*$/.test(id || "") && /^[a-z]*$/.test(extension) ? { id, extension } : null;
 }
 pendingEdit = editRequest(process.argv);
+const CORES = Math.max(1, require("os").availableParallelism?.() || require("os").cpus().length);
 let lastUse = { at: 0, apps: {} };
 const UNDO_MS = 12e3;
 lib.emptyTrash();
+update.purgeBackups();
 let unsaved = false;
 let leaving = false;
 async function mayLeave() {
@@ -289,7 +291,7 @@ const handlers = {
     for (const [id, { memory, cpuSeconds }] of Object.entries(use)) {
       const last = lastUse.apps[id];
       const seconds = (now - lastUse.at) / 1e3;
-      result[id] = { memory, cpu: last !== void 0 && seconds > 0.5 ? Math.max(0, (cpuSeconds - last) / seconds * 100) : null };
+      result[id] = { memory, cpu: last !== void 0 && seconds > 0.5 ? Math.max(0, (cpuSeconds - last) / seconds / CORES * 100) : null };
     }
     lastUse = { at: now, apps: Object.fromEntries(Object.entries(use).map(([id, { cpuSeconds }]) => [id, cpuSeconds])) };
     return result;
@@ -388,6 +390,12 @@ const handlers = {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   },
   checkUpdate: () => update.check(),
+  releases: () => update.releases(),
+  async openBackups() {
+    fs.mkdirSync(update.backupsDir, { recursive: true });
+    const error = await shell.openPath(update.backupsDir);
+    if (error) throw new Error(error);
+  },
   async askUpdate(info) {
     const how = info.blocked || `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`;
     const buttons = info.blocked ? ["OK", "Open release page"] : ["Update now", "Later", "Open release page"];
@@ -406,8 +414,8 @@ const handlers = {
     const page = String(url || "");
     shell.openExternal(page.startsWith(`https://github.com/${update.REPO}/`) ? page : update.releasesUrl);
   },
-  async installUpdate() {
-    const version = await update.install();
+  async installUpdate(tag) {
+    const version = await update.install(tag);
     setTimeout(() => {
       app.relaunch();
       app.exit(0);

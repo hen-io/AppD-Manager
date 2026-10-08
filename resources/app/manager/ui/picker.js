@@ -3,7 +3,7 @@ let closeMenu = () => {
 };
 function openMenu(select, button) {
   closeMenu();
-  const options = [...select.options].filter((option, index) => !(index === 0 && option.value === ""));
+  const options = [...select.options].filter((option, index) => !(index === 0 && option.value === "") && !option.disabled);
   if (!options.length) return;
   const menu = document.createElement("div");
   menu.className = `picker-menu ${select.className.includes("mono") ? "mono" : ""}`;

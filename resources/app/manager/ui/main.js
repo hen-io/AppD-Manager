@@ -91,12 +91,18 @@ for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) {
   });
 }
 $("check-update").addEventListener("click", checkUpdate);
+$("open-backups").addEventListener("click", () => call("openBackups").catch((e) => setStatus(e.message, true)));
+$("release-pick").addEventListener("change", () => {
+  $("install-release").disabled = !$("release-pick").value;
+});
+$("install-release").addEventListener("click", installVersion);
 $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
 const rest = () => document.body.classList.toggle("away", !document.hasFocus() || document.hidden);
 window.addEventListener("blur", rest);
 window.addEventListener("focus", rest);
 document.addEventListener("visibilitychange", rest);
+document.addEventListener("visibilitychange", () => document.hidden || refreshRunning());
 rest();
 for (const el of document.querySelectorAll("[data-icon]")) label(el, el.dataset.icon, el.textContent);
 for (const summary of document.querySelectorAll("summary")) summary.append(iconSvg("chevron", "chevron"));

@@ -347,13 +347,6 @@ const extension = (name) => cfg.extensions.includes(name);
 async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
-  if (extension("twitch")) await extras.enableTwitchAdBlock().catch(() => {
-  });
-  if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
-    hideLeftovers: cfg.adBlockHideLeftovers,
-    inPageAds: cfg.adBlockInPageAds,
-    exceptions: cfg.adBlockExceptions
-  }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   win = new BrowserWindow({
     alwaysOnTop: cfg.alwaysOnTop,
@@ -361,17 +354,19 @@ async function createWindow() {
     height: state.height || cfg.height,
     title: cfg.name,
     icon,
-    ...extension("darkreader") || cfg.colorScheme === "dark" ? { backgroundColor: "#181a1b" } : {},
+    ...cfg.colorScheme === "light" && !extension("darkreader") ? {} : { backgroundColor: "#15171b" },
     frame: cfg.windowDecorations,
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: cfg.backgroundThrottling,
+      v8CacheOptions: "bypassHeatCheck",
       ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
   if (cfg.startMaximized || state.maximized) win.maximize();
+  if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile);
   note(`started, opening ${plain(startUrl)}`);
   let showing = "";
   win.webContents.on("did-start-navigation", (details) => {
@@ -397,7 +392,15 @@ async function createWindow() {
   if (cfg.unreadBadge) showUnreadCount(win, app);
   if (cfg.closeToTray) keepInTray(win, { name: cfg.name, icon, isQuitting: throttle.isQuitting, quit: () => app.quit(), note });
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
+  if (extension("twitch")) await extras.enableTwitchAdBlock().catch(() => {
+  });
+  if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
+    hideLeftovers: cfg.adBlockHideLeftovers,
+    inPageAds: cfg.adBlockInPageAds,
+    exceptions: cfg.adBlockExceptions
+  }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
   await loadCustomExtensions();
+  if (win.isDestroyed()) return;
   if (extension("sponsorblock")) {
     extras.enableSponsorBlock(win.webContents, cfg);
   }
@@ -432,7 +435,6 @@ async function createWindow() {
       });
     });
   }
-  if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile);
   win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
   throttle.runLimiter();
 }

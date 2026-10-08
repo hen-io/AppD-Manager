@@ -141,6 +141,7 @@ function showUsage() {
 }
 let looks = 0;
 async function refreshRunning() {
+  if (document.hidden) return;
   let ids;
   try {
     ids = await call("runningApps");

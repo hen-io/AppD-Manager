@@ -14,7 +14,52 @@ async function folderAction(method) {
     $("folder-status").classList.add("error");
   }
 }
+let versions = null;
+async function showVersions() {
+  if (versions) return;
+  versions = [];
+  const pick = $("release-pick");
+  pick.replaceChildren(new Option("Looking up the versions…", ""));
+  try {
+    versions = await call("releases");
+    pick.replaceChildren(new Option("Choose a version…", ""), ...versions.map((release) => {
+      const option = new Option(`${release.version}${release.current ? " (installed)" : ""}`, release.tag);
+      option.dataset.note = [release.date, release.name !== release.tag && release.name !== release.version ? release.name : ""].filter(Boolean).join(" · ");
+      option.disabled = release.current;
+      return option;
+    }));
+  } catch (e) {
+    versions = null;
+    pick.replaceChildren(new Option("The versions could not be looked up", ""));
+    $("release-status").textContent = e.message;
+  }
+}
+async function installVersion() {
+  const tag = $("release-pick").value;
+  const release = (versions || []).find((one) => one.tag === tag);
+  if (!release) return;
+  const answer = await window.ask({
+    icon: "history",
+    buttons: [`Install ${release.version}`, "Cancel"],
+    cancel: 1,
+    message: `Install version ${release.version}?`,
+    detail: `You have ${state.version}. AppD-Manager restarts with version ${release.version}; your apps are not touched.${state.prefs.backupBeforeUpdate ? " A copy of what is there now is kept first." : ""}`
+  });
+  if (answer !== 0) return;
+  $("install-release").disabled = true;
+  $("release-status").classList.remove("error");
+  $("release-status").textContent = "Downloading…";
+  try {
+    const version = await call("installUpdate", tag);
+    $("release-status").textContent = `Version ${version} is installed. Restarting…`;
+  } catch (e) {
+    $("release-status").textContent = e.message;
+    $("release-status").classList.add("error");
+    $("install-release").disabled = false;
+  }
+}
 function showSettingsTab(tab) {
+  if (tab === "updates") showVersions();
   for (const button of $("settings-tabs").querySelectorAll("[data-tab]")) button.classList.toggle("active", button.dataset.tab === tab);
   for (const card of $("settings").querySelectorAll(".card[data-tab]")) card.hidden = card.dataset.tab !== tab;
 }
@@ -31,7 +76,7 @@ function showPrefs() {
 }
 async function changePref(el) {
   try {
-    state.prefs = await call("setPrefs", { [el.dataset.pref]: el.type === "checkbox" ? el.checked : el.value });
+    state.prefs = await call("setPrefs", { [el.dataset.pref]: el.type === "checkbox" ? el.checked : el.type === "number" ? Number(el.value) : el.value });
   } catch (e) {
     setStatus(e.message, true);
   }
