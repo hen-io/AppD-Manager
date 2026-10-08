@@ -98,12 +98,49 @@ $("release-pick").addEventListener("change", () => {
 $("install-release").addEventListener("click", installVersion);
 $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
-const rest = () => document.body.classList.toggle("away", !document.hasFocus() || document.hidden);
+const isAway = () => !document.hasFocus() || document.hidden;
+const held = /* @__PURE__ */ new Set();
+let watching = null;
+function settle(animation) {
+  try {
+    if (animation.effect?.getComputedTiming().iterations === Infinity) {
+      animation.pause();
+      held.add(animation);
+    } else {
+      animation.finish();
+    }
+  } catch {
+  }
+}
+function rest() {
+  const away = isAway();
+  document.body.classList.toggle("away", away);
+  if (away) {
+    clearInterval(watching);
+    watching = null;
+    document.getAnimations().forEach(settle);
+    return;
+  }
+  for (const animation of held) {
+    try {
+      animation.play();
+    } catch {
+    }
+  }
+  held.clear();
+  if (!watching) {
+    refreshRunning();
+    watching = setInterval(refreshRunning, 2e3);
+  }
+}
+for (const start of ["animationstart", "transitionrun"]) {
+  document.addEventListener(start, (event) => {
+    if (isAway()) event.target.getAnimations?.({ subtree: true }).forEach(settle);
+  }, true);
+}
 window.addEventListener("blur", rest);
 window.addEventListener("focus", rest);
 document.addEventListener("visibilitychange", rest);
-document.addEventListener("visibilitychange", () => document.hidden || refreshRunning());
-rest();
 for (const el of document.querySelectorAll("[data-icon]")) label(el, el.dataset.icon, el.textContent);
 for (const summary of document.querySelectorAll("summary")) summary.append(iconSvg("chevron", "chevron"));
 document.querySelectorAll("label:not(.check)").forEach(floatLabel);
@@ -134,7 +171,7 @@ new MutationObserver((changes) => {
   renderSidebar();
   select(null);
   if (state.edit) window.editApp(state.edit.id, state.edit.extension);
-  refreshRunning();
-  setInterval(refreshRunning, 2e3);
+  await refreshRunning();
+  rest();
   if (state.prefs.checkUpdates) checkUpdateOnStart();
 })();

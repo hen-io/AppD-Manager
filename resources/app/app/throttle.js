@@ -84,6 +84,10 @@ module.exports = function createThrottle(cfg, { note, because }) {
     let soundCheck = null;
     let cover = null;
     let round = 0;
+    let gone = false;
+    let hovered = false;
+    let hoverTimer = null;
+    const inUse = () => hovered || Boolean(BrowserWindow.getFocusedWindow());
     const SETTLE_MS = 1e4;
     const LOAD_MAX_MS = 6e4;
     let busyUntil = Date.now() + LOAD_MAX_MS;
@@ -134,6 +138,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
         view.setBackgroundColor("#00000000");
         view.setBounds({ x: 0, y: 0, width, height });
         cover = view;
+        watchMouse(view.webContents);
         window.contentView.addChildView(view);
         view.stopCovering = coverWindow(window, view);
         await withinMoment(showPicture(view, picture, width));
@@ -144,10 +149,11 @@ module.exports = function createThrottle(cfg, { note, because }) {
       if (cfg.skipMissedUpdates) dropBacklog();
       watchdog = setInterval(() => {
         if (window.isDestroyed()) clearInterval(watchdog);
-        else if (BrowserWindow.getFocusedWindow()) back();
+        else if (inUse()) back();
       }, 1e3);
     };
     const away = () => {
+      gone = true;
       idleSince = Date.now() - GRACE_MS;
       if (awayPercent < alwaysPercent) {
         slowTimer = setTimeout(() => {
@@ -165,6 +171,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
     });
     const SKIP_AFTER_MS = 3e4;
     const back = async () => {
+      gone = false;
       clearTimeout(timer);
       clearTimeout(pauseTimer);
       clearTimeout(slowTimer);
@@ -200,17 +207,47 @@ module.exports = function createThrottle(cfg, { note, because }) {
       }
       if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reloadIgnoringCache();
     };
-    window.on("blur", () => {
+    const leave = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        if (!window.isDestroyed() && !BrowserWindow.getFocusedWindow()) away();
+        if (!window.isDestroyed() && !inUse()) away();
       }, GRACE_MS);
+    };
+    const DWELL_MS = 250;
+    const enter = () => {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+      hovered = true;
+      clearTimeout(timer);
+      if (gone) back();
+    };
+    const exit = () => {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+      if (!hovered) return;
+      hovered = false;
+      if (!BrowserWindow.getFocusedWindow()) leave();
+    };
+    function watchMouse(contents) {
+      contents.on("input-event", (_event, input) => {
+        if (input.type === "mouseLeave") return exit();
+        if (hovered || !input.type.startsWith("mouse")) return;
+        if (input.type === "mouseWheel" || input.type === "mouseDown") enter();
+        else hoverTimer ??= setTimeout(enter, DWELL_MS);
+      });
+    }
+    watchMouse(wc);
+    window.on("hide", exit);
+    window.on("minimize", exit);
+    window.on("blur", () => {
+      if (!hovered) leave();
     });
     window.on("focus", back);
     window.on("restore", back);
     window.on("close", resumePage);
     window.on("closed", () => {
       clearTimeout(timer);
+      clearTimeout(hoverTimer);
       clearTimeout(pauseTimer);
       clearInterval(watchdog);
       clearInterval(soundCheck);

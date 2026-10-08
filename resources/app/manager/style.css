@@ -1476,13 +1476,6 @@ dialog[open] {
 dialog[open]::backdrop {
   animation: dim var(--enter) both;
 }
-body.away .slider .wave::before,
-body.away .empty-art,
-body.away #busy::before,
-body.away #apps button.running::after,
-body.away .app-card.running .app-name::after {
-  animation-play-state: paused;
-}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
