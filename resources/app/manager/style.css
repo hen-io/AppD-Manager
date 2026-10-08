@@ -925,10 +925,10 @@ details.card[open] > summary {
   --tint: oklch(62% 0.17 var(--app-hue));
 }
 .app-card.glow {
-  --strong: 0.08;
-  --a: light-dark(oklch(from var(--app-colour) 0.74 clamp(var(--strong), c * 1.2, 0.18) h), oklch(from var(--app-colour) 0.46 clamp(var(--strong), c, 0.16) h));
-  --b: light-dark(oklch(from var(--app-colour) 0.84 clamp(var(--strong), c, 0.13) h), oklch(from var(--app-colour) 0.33 clamp(var(--strong), c, 0.13) h));
-  --c: light-dark(oklch(from var(--app-colour) 0.91 clamp(var(--strong), c * 0.7, 0.08) h), oklch(from var(--app-colour) 0.22 clamp(var(--strong), c * 0.8, 0.09) h));
+  --strong: 0.1;
+  --a: light-dark(oklch(from var(--app-colour) 0.72 clamp(var(--strong), c * 1.4, 0.22) h), oklch(from var(--app-colour) 0.52 clamp(var(--strong), c * 1.2, 0.2) h));
+  --b: light-dark(oklch(from var(--app-colour) 0.81 clamp(var(--strong), c * 1.15, 0.17) h), oklch(from var(--app-colour) 0.36 clamp(var(--strong), c * 1.1, 0.16) h));
+  --c: light-dark(oklch(from var(--app-colour) 0.9 clamp(var(--strong), c * 0.8, 0.11) h), oklch(from var(--app-colour) 0.23 clamp(var(--strong), c * 0.9, 0.11) h));
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -940,24 +940,41 @@ details.card[open] > summary {
 .app-card.glow::before {
   content: "";
   position: absolute;
-  inset: -20%;
+  inset: -35%;
   z-index: -1;
   background:
     radial-gradient(
-      ellipse 42% 85% at 14% 38%,
+      ellipse 40% 80% at 18% 40%,
       var(--a) 25%,
       transparent),
     radial-gradient(
-      ellipse 40% 90% at 88% 70%,
-      var(--b) 25%,
-      transparent),
+      ellipse 38% 85% at 84% 66%,
+      var(--a) 5%,
+      transparent 80%),
     radial-gradient(
-      ellipse 36% 80% at 56% 18%,
+      ellipse 34% 75% at 56% 24%,
       var(--c) 20%,
       transparent);
-  filter: blur(20px) saturate(1.2);
+  filter: blur(20px) saturate(1.3);
+  will-change: translate, rotate;
+  animation: drift 18s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i, 0) * -2.7s);
   transition: scale var(--motion), opacity var(--motion);
-  opacity: 0.92;
+  opacity: 0.95;
+}
+@keyframes drift {
+  from {
+    translate: -7% -3%;
+    rotate: -3deg;
+  }
+  50% {
+    translate: 2% 4%;
+    rotate: 2deg;
+  }
+  to {
+    translate: 8% -2%;
+    rotate: 5deg;
+  }
 }
 .app-card.glow:hover {
   background: var(--b);
