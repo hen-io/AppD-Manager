@@ -55,6 +55,13 @@ function renderList() {
     const name = document.createElement("div");
     name.className = "app-name";
     name.textContent = title;
+    if (app2.cfg?.trayApp) {
+      const mark = document.createElement("span");
+      mark.className = "tray-mark";
+      mark.textContent = "Tray";
+      mark.title = "A tray app: it lives behind an icon in the system tray";
+      name.append(mark);
+    }
     const url = document.createElement("div");
     url.className = app2.cfg ? "app-url" : "app-url error";
     url.textContent = app2.cfg ? app2.cfg.url : "Broken config file";

@@ -7,6 +7,8 @@ const extras = require("./extras");
 const setUpPermissions = require("./app/permissions");
 const showUnreadCount = require("./app/badge");
 const keepInTray = require("./app/tray");
+const makeTrayApp = require("./app/trayapp");
+const { frameOptions, styleFrame } = require("./app/frame");
 const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
@@ -14,10 +16,11 @@ const showLoadingScreen = require("./app/loading");
 const storeExtension = require("./app/store-extension");
 const id = process.env.APPD_ID;
 let cfg;
+const settingsText = (settings) => JSON.stringify({ ...settings, autostart: void 0 });
 let startedWith = "";
 try {
   cfg = lib.load(id);
-  startedWith = JSON.stringify(cfg);
+  startedWith = settingsText(cfg);
   lib.writeDesktop(id, cfg);
 } catch (e) {
   console.error(`appd: ${e.message}`);
@@ -112,7 +115,7 @@ async function runAction(action, wc) {
   if (action !== "clear-cache" && action !== "hard-reload") return;
   let settings = startedWith;
   try {
-    settings = JSON.stringify(lib.load(id));
+    settings = settingsText(lib.load(id));
   } catch {
   }
   if (settings !== startedWith) return restartApp(wc);
@@ -124,6 +127,18 @@ function actionIn(argv) {
   const action = arg ? arg.slice("--appd-action=".length) : "";
   return action in lib.APP_ACTIONS ? action : "";
 }
+let menusOpen = 0;
+function popUp(items, wc) {
+  menusOpen++;
+  Menu.buildFromTemplate(items).popup({
+    window: BrowserWindow.fromWebContents(wc) ?? void 0,
+    callback: () => {
+      menusOpen--;
+      trayIcon?.refresh();
+    }
+  });
+}
+let trayIcon = null;
 const zoom = createZoom(cfg);
 const customExtensions = [];
 async function loadCustomExtensions() {
@@ -171,7 +186,7 @@ function extensionMenu() {
   ];
   return items.length ? [{ type: "separator" }, { label: "Extensions", submenu: items }] : [];
 }
-function appMenu(wc) {
+function appMenu(wc, inTray = false) {
   const window = BrowserWindow.fromWebContents(wc);
   const sep = { type: "separator" };
   return [
@@ -188,14 +203,21 @@ function appMenu(wc) {
         click: () => zoom.reset(wc)
       }
     ] : [],
-    {
+    ...cfg.trayApp ? [] : [{
       label: "Full screen",
       accelerator: "F11",
       type: "checkbox",
       checked: Boolean(window?.isFullScreen()),
       click: () => window?.setFullScreen(!window.isFullScreen())
-    },
-    ...cfg.windowDecorations ? [] : [
+    }],
+    ...cfg.trayApp && cfg.trayHideOnBlur && trayIcon?.pin ? [sep, {
+      label: "Keep open",
+      type: "checkbox",
+      checked: trayIcon.isPinned(),
+      click: () => trayIcon.pin(!trayIcon.isPinned())
+    }] : [],
+    ...cfg.trayApp && !inTray ? [{ label: "Hide", click: () => window?.hide() }, sep, { label: `Quit ${cfg.name}`, click: () => app.quit() }] : [],
+    ...cfg.windowDecorations || cfg.trayApp ? [] : [
       sep,
       { label: "Minimize", click: () => window?.minimize() },
       { label: window?.isMaximized() ? "Restore size" : "Maximize", click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
@@ -206,7 +228,7 @@ function appMenu(wc) {
 }
 function showActionMenu(wc) {
   if (wc.isDestroyed()) return;
-  Menu.buildFromTemplate(appMenu(wc)).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
+  popUp(appMenu(wc), wc);
 }
 ipcMain.on("appd-action-button", (event) => {
   event.returnValue = cfg.actionButton;
@@ -275,7 +297,7 @@ function contextMenu(wc, p) {
     items.push({ role: "copy" }, sep);
   }
   items.push(...appMenu(wc));
-  Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
+  popUp(items, wc);
 }
 app.on("web-contents-created", (_event, wc) => {
   if (!cfg.userAgent) followGoogleSignIn(wc);
@@ -348,14 +370,17 @@ async function createWindow() {
   const state = readState();
   nativeTheme.themeSource = cfg.colorScheme;
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
+  const bare = cfg.trayApp || !cfg.windowDecorations;
   win = new BrowserWindow({
-    alwaysOnTop: cfg.alwaysOnTop,
-    width: state.width || cfg.width,
-    height: state.height || cfg.height,
+    alwaysOnTop: cfg.alwaysOnTop || cfg.trayApp,
+    width: cfg.trayApp ? cfg.trayWidth : state.width || cfg.width,
+    height: cfg.trayApp ? cfg.trayHeight : state.height || cfg.height,
     title: cfg.name,
     icon,
+    ...cfg.trayApp ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
     ...cfg.colorScheme === "light" && !extension("darkreader") ? {} : { backgroundColor: "#15171b" },
-    frame: cfg.windowDecorations,
+    frame: !bare,
+    ...bare ? frameOptions(cfg) : {},
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
@@ -365,8 +390,9 @@ async function createWindow() {
       ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
     }
   });
-  if (cfg.startMaximized || state.maximized) win.maximize();
-  if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile);
+  if (bare) styleFrame(win, cfg);
+  if (!cfg.trayApp && (cfg.startMaximized || state.maximized)) win.maximize();
+  if (cfg.loadingScreen && (!cfg.trayApp || cfg.trayShowAtStart)) showLoadingScreen(win, cfg, iconFile);
   note(`started, opening ${plain(startUrl)}`);
   let showing = "";
   win.webContents.on("did-start-navigation", (details) => {
@@ -390,7 +416,17 @@ async function createWindow() {
   });
   win.webContents.on("unresponsive", () => note("the page does not respond"));
   if (cfg.unreadBadge) showUnreadCount(win, app);
-  if (cfg.closeToTray) keepInTray(win, { name: cfg.name, icon, isQuitting: throttle.isQuitting, quit: () => app.quit(), note });
+  const trayOptions = {
+    name: cfg.name,
+    icon,
+    note,
+    isQuitting: throttle.isQuitting,
+    quit: () => app.quit(),
+    menu: () => win.isDestroyed() ? [] : appMenu(win.webContents, true),
+    isBusy: () => menusOpen > 0
+  };
+  if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
+  else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
   if (extension("twitch")) await extras.enableTwitchAdBlock().catch(() => {
   });
@@ -409,6 +445,7 @@ async function createWindow() {
   }
   if (throttle.wanted) throttle.watchFocus(win);
   win.on("close", () => {
+    if (cfg.trayApp) return;
     const { width, height } = win.getNormalBounds();
     try {
       fs.writeFileSync(statePath, JSON.stringify({ width, height, maximized: win.isMaximized() }));
@@ -448,9 +485,10 @@ if (!app.requestSingleInstanceLock()) {
     if (argv.includes("--appd-action=restart")) return restartApp(win.webContents);
     const action = actionIn(argv);
     if (action) runAction(action, win.webContents);
+    if (trayIcon?.show) return trayIcon.show();
     if (win.isMinimized()) win.restore();
     win.show();
-    win.focus();
+    return win.focus();
   });
   app.on("window-all-closed", () => app.quit());
   if (lib.WINDOWS) {

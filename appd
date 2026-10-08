@@ -17,8 +17,16 @@ if [ ! -x "$electron" ]; then
   exit 1
 fi
 
+x11=0
+for arg in "$@"; do
+  [ "$arg" = "--appd-x11" ] && x11=1
+done
 flags=()
-[ -n "${WAYLAND_DISPLAY:-}" ] && flags+=(--ozone-platform=wayland)
+if [ "$x11" = 1 ]; then
+  flags+=(--ozone-platform=x11)
+elif [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  flags+=(--ozone-platform=wayland)
+fi
 
 case "${1:-manager}" in
   run)

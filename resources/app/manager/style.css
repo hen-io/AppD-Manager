@@ -464,6 +464,13 @@ input[type=checkbox]:focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
 }
+label.check input[type=color] {
+  width: 52px;
+  height: 32px;
+  flex: none;
+  padding: 3px;
+  cursor: pointer;
+}
 label.indented {
   margin-left: 66px;
 }
@@ -886,6 +893,16 @@ details.card[open] > summary {
 }
 .app-usage:empty {
   display: none;
+}
+.app-name .tray-mark {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font: 500 11px/16px var(--font);
+  letter-spacing: 0.03em;
+  vertical-align: 2px;
+  background: var(--tertiary-container);
+  color: var(--on-tertiary-container);
 }
 .app-usage {
   white-space: nowrap;

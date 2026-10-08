@@ -149,10 +149,10 @@ async function offerRestart(ids) {
   return one ? "The app restarts with the new settings, on the page it was on." : "The running apps restart with the new settings, each on the page it was on.";
 }
 function startApp(id, extra = []) {
-  lib.load(id);
+  const cfg = lib.load(id);
   const env = { ...process.env };
   delete env.CHROME_DESKTOP;
-  const [command, args] = lib.runCommand(id, extra);
+  const [command, args] = lib.runCommand(id, [...lib.startFlags(cfg), ...extra]);
   const child = spawn(command, args, { detached: true, stdio: "ignore", env });
   child.on("error", () => {
   });
@@ -424,8 +424,9 @@ const handlers = {
   }
 };
 for (const [name, fn] of Object.entries(handlers)) {
-  ipcMain.handle(name, async (_event, ...args) => {
+  ipcMain.handle(name, async (event, ...args) => {
     try {
+      if (!win || win.isDestroyed() || event.senderFrame !== win.webContents.mainFrame) throw new Error("Not allowed from here.");
       return { value: await fn(...args) };
     } catch (e) {
       return { error: e.message };

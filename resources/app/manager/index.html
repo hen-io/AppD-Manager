@@ -215,7 +215,7 @@
             <input name="autostart" type="checkbox">
             Start this app when you log in
           </label>
-          <label class="check">
+          <label class="check not-for-tray">
             <input name="closeToTray" type="checkbox">
             Keep running in the system tray when the window is closed
           </label>
@@ -236,7 +236,7 @@
 
         <details class="card" open>
           <summary data-icon="window">Window</summary>
-          <div class="size-row">
+          <div class="size-row not-for-tray">
             <label>Width
               <input name="width" type="number" min="200" step="1">
             </label>
@@ -248,7 +248,7 @@
               Always open maximized
             </label>
           </div>
-          <span class="note size-note">The size of the first window. Later the window opens the way you left it, unless it always opens maximized.</span>
+          <span class="note size-note not-for-tray">The size of the first window. Later the window opens the way you left it, unless it always opens maximized.</span>
           <label>Sites that have a light and a dark look start in
             <select name="colorScheme">
               <option value="system">The one your desktop uses</option>
@@ -267,15 +267,28 @@
             </select>
             <span class="note">A small round button in a corner of the window that opens the app's menu. Hidden, the menu is still there with a right click in the page: reload, hard reload, empty cache, back to the app's own page, reset zoom, full screen, and the settings of its extensions.</span>
           </label>
-          <label class="check">
+          <label class="check not-for-tray">
             <input name="alwaysOnTop" type="checkbox">
             Keep the window above all others
           </label>
-          <label class="check">
+          <label class="check not-for-tray">
             <input name="windowDecorations" type="checkbox">
             Show window decorations (title bar and borders)
           </label>
-          <span class="note below-check">Without them the window is bare. Move it with Meta+drag, and minimize, maximize or close it from the app's menu (a right click in the page, or the menu button) or with Alt+F4.</span>
+          <span class="note below-check not-for-tray">Without them the window is bare. Move it with Meta+drag, and minimize, maximize or close it from the app's menu (a right click in the page, or the menu button) or with Alt+F4.</span>
+          <div id="bare-look">
+            <label>Round corners
+              <input name="windowRadius" data-slider="0 40 1" data-unit="px" type="number" min="0" max="40" step="1">
+            </label>
+            <label>Line around the window
+              <input name="windowBorderWidth" data-slider="0 8 1" data-unit="px" type="number" min="0" max="8" step="1">
+            </label>
+            <label class="check">
+              <input name="windowBorderColor" type="color">
+              Colour of that line
+            </label>
+            <span class="note below-row">For a window without decorations. With round corners the window is see-through where they are cut off, which needs a desktop with compositing (KDE has it).</span>
+          </div>
           <label class="check">
             <input name="fixedTitle" type="checkbox">
             Always show the app name as window title
@@ -296,6 +309,48 @@
             <input name="hideScrollbars" type="checkbox">
             Hide the scrollbars (pages still scroll)
           </label>
+        </details>
+
+        <details class="card" open>
+          <summary data-icon="tray">System tray app</summary>
+          <label class="check">
+            <input name="trayApp" type="checkbox">
+            Run this app from the system tray
+          </label>
+          <span class="note below-check">The app lives behind an icon in the tray. A click on the icon brings up its window, small and without decorations; a right click, its menu. It is not in the taskbar.</span>
+          <div id="tray-settings">
+            <label>Width of its window
+              <input name="trayWidth" data-slider="240 1200 10" data-unit="px" type="number" min="200" max="2400" step="10">
+            </label>
+            <label>Height of its window
+              <input name="trayHeight" data-slider="200 1400 10" data-unit="px" type="number" min="150" max="2000" step="10">
+            </label>
+            <label>Where it comes up
+              <select name="trayPosition">
+                <option value="bottom-right" data-note="Where the tray is on most desktops">Bottom right</option>
+                <option value="bottom-center">Bottom, in the middle</option>
+                <option value="bottom-left">Bottom left</option>
+                <option value="top-right">Top right</option>
+                <option value="top-center">Top, in the middle</option>
+                <option value="top-left">Top left</option>
+              </select>
+              <span class="note">The corner of the screen your tray is in.</span>
+            </label>
+            <label class="check">
+              <input name="trayAtIcon" type="checkbox">
+              Come up right by the icon when the desktop tells where it is
+            </label>
+            <span class="note below-check">Desktops on X11 tell, when the tray sits in a panel. On Wayland a program is not told where its icon is, and the window comes up in the corner chosen above.</span>
+            <label class="check">
+              <input name="trayHideOnBlur" type="checkbox">
+              Hide the window again when something else is clicked
+            </label>
+            <label class="check">
+              <input name="trayShowAtStart" type="checkbox">
+              Show the window when the app starts
+            </label>
+            <span class="note below-check">Off: it starts as its icon alone. Its look - round corners, a line around it - is under Window.</span>
+          </div>
         </details>
 
         <details class="card" open>

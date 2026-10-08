@@ -29,6 +29,7 @@ function describeExtension(folder) {
     options: text(manifest.options_ui?.page) || text(manifest.options_page)
   };
 }
+const startFlags = (cfg) => cfg.trayApp && !WINDOWS ? ["--appd-x11"] : [];
 function runCommand(id, extra = []) {
   if (!WINDOWS) return [launcher, ["run", id, ...extra]];
   const built = path.join(path.dirname(launcher), "resources", "app") === __dirname;
@@ -106,6 +107,16 @@ const DEFAULTS = {
   width: 1280,
   height: 800,
   autostart: false,
+  trayApp: false,
+  trayWidth: 420,
+  trayHeight: 640,
+  trayAtIcon: true,
+  trayPosition: "bottom-right",
+  trayHideOnBlur: true,
+  trayShowAtStart: false,
+  windowRadius: 0,
+  windowBorderWidth: 0,
+  windowBorderColor: "#7a7f87",
   alwaysOnTop: false,
   closeToTray: false,
   unreadBadge: true,
@@ -298,6 +309,11 @@ const RULES = {
   width: { min: 200, max: 16e3 },
   height: { min: 150, max: 16e3 },
   defaultZoom: { min: 25, max: 500 },
+  trayWidth: { min: 200, max: 2400 },
+  trayHeight: { min: 150, max: 2e3 },
+  trayPosition: { oneOf: ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center"] },
+  windowRadius: { min: 0, max: 40 },
+  windowBorderWidth: { min: 0, max: 8 },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -340,6 +356,7 @@ function validate(cfg) {
   for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
+  if (!/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error('"windowBorderColor" must be a colour like #7a7f87');
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
 }
 function extensionDefaults() {
@@ -473,6 +490,7 @@ function load(id) {
     cfg = withDefaults(JSON.parse(raw));
     cfg.name ||= id;
     validate(cfg);
+    cfg.autostart = startsAtLogin(id);
   } catch (e) {
     throw new Error(`${configPath(id)}: ${e.message}`);
   }
@@ -497,6 +515,7 @@ function save(id, cfg) {
   for (const key of ALL_EXTENSION_KEYS) delete stored[key];
   Object.assign(stored, differing(cfg, extensionDefaults()));
   fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
+  setAutostart(id, cfg);
 }
 const trashDir = path.join(root, "Trash");
 function remove(id) {
@@ -731,11 +750,10 @@ function syncWindows(ids, problems) {
 }
 function writeDesktop(id, cfg) {
   if (WINDOWS) return void writeWindowsShortcut(id, cfg);
-  writeAutostart(id, cfg);
   writeEntry(desktopId(id), [
     `Name=${entryValue(cfg.name)}`,
     `Comment=${entryValue(cfg.description || cfg.url)}`,
-    `Exec=${execArg(launcher)} run ${id}`,
+    `Exec=${execArg(launcher)} run ${id}${startFlags(cfg).map((flag) => ` ${flag}`).join("")}`,
     `Icon=${entryValue(iconFile(id, cfg) || cfg.icon)}`,
     "Categories=Network;",
     `StartupWMClass=${desktopId(id)}`,
@@ -743,31 +761,44 @@ function writeDesktop(id, cfg) {
   ], Object.entries(APP_ACTIONS).flatMap(([action, label]) => [
     `[Desktop Action ${action}]`,
     `Name=${label}`,
-    `Exec=${execArg(launcher)} run ${id} --appd-action=${action}`,
+    `Exec=${execArg(launcher)} run ${id}${startFlags(cfg).map((flag) => ` ${flag}`).join("")} --appd-action=${action}`,
     ""
   ]));
 }
 const autostartDir = path.join(process.env.XDG_CONFIG_HOME || path.join(home, ".config"), "autostart");
 const autostartPath = (id) => path.join(autostartDir, `${desktopId(id)}.desktop`);
-function writeAutostart(id, cfg) {
+const OURS = "X-AppD-Manager=true";
+function startsAtLogin(id) {
+  if (WINDOWS) return fs.existsSync(path.join(path.dirname(startMenuDir), "Startup", `AppD ${id}.lnk`));
+  return fs.existsSync(autostartPath(id));
+}
+function setAutostart(id, cfg) {
+  if (WINDOWS) return;
   const file = autostartPath(id);
-  if (!cfg.autostart) return fs.rmSync(file, { force: true });
+  if (!cfg.autostart) {
+    fs.rmSync(file, { force: true });
+    return;
+  }
+  let existing = null;
+  try {
+    existing = fs.readFileSync(file, "utf8");
+  } catch {
+  }
+  if (existing !== null && !existing.includes(OURS)) return;
   const content = [
     "[Desktop Entry]",
     "Type=Application",
     `Name=${entryValue(cfg.name)}`,
-    `Exec=${execArg(launcher)} run ${id}`,
+    `Exec=${execArg(launcher)} run ${id}${startFlags(cfg).map((flag) => ` ${flag}`).join("")}`,
     `Icon=${entryValue(iconFile(id, cfg) || cfg.icon)}`,
     "Terminal=false",
     "X-GNOME-Autostart-enabled=true",
+    OURS,
     ""
   ].join("\n");
-  try {
-    if (fs.readFileSync(file, "utf8") === content) return void 0;
-  } catch {
-  }
+  if (existing === content) return;
   fs.mkdirSync(autostartDir, { recursive: true });
-  return fs.writeFileSync(file, content);
+  fs.writeFileSync(file, content);
 }
 function writeManagerDesktop() {
   writeEntry(MANAGER_DESKTOP_ID, [
@@ -797,7 +828,11 @@ function sync() {
   }
   for (const file of fs.existsSync(autostartDir) ? fs.readdirSync(autostartDir) : []) {
     const m = /^appd-(.+)\.desktop$/.exec(file);
-    if (m && !ids.includes(m[1])) fs.rmSync(path.join(autostartDir, file));
+    if (!m || ids.includes(m[1])) continue;
+    try {
+      if (fs.readFileSync(path.join(autostartDir, file), "utf8").includes(OURS)) fs.rmSync(path.join(autostartDir, file));
+    } catch {
+    }
   }
   spawn("kbuildsycoca6", { stdio: "ignore", detached: true }).on("error", () => {
   }).unref();
@@ -810,6 +845,7 @@ module.exports = {
   setPrefs,
   restore,
   emptyTrash,
+  startFlags,
   MODES,
   PALETTES,
   appearance,

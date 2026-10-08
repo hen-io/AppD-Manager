@@ -64,8 +64,15 @@ function showSlowDown() {
     field.closest("label").classList.toggle("off", field.disabled);
   }
 }
+function showWindowKind() {
+  const tray = form.elements.trayApp.checked;
+  for (const el of form.querySelectorAll(".not-for-tray")) el.hidden = tray;
+  $("tray-settings").hidden = !tray;
+  $("bare-look").hidden = !tray && form.elements.windowDecorations.checked;
+}
 function updateSaveButton() {
   showSlowDown();
+  showWindowKind();
   const cfg = readForm();
   $("save").disabled = JSON.stringify(cfg) === loadedForm;
   showOwnSettings(cfg);
