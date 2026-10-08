@@ -89,6 +89,7 @@ $("install-update").addEventListener("click", installUpdate);
 $("release-page").addEventListener("click", () => update && call("openReleasePage", update.url));
 for (const button of document.querySelectorAll("button[data-icon]")) label(button, button.dataset.icon, button.textContent);
 document.querySelectorAll("select").forEach(enhance);
+document.querySelectorAll("input[data-slider]").forEach(addSlider);
 new MutationObserver((changes) => {
   for (const change of changes) {
     for (const node of change.addedNodes) {

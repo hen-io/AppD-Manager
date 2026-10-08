@@ -212,6 +212,72 @@ label.check input[type=number] {
   width: 5.5em;
   flex: none;
 }
+.number-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.number-field input[type=number] {
+  width: 84px;
+  flex: none;
+  text-align: right;
+}
+.number-field input[type=number]::-webkit-inner-spin-button {
+  appearance: none;
+}
+.number-field .unit {
+  flex: none;
+  min-width: 26px;
+  margin-left: -6px;
+  font: var(--body-medium);
+  color: var(--on-surface-variant);
+}
+label:not(.check) > .number-field > input[type=number] {
+  max-width: none;
+}
+input[type=range] {
+  appearance: none;
+  flex: 1;
+  min-width: 80px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  --fill: 0%;
+}
+input[type=range]:hover,
+input[type=range]:focus {
+  border: 0;
+  box-shadow: none;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 16px;
+  border-radius: var(--shape-s);
+  background:
+    linear-gradient(
+      to right,
+      var(--primary) 0 calc(var(--fill) - 6px),
+      transparent calc(var(--fill) - 6px) calc(var(--fill) + 6px),
+      var(--secondary-container) calc(var(--fill) + 6px) 100%);
+}
+input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 44px;
+  margin-top: -14px;
+  border-radius: 2px;
+  background: var(--primary);
+  transition: width var(--motion);
+}
+input[type=range]:active::-webkit-slider-thumb {
+  width: 2px;
+}
+input[type=range]:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
 input[type=checkbox] {
   appearance: none;
   position: relative;
@@ -937,9 +1003,9 @@ form.global > .page {
   border-radius: 50%;
   background:
     conic-gradient(
-      oklch(55% 0.21 var(--hue)) 0 50%,
-      oklch(62% 0.17 calc(var(--hue) + 70)) 0 75%,
-      oklch(88% 0.08 var(--hue)) 0);
+      oklch(55% calc(0.21 * var(--vivid)) var(--hue)) 0 50%,
+      oklch(66% calc(0.16 * var(--vivid)) var(--hue-3)) 0 75%,
+      oklch(88% calc(0.08 * var(--vivid)) var(--hue)) 0);
   box-shadow: var(--elevation-1);
 }
 #palettes button.selected .swatch {
