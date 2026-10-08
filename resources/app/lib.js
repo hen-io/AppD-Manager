@@ -196,6 +196,35 @@ function readSettings() {
     return {};
   }
 }
+const PREFS = {
+  checkUpdates: true,
+  confirmRemove: true,
+  restartOnSave: "ask",
+  showUsage: true,
+  motion: true
+};
+const RESTART_ON_SAVE = ["ask", "always", "never"];
+function prefs() {
+  const kept = readSettings().manager || {};
+  const result = { ...PREFS };
+  for (const key of Object.keys(PREFS)) {
+    if (typeof kept[key] === typeof PREFS[key]) result[key] = kept[key];
+  }
+  if (!RESTART_ON_SAVE.includes(result.restartOnSave)) result.restartOnSave = PREFS.restartOnSave;
+  return result;
+}
+function setPrefs(next) {
+  const now = prefs();
+  for (const key of Object.keys(PREFS)) {
+    if (key in next && typeof next[key] === typeof PREFS[key]) now[key] = next[key];
+  }
+  if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(`"restartOnSave" must be one of: ${RESTART_ON_SAVE.join(", ")}`);
+  const settings = readSettings();
+  settings.manager = now;
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  return now;
+}
 function appearance() {
   const kept = readSettings().appearance || {};
   return { mode: kept.mode in MODES ? kept.mode : "system", palette: kept.palette in PALETTES ? kept.palette : DEFAULT_PALETTE };
@@ -773,6 +802,8 @@ function sync() {
 module.exports = {
   resourceUse,
   DEFAULT_PALETTE,
+  prefs,
+  setPrefs,
   restore,
   emptyTrash,
   MODES,

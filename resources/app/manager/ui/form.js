@@ -81,7 +81,7 @@ async function go(id) {
   const card = document.querySelector(`.app-card[data-id="${CSS.escape(String(app))}"]`);
   for (const other of document.querySelectorAll(".app-card")) other.style.viewTransitionName = other === card ? "hero" : "";
   hero = app;
-  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return select(id);
+  if (!document.startViewTransition || !state.prefs.motion || matchMedia("(prefers-reduced-motion: reduce)").matches) return select(id);
   const transition = document.startViewTransition(() => select(id));
   for (const step of [transition.ready, transition.finished]) step.catch(() => {
   });
@@ -96,7 +96,7 @@ function select(id) {
   form.classList.toggle("global", isGlobal);
   $("settings-tabs").hidden = !isGlobal && id !== SETTINGS;
   $("settings").hidden = id !== SETTINGS;
-  for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) tab.classList.toggle("active", tab.dataset.tab === "extensions" === isGlobal);
+  showSettingsTab(isGlobal ? "extensions" : settingsTab);
   $("global-note").hidden = !isGlobal;
   $("home").hidden = id !== null;
   if (id === null) {
@@ -104,9 +104,8 @@ function select(id) {
     $("home-apps").classList.add("stagger");
     setTimeout(() => $("home-apps").classList.remove("stagger"), 900);
   }
-  $("about").hidden = id !== ABOUT;
   $("broken").hidden = !app || Boolean(app.cfg);
-  const view = id === null ? "home" : isGlobal || id === SETTINGS ? "settings" : id === ABOUT ? "about" : "";
+  const view = id === null ? "home" : isGlobal || id === SETTINGS ? "settings" : "";
   for (const button of $("views").querySelectorAll("[data-view]")) button.classList.toggle("active", button.dataset.view === view);
   document.querySelector("main").scrollTop = 0;
   form.hidden = !editable;
@@ -135,12 +134,20 @@ function select(id) {
   }
   renderList();
 }
+function selectInPlace(id) {
+  const main = document.querySelector("main");
+  const top = main.scrollTop;
+  const open = [...form.querySelectorAll(".extension-settings[open]")].map((part) => part.id);
+  select(id);
+  for (const part of open) $(part).open = true;
+  main.scrollTop = top;
+}
 async function saveForm() {
   if (selected === GLOBAL) {
     try {
       const result = await call("saveExtensionDefaults", readForm());
       state = result.state;
-      select(GLOBAL);
+      selectInPlace(GLOBAL);
       setStatus(`Saved. ${result.restart}`.trim());
       refreshRunning();
       return true;
@@ -153,7 +160,8 @@ async function saveForm() {
     const result = await call("save", selected === NEW ? null : selected, readForm());
     state = result.state;
     renderSidebar();
-    select(result.id);
+    if (result.id === selected) selectInPlace(result.id);
+    else select(result.id);
     setStatus(result.restart ? `Saved. ${result.restart}` : "Saved. The menu entry is up to date.");
     refreshRunning();
     return true;

@@ -7,7 +7,7 @@ body {
   margin: 0;
   height: 100vh;
   display: grid;
-  grid-template-columns: 304px 1fr;
+  grid-template-columns: 360px 1fr;
   transition: grid-template-columns var(--enter);
   font: var(--body-medium);
   color: var(--on-surface);
@@ -880,6 +880,11 @@ details.card[open] > summary {
 .app-usage:empty {
   display: none;
 }
+.app-usage {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #apps li.selected .app-usage {
   color: inherit;
 }
@@ -958,10 +963,14 @@ form .title.tinted {
   margin: 6px auto 24px;
 }
 #about h3 {
+  justify-content: center;
   font: var(--title-large);
 }
+#about {
+  text-align: center;
+}
 #about .row {
-  margin-bottom: 16px;
+  justify-content: center;
 }
 #author {
   font-style: italic;
@@ -1444,10 +1453,12 @@ dialog[open] {
 dialog[open]::backdrop {
   animation: dim var(--enter) both;
 }
-body.away *,
-body.away *::before,
-body.away *::after {
-  animation-play-state: paused !important;
+body.away .slider .wave,
+body.away .empty-art,
+body.away #busy::before,
+body.away #apps button.running::after,
+body.away .app-card.running .app-name::after {
+  animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1456,6 +1467,12 @@ body.away *::after {
     animation: none !important;
     transition: none !important;
   }
+}
+body.still *,
+body.still *::before,
+body.still *::after {
+  animation: none !important;
+  transition: none !important;
 }
 #busy {
   position: fixed;

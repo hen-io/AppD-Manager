@@ -3,8 +3,8 @@ document.documentElement.dataset.palette = new URLSearchParams(location.search).
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 const NEW = "";
-const ABOUT = "***";
 const SETTINGS = "**";
+let settingsTab = "general";
 const GLOBAL = "*";
 let state = { apps: [], defaults: {} };
 let selected = null;

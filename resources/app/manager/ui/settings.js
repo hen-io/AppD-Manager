@@ -14,6 +14,29 @@ async function folderAction(method) {
     $("folder-status").classList.add("error");
   }
 }
+function showSettingsTab(tab) {
+  for (const button of $("settings-tabs").querySelectorAll("[data-tab]")) button.classList.toggle("active", button.dataset.tab === tab);
+  for (const card of $("settings").querySelectorAll(".card[data-tab]")) card.hidden = card.dataset.tab !== tab;
+}
+function showPrefs() {
+  for (const el of document.querySelectorAll("[data-pref]")) {
+    if (el.type === "checkbox") el.checked = state.prefs[el.dataset.pref];
+    else el.value = state.prefs[el.dataset.pref];
+  }
+  document.body.classList.toggle("still", !state.prefs.motion);
+  if (!state.prefs.showUsage) {
+    usage = {};
+    showUsage();
+  }
+}
+async function changePref(el) {
+  try {
+    state.prefs = await call("setPrefs", { [el.dataset.pref]: el.type === "checkbox" ? el.checked : el.value });
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+  showPrefs();
+}
 function renderAppearance() {
   $("appearance-mode").replaceChildren(...Object.entries(state.modes).map(([mode, name]) => new Option(name, mode)));
   $("appearance-mode").value = state.appearance.mode;
@@ -100,6 +123,7 @@ async function checkUpdateOnStart() {
   const info = await checkUpdate();
   if (!info || !info.available) return;
   if (!await call("askUpdate", info)) return;
+  settingsTab = "updates";
   select(SETTINGS);
   installUpdate();
 }

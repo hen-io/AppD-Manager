@@ -90,6 +90,7 @@ function state() {
     defaults: lib.fresh(),
     rules: lib.RULES,
     appearance: lib.appearance(),
+    prefs: lib.prefs(),
     modes: lib.MODES,
     palettes: lib.PALETTES,
     templates: require("./templates"),
@@ -132,13 +133,16 @@ async function offerRestart(ids) {
     }
   });
   const one = ids.length === 1;
-  const response = await ask({
+  const mode = lib.prefs().restartOnSave;
+  const kept = one ? "The app keeps its old settings until it is started again." : "The running apps keep their old settings until they are started again.";
+  if (mode === "never") return kept;
+  const response = mode === "always" ? 0 : await ask({
     icon: "restart",
     buttons: [one ? "Restart now" : "Restart them now", "Later"],
     message: one ? `Restart "${names[0]}" now?` : `Restart ${ids.length} running apps now?`,
     detail: (one ? "The app is running and keeps" : names.join(", ") + " are running and keep") + " the old settings until restarted. Restarting closes the window; anything not saved in the page is lost."
   });
-  if (response !== 0) return one ? "The app keeps its old settings until it is started again." : "The running apps keep their old settings until they are started again.";
+  if (response !== 0) return kept;
   for (const id of ids) restartApp(id);
   return one ? "The app restarts with the new settings, on the page it was on." : "The running apps restart with the new settings, each on the page it was on.";
 }
@@ -191,7 +195,7 @@ const handlers = {
   },
   async remove(id) {
     lib.checkId(id);
-    const response = await ask({
+    const response = !lib.prefs().confirmRemove ? 0 : await ask({
       icon: "delete",
       danger: true,
       buttons: ["Remove", "Cancel"],
@@ -212,6 +216,7 @@ const handlers = {
     lib.sync();
     return { state: state() };
   },
+  setPrefs: (next) => lib.setPrefs(Object(next)),
   setAppearance(next) {
     const now = lib.setAppearance({ ...next.mode ? { mode: String(next.mode) } : {}, ...next.palette ? { palette: String(next.palette) } : {} });
     nativeTheme.themeSource = now.mode;
@@ -421,10 +426,10 @@ for (const [name, fn] of Object.entries(handlers)) {
 }
 function createWindow() {
   win = new BrowserWindow({
-    width: 980,
-    height: 700,
-    minWidth: 720,
-    minHeight: 480,
+    width: 1240,
+    height: 900,
+    minWidth: 900,
+    minHeight: 520,
     title: "AppD-Manager",
     webPreferences: {
       preload: path.join(__dirname, "manager", "preload.js"),

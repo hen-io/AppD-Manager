@@ -18,7 +18,6 @@
     <nav id="views">
       <button type="button" data-view="home" data-icon="home" title="Home">Home</button>
       <button type="button" data-view="settings" data-icon="cog" title="Settings">Settings</button>
-      <button type="button" data-view="about" data-icon="info" title="About">About</button>
     </nav>
     <button id="new" type="button" class="primary" data-icon="plus" title="New app">New app</button>
 
@@ -37,21 +36,49 @@
       <h1>Settings</h1>
       <div class="tabs">
         <button type="button" data-tab="general" data-icon="tune">General</button>
+        <button type="button" data-tab="appearance" data-icon="palette">Appearance</button>
         <button type="button" data-tab="extensions" data-icon="puzzle">Extensions</button>
+        <button type="button" data-tab="updates" data-icon="update">Updates</button>
+        <button type="button" data-tab="about" data-icon="info">About</button>
       </div>
     </nav>
 
     <section id="settings" class="page" hidden>
-      <section class="card">
+      <section class="card" data-tab="general">
+        <h3 data-icon="behaviour">Behaviour</h3>
+        <label class="check">
+          <input data-pref="confirmRemove" type="checkbox">
+          Ask before removing an app
+        </label>
+        <span class="note below-check">Either way a removed app can be brought back for a few seconds, with "Undo".</span>
+        <label>After saving an app that is running
+          <select data-pref="restartOnSave" aria-label="After saving an app that is running">
+            <option value="ask" data-note="A question each time: restart now, or later">Ask whether to restart it</option>
+            <option value="always" data-note="It comes back on the page it was on; what was typed into the page is lost">Restart it at once</option>
+            <option value="never" data-note="The new settings apply the next time it starts">Leave it running</option>
+          </select>
+        </label>
+        <label class="check">
+          <input data-pref="showUsage" type="checkbox">
+          Show what running apps use (CPU and memory)
+        </label>
+      </section>
+
+      <section class="card" data-tab="appearance">
         <h3 data-icon="palette">Appearance</h3>
         <label>Light or dark
           <select id="appearance-mode" aria-label="Light or dark"></select>
         </label>
         <span class="field-label">Colours</span>
         <div id="palettes"></div>
+        <label class="check">
+          <input data-pref="motion" type="checkbox">
+          Animations
+        </label>
+        <span class="note below-check">Off: views, menus and sliders change at once instead of moving.</span>
       </section>
 
-      <section class="card">
+      <section class="card" data-tab="general">
         <h3 data-icon="folder">Apps folder</h3>
         <p id="apps-dir" class="path"></p>
         <p class="note">Each app has its own folder in here. Changing the location moves your apps there, with their settings and logins. Close running apps first: they stay behind.</p>
@@ -63,7 +90,7 @@
         <p id="folder-status" class="note error"></p>
       </section>
 
-      <section class="card">
+      <section class="card" data-tab="general">
         <h3 data-icon="backup">Backup</h3>
         <p class="note">Every app's settings and icon, and the extension settings for all apps, in one file. Logins are not part of it: after importing, sign in again.</p>
         <div class="row">
@@ -73,10 +100,13 @@
         <p id="backup-status" class="note"></p>
       </section>
 
-      <section class="card">
+      <section class="card" data-tab="updates">
         <h3 data-icon="update">Updates</h3>
         <p id="installed-version"></p>
-        <p class="note">AppD-Manager looks for a new version every time it starts.</p>
+        <label class="check">
+          <input data-pref="checkUpdates" type="checkbox">
+          Look for a new version every time AppD-Manager starts
+        </label>
         <div class="row">
           <button id="check-update" type="button" data-icon="update">Check for updates</button>
           <button id="install-update" type="button" class="primary" hidden></button>
@@ -84,6 +114,18 @@
         </div>
         <p id="update-status" class="note"></p>
         <div id="release" class="release" hidden></div>
+      </section>
+
+      <section id="about" class="card" data-tab="about">
+        <img class="banner" src="../include/banner.png" alt="AppD-Manager">
+        <h3 id="version"></h3>
+        <p>Websites as apps of their own: each in its own window, with its own menu entry, icon and logins.</p>
+        <p id="runtime" class="note"></p>
+        <p id="author" hidden></p>
+        <div class="row">
+          <button id="author-link" type="button" hidden></button>
+          <button id="project-page" type="button" data-icon="open-in-new">Project page</button>
+        </div>
       </section>
     </section>
 
@@ -101,20 +143,6 @@
         <p id="home-empty-text" class="note"></p>
         <button id="home-new" type="button" class="primary" data-icon="plus">New app</button>
       </div>
-    </section>
-
-    <section id="about" class="page" hidden>
-      <img class="banner" src="../include/banner.png" alt="AppD-Manager">
-      <section class="card">
-        <h3 id="version"></h3>
-        <p>Websites as apps of their own: each in its own window, with its own menu entry, icon and logins.</p>
-        <p id="runtime" class="note"></p>
-        <p id="author" hidden></p>
-        <div class="row">
-          <button id="author-link" type="button" hidden></button>
-          <button id="project-page" type="button" data-icon="open-in-new">Project page</button>
-        </div>
-      </section>
     </section>
 
     <section id="broken" class="page" hidden>

@@ -16,6 +16,7 @@ for (const name of [
   "exportApps",
   "importApps",
   "setAppearance",
+  "setPrefs",
   "askUnsaved",
   "runningApps",
   "usage",

@@ -5,6 +5,7 @@ $("flag-presets").addEventListener("change", addFlagPreset);
 $("agent-presets").addEventListener("change", useAgentPreset);
 $("template").addEventListener("change", useTemplate);
 $("appearance-mode").addEventListener("change", () => changeAppearance({ mode: $("appearance-mode").value }));
+for (const el of document.querySelectorAll("[data-pref]")) el.addEventListener("change", () => changePref(el));
 $("export-apps").addEventListener("click", () => backup("exportApps"));
 $("import-apps").addEventListener("click", () => backup("importApps"));
 $("extension-add").addEventListener("change", addExtension);
@@ -59,7 +60,7 @@ $("change-dir").addEventListener("click", () => folderAction("pickAppsDir"));
 $("default-dir").addEventListener("click", () => folderAction("resetAppsDir"));
 $("author-link").addEventListener("click", () => call("openAuthorLink"));
 for (const button of $("views").querySelectorAll("[data-view]")) {
-  button.addEventListener("click", () => go({ home: null, settings: SETTINGS, about: ABOUT }[button.dataset.view]));
+  button.addEventListener("click", () => go({ home: null, settings: SETTINGS }[button.dataset.view]));
 }
 $("project-page").addEventListener("click", () => call("openProjectPage"));
 $("exit").addEventListener("click", () => call("exit").catch((e) => setStatus(e.message, true)));
@@ -83,7 +84,11 @@ showSidebar((() => {
   }
 })());
 for (const tab of $("settings-tabs").querySelectorAll("[data-tab]")) {
-  tab.addEventListener("click", () => go(tab.dataset.tab === "extensions" ? GLOBAL : SETTINGS));
+  tab.addEventListener("click", () => {
+    if (tab.dataset.tab === "extensions") return go(GLOBAL);
+    settingsTab = tab.dataset.tab;
+    return selected === SETTINGS ? showSettingsTab(settingsTab) : go(SETTINGS);
+  });
 }
 $("check-update").addEventListener("click", checkUpdate);
 $("install-update").addEventListener("click", installUpdate);
@@ -119,10 +124,11 @@ new MutationObserver((changes) => {
     return option;
   }));
   renderAppearance();
+  showPrefs();
   renderSidebar();
   select(null);
   if (state.edit) window.editApp(state.edit.id, state.edit.extension);
   refreshRunning();
   setInterval(refreshRunning, 2e3);
-  checkUpdateOnStart();
+  if (state.prefs.checkUpdates) checkUpdateOnStart();
 })();

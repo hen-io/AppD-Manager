@@ -144,7 +144,7 @@ async function refreshRunning() {
   let ids;
   try {
     ids = await call("runningApps");
-    if (ids.length && looks++ % 2 === 0) usage = await call("usage");
+    if (ids.length && state.prefs.showUsage && looks++ % 2 === 0) usage = await call("usage");
     else if (!ids.length) usage = {};
   } catch {
     return;
