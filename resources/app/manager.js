@@ -149,7 +149,7 @@ function startApp(id, extra = []) {
   });
   child.unref();
 }
-const restartApp = (id) => startApp(id, ["--appd-action=hard-reload"]);
+const restartApp = (id) => startApp(id, ["--appd-action=restart"]);
 const handlers = {
   state() {
     const value = state();

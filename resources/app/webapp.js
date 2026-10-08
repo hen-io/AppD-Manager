@@ -14,8 +14,10 @@ const showLoadingScreen = require("./app/loading");
 const storeExtension = require("./app/store-extension");
 const id = process.env.APPD_ID;
 let cfg;
+let startedWith = "";
 try {
   cfg = lib.load(id);
+  startedWith = JSON.stringify(cfg);
   lib.writeDesktop(id, cfg);
 } catch (e) {
   console.error(`appd: ${e.message}`);
@@ -107,20 +109,21 @@ async function runAction(action, wc) {
     await ses.clearStorageData({ storages: ["cachestorage", "shadercache", "serviceworkers"] }).catch(() => {
     });
   }
-  if (action === "clear-cache" || action === "hard-reload") restartApp(wc);
+  if (action !== "clear-cache" && action !== "hard-reload") return;
+  let settings = startedWith;
+  try {
+    settings = JSON.stringify(lib.load(id));
+  } catch {
+  }
+  if (settings !== startedWith) return restartApp(wc);
+  because(action === "clear-cache" ? "the cache was emptied" : "hard reload");
+  wc.reloadIgnoringCache();
 }
 function actionIn(argv) {
   const arg = argv.find((value) => value.startsWith("--appd-action="));
   const action = arg ? arg.slice("--appd-action=".length) : "";
   return action in lib.APP_ACTIONS ? action : "";
 }
-function parseShortcut(text) {
-  const parts = String(text || "").split("+").map((part) => part.trim().toLowerCase()).filter(Boolean);
-  const key = parts.pop();
-  if (!key) return null;
-  return { control: parts.includes("ctrl") || parts.includes("control"), shift: parts.includes("shift"), alt: parts.includes("alt"), key };
-}
-const menuShortcut = parseShortcut(cfg.menuShortcut);
 const zoom = createZoom(cfg);
 const customExtensions = [];
 async function loadCustomExtensions() {
@@ -168,12 +171,11 @@ function extensionMenu() {
   ];
   return items.length ? [{ type: "separator" }, { label: "Extensions", submenu: items }] : [];
 }
-function showActionMenu(wc) {
-  if (wc.isDestroyed()) return;
+function appMenu(wc) {
   const window = BrowserWindow.fromWebContents(wc);
   const history = wc.navigationHistory;
   const sep = { type: "separator" };
-  Menu.buildFromTemplate([
+  return [
     { label: "Reload", accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
@@ -208,7 +210,11 @@ function showActionMenu(wc) {
       { label: "Close window", accelerator: "Alt+F4", click: () => window?.close() }
     ],
     ...extensionMenu()
-  ]).popup({ window: window ?? void 0 });
+  ];
+}
+function showActionMenu(wc) {
+  if (wc.isDestroyed()) return;
+  Menu.buildFromTemplate(appMenu(wc)).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
 }
 ipcMain.on("appd-action-button", (event) => {
   event.returnValue = cfg.actionButton;
@@ -226,10 +232,6 @@ ipcMain.on("appd-page-filters", (event, url) => {
 });
 function shortcut(wc, input) {
   const key = input.key.toLowerCase();
-  if (menuShortcut && key === menuShortcut.key && input.control === menuShortcut.control && input.shift === menuShortcut.shift && input.alt === menuShortcut.alt) {
-    showActionMenu(wc);
-    return true;
-  }
   const ctrl = input.control && !input.alt;
   const history = wc.navigationHistory;
   if (key === "f5" || ctrl && !input.shift && key === "r") because("F5 or Ctrl+R") || wc.reload();
@@ -280,12 +282,7 @@ function contextMenu(wc, p) {
   } else if (p.selectionText) {
     items.push({ role: "copy" }, sep);
   }
-  items.push(
-    { label: `Go to ${cfg.name}`, click: () => wc.loadURL(cfg.url) },
-    { label: "Back", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
-    { label: "Reload", click: () => because("Reload in the right-click menu") || wc.reload() },
-    ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) }))
-  );
+  items.push(...appMenu(wc));
   Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(wc) ?? void 0 });
 }
 app.on("web-contents-created", (_event, wc) => {
@@ -454,6 +451,7 @@ if (!app.requestSingleInstanceLock()) {
     if (argv.includes("--appd-action=quit")) return app.quit();
     if (!win) return;
     throttle.resumePage();
+    if (argv.includes("--appd-action=restart")) return restartApp(win.webContents);
     const action = actionIn(argv);
     if (action) runAction(action, win.webContents);
     if (win.isMinimized()) win.restore();

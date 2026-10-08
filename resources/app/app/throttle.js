@@ -198,7 +198,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
         if (reloading) wc.once("did-finish-load", drop);
         setTimeout(drop, reloading ? 1e4 : 300);
       }
-      if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reload();
+      if (reloading) because(`back after ${Math.round(idleMs / 6e4)} minutes away (reloadAfterIdleMinutes)`) || wc.reloadIgnoringCache();
     };
     window.on("blur", () => {
       clearTimeout(timer);

@@ -39,8 +39,8 @@ const windowsAppId = (name) => `hen-io.AppD-Manager.${name}`;
 const pidFile = (id) => path.join(appDir(id), "running.pid");
 const MANAGER_DESKTOP_ID = "appdmanager";
 const APP_ACTIONS = {
-  "hard-reload": "Hard reload (restart the app)",
-  "clear-cache": "Empty cache (and restart the app)"
+  "hard-reload": "Hard reload",
+  "clear-cache": "Empty cache and hard reload"
 };
 const EXTENSIONS = {
   adblock: {
@@ -158,7 +158,6 @@ const DEFAULTS = {
   darkSepia: 0,
   colorScheme: "system",
   actionButton: "off",
-  menuShortcut: "Ctrl+X",
   windowDecorations: true,
   fixedTitle: false,
   defaultZoom: 100,
