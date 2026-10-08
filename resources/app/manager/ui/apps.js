@@ -64,13 +64,6 @@ function renderList() {
     const name = document.createElement("div");
     name.className = "app-name";
     name.textContent = title;
-    if (app2.cfg?.trayApp) {
-      const mark = document.createElement("span");
-      mark.className = "tray-mark";
-      mark.textContent = "Tray";
-      mark.title = "A tray app: it lives behind an icon in the system tray";
-      name.append(mark);
-    }
     const url = document.createElement("div");
     url.className = app2.cfg ? "app-url" : "app-url error";
     url.textContent = app2.cfg ? app2.cfg.url : "Broken config file";
@@ -92,6 +85,13 @@ function renderList() {
     tint(card, app2.iconUrl, title);
     card.classList.toggle("running", running.has(app2.id));
     card.append(iconElement(app2.iconUrl, title), text);
+    if (app2.cfg) {
+      const kind = document.createElement("span");
+      kind.className = app2.cfg.trayApp ? "kind-badge tray" : "kind-badge";
+      kind.textContent = app2.cfg.trayApp ? "Tray app" : "App";
+      kind.title = app2.cfg.trayApp ? "A tray app: it lives behind an icon in the system tray" : "An app in a window of its own";
+      card.append(kind);
+    }
     const action = (icon, tip, method) => {
       const el = document.createElement("button");
       el.type = "button";

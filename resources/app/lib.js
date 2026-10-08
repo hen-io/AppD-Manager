@@ -112,6 +112,7 @@ const DEFAULTS = {
   trayHeight: 640,
   trayAtIcon: true,
   trayPosition: "bottom-right",
+  trayMargin: 8,
   trayScreen: 0,
   trayX: 100,
   trayY: 100,
@@ -123,6 +124,8 @@ const DEFAULTS = {
   windowBorderColor: "",
   windowBorderOpacity: 100,
   windowBorderStyle: "solid",
+  windowGlow: 0,
+  windowGlowSide: "inner",
   alwaysOnTop: false,
   closeToTray: false,
   unreadBadge: true,
@@ -328,7 +331,10 @@ const RULES = {
   windowRadius: { min: 0, max: 40 },
   windowBorderWidth: { min: 0, max: 12 },
   windowBorderOpacity: { min: 5, max: 100 },
-  windowBorderStyle: { oneOf: ["solid", "double", "dashed", "dotted", "groove", "ridge", "glow"] },
+  windowBorderStyle: { oneOf: ["solid", "double", "dashed", "dotted", "groove", "ridge"] },
+  windowGlow: { min: 0, max: 40 },
+  windowGlowSide: { oneOf: ["inner", "outer", "both"] },
+  trayMargin: { min: 0, max: 300 },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -470,6 +476,11 @@ function withDefaults(file) {
     else stored.unfocusedCpuPercent = Math.min(limit, 10);
   }
   if (version < 4 && stored.windowBorderColor === "#7a7f87") stored.windowBorderColor = "";
+  if (stored.windowBorderStyle === "glow") {
+    stored.windowGlow = Math.min(40, (stored.windowBorderWidth || 2) * 3);
+    stored.windowBorderStyle = "solid";
+    stored.windowBorderWidth = 1;
+  }
   if (typeof stored.reloadAfterIdleMinutes === "number" && stored.reloadAfterIdleSeconds === void 0) stored.reloadAfterIdleSeconds = stored.reloadAfterIdleMinutes * 60;
   delete stored.reloadAfterIdleMinutes;
   for (const key of ["cpuPercent", "unfocusedCpuPercent"]) {
@@ -698,16 +709,22 @@ function windowsIcon(source, folder) {
   try {
     const image = electronShell().nativeImage.createFromPath(source);
     if (image.isEmpty()) return void 0;
-    const png = image.resize({ width: 256, height: 256 }).toPNG();
-    const head = Buffer.alloc(22);
-    head.writeUInt16LE(1, 2);
-    head.writeUInt16LE(1, 4);
-    head.writeUInt16LE(1, 10);
-    head.writeUInt16LE(32, 12);
-    head.writeUInt32LE(png.length, 14);
-    head.writeUInt32LE(22, 18);
+    const pictures = [16, 24, 32, 48, 64].map((size) => {
+      const data = image.resize({ width: size, height: size, quality: "best" }).toBitmap({ scaleFactor: 1 });
+      const rgba = Buffer.alloc(size * size * 4);
+      for (let i = 0; i < rgba.length; i += 4) {
+        const solid = data[i + 3];
+        const full = solid ? 255 / solid : 0;
+        rgba[i] = Math.min(255, Math.round(data[i + 2] * full));
+        rgba[i + 1] = Math.min(255, Math.round(data[i + 1] * full));
+        rgba[i + 2] = Math.min(255, Math.round(data[i] * full));
+        rgba[i + 3] = solid;
+      }
+      return { size, rgba };
+    });
+    pictures.push({ size: 256, png: image.resize({ width: 256, height: 256, quality: "best" }).toPNG() });
     const file = path.join(folder, "icon.ico");
-    fs.writeFileSync(file, Buffer.concat([head, png]));
+    fs.writeFileSync(file, require("./ico").icoFrom(pictures));
     return file;
   } catch {
     return void 0;
@@ -724,7 +741,9 @@ function writeShortcut(file, options) {
 }
 function writeWindowsShortcut(id, cfg) {
   const [target, args] = runCommand(id);
-  const source = iconFile(id, cfg);
+  const drawn = path.join(profileDir(id), "icon-256.png");
+  const own = iconFile(id, cfg);
+  const source = own && !/\.(png|jpe?g)$/i.test(own) && fs.existsSync(drawn) ? drawn : own;
   const startup = path.join(path.dirname(startMenuDir), "Startup", `AppD ${id}.lnk`);
   if (!cfg.autostart) fs.rmSync(startup, { force: true });
   else if (electronShell()) electronShell().shell.writeShortcutLink(startup, fs.existsSync(startup) ? "update" : "create", { target, args: shortcutArgs(args), cwd: path.dirname(launcher) });
@@ -756,6 +775,8 @@ function syncWindows(ids, problems) {
     target,
     args: shortcutArgs(args.filter((arg) => !arg.startsWith("--appd-run="))),
     description: "Add, change and remove web apps",
+    icon: path.join(__dirname, "manager", "icon.ico"),
+    iconIndex: 0,
     appUserModelId: windowsAppId("manager")
   }) && written;
   if (!written) {

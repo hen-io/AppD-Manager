@@ -445,6 +445,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 520,
     title: "AppD-Manager",
+    icon: path.join(__dirname, "manager", lib.WINDOWS ? "icon.ico" : "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "manager", "preload.js"),
       sandbox: true,

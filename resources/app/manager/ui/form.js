@@ -44,7 +44,7 @@ function readForm() {
   cfg.customExtensions = [...customExtensions];
   cfg.sponsorBlockActions = sponsorChoices("select");
   cfg.sponsorBlockColors = sponsorChoices("input");
-  for (const key of ["trayX", "trayY", "trayScreen"]) cfg[key] = Number.isFinite(Number(form.elements[key].value)) ? Number(form.elements[key].value) : state.defaults[key];
+  for (const key of ["trayX", "trayY", "trayScreen", "trayMargin", "windowGlow"]) cfg[key] = Number.isFinite(Number(form.elements[key].value)) ? Number(form.elements[key].value) : state.defaults[key];
   cfg.windowBorderColor = $("border-auto").checked ? "" : $("border-colour").value;
   return cfg;
 }
@@ -77,7 +77,11 @@ function showWindowKind() {
   const placed = form.elements.trayPosition.value === "custom";
   $("tray-at-icon").hidden = placed || Number(form.elements.trayScreen.value) > 0;
   $("place-now").textContent = placed ? `${Math.round(Number(form.elements.trayX.value))}% across, ${Math.round(Number(form.elements.trayY.value))}% down` : "";
-  $("border-look").hidden = !(Number(form.elements.windowBorderWidth.value) > 0);
+  const lined = Number(form.elements.windowBorderWidth.value) > 0;
+  const glowing = Number(form.elements.windowGlow.value) > 0;
+  $("border-style").hidden = !lined;
+  $("glow-side").hidden = !glowing;
+  $("border-look").hidden = !lined && !glowing;
   $("border-own").hidden = $("border-auto").checked;
   if ($("border-auto").checked) $("border-colour").value = iconHex();
 }

@@ -237,13 +237,17 @@ module.exports = function createThrottle(cfg, { note, because }) {
       });
     }
     watchMouse(wc);
-    window.on("hide", exit);
+    window.on("hide", () => {
+      exit();
+      if (!hovered) leave();
+    });
     window.on("minimize", exit);
     window.on("blur", () => {
       if (!hovered) leave();
     });
     window.on("focus", back);
     window.on("restore", back);
+    window.on("show", back);
     window.on("close", resumePage);
     window.on("closed", () => {
       clearTimeout(timer);

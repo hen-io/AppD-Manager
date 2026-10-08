@@ -1,12 +1,11 @@
 "use strict";
-const { roundOverlay } = require("./frame");
+const { roundOverlay, pageArea } = require("./frame");
 module.exports = function coverWindow(window, view) {
   const fit = () => {
     if (window.isDestroyed()) return;
-    let { width, height } = window.contentView.getBounds();
-    if (!width || !height) [width, height] = window.getContentSize();
+    const area = pageArea(window);
     const now = view.getBounds();
-    if (now.x || now.y || now.width !== width || now.height !== height) view.setBounds({ x: 0, y: 0, width, height });
+    if (now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) view.setBounds(area);
   };
   const events = ["resize", "resized", "maximize", "unmaximize", "enter-full-screen", "leave-full-screen", "restore", "show"];
   for (const name of events) window.on(name, fit);

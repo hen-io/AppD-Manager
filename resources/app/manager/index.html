@@ -282,7 +282,7 @@
             <label>Line around the window
               <input name="windowBorderWidth" data-slider="0 12 1" data-unit="px" type="number" min="0" max="12" step="1">
             </label>
-            <div id="border-look">
+            <div id="border-style">
               <label>Kind of line
                 <select name="windowBorderStyle">
                   <option value="solid" data-note="One plain line">Solid</option>
@@ -291,19 +291,33 @@
                   <option value="dotted" data-note="Dots">Dotted</option>
                   <option value="groove" data-note="Looks carved into the window; best from a width of 4">Groove</option>
                   <option value="ridge" data-note="Looks raised from the window; best from a width of 4">Ridge</option>
-                  <option value="glow" data-note="A fine line whose colour fades into the window; the width is how far">Glow</option>
                 </select>
               </label>
+            </div>
+            <label>Glow along the edge
+              <input name="windowGlow" data-slider="0 40 1" data-unit="px" type="number" min="0" max="40" step="1">
+            </label>
+            <div id="glow-side">
+              <label>Where the glow is
+                <select name="windowGlowSide">
+                  <option value="inner" data-note="Over the page, fading inwards from the edge">Inside the window</option>
+                  <option value="outer" data-note="Around the window, fading outwards">Outside the window</option>
+                  <option value="both" data-note="Inwards and outwards">Both</option>
+                </select>
+                <span class="note">A glow needs no line. One outside the window lies in see-through room around it, which needs a desktop with compositing (KDE has it).</span>
+              </label>
+            </div>
+            <div id="border-look">
               <label class="check">
                 <input id="border-auto" type="checkbox">
-                Give the line the main colour of the app's icon
+                Give the line and the glow the main colour of the app's icon
               </label>
               <label class="check" id="border-own">
                 <input id="border-colour" type="color">
-                Colour of the line
+                Their colour
               </label>
               <input name="windowBorderColor" type="hidden">
-              <label>How solid the line is
+              <label>How solid the colour is
                 <input name="windowBorderOpacity" data-slider="5 100 5" data-unit="%" type="number" min="5" max="100" step="1">
               </label>
             </div>
@@ -361,6 +375,10 @@
                 <option value="0" data-note="As far as the desktop tells the app where the mouse is">The screen the mouse is on</option>
               </select>
               <span class="note">Screens are counted from the left. Name the one your tray is on if the window comes up on another.</span>
+            </label>
+            <label>Distance from the edges
+              <input name="trayMargin" data-slider="0 100 1" data-unit="px" type="number" min="0" max="300" step="1">
+              <span class="note">How far the window stays from the edges of the room windows have on the screen - which ends where a panel or taskbar begins.</span>
             </label>
             <div class="row">
               <button type="button" id="place-open" data-icon="place">Place it on the screen…</button>

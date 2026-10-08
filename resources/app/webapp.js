@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -8,8 +8,9 @@ const setUpPermissions = require("./app/permissions");
 const showUnreadCount = require("./app/badge");
 const keepInTray = require("./app/tray");
 const makeTrayApp = require("./app/trayapp");
-const { frameOptions, styleFrame, isBare, hasLook } = require("./app/frame");
+const { frameOptions, styleFrame, isBare, hasLook, needsHost, wantsIconColour, outsetOf } = require("./app/frame");
 const iconColour = require("./app/iconcolour");
+const { windowIcon } = require("./app/icondraw");
 const watchForUpdate = require("./app/updated");
 const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
@@ -76,7 +77,7 @@ function followGoogleSignIn(wc) {
   });
 }
 const iconFile = lib.iconFile(id, cfg);
-const icon = iconFile && /\.png$/i.test(iconFile) ? iconFile : void 0;
+let icon = iconFile && /\.png$/i.test(iconFile) ? iconFile : void 0;
 const statePath = path.join(lib.profileDir(id), "window-state.json");
 const internalHosts = [new URL(cfg.url).hostname, ...cfg.internalHosts];
 let win;
@@ -404,28 +405,60 @@ async function createWindow() {
   nativeTheme.themeSource = cfg.colorScheme;
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   const bare = isBare(cfg);
-  const lineColour = bare && cfg.windowBorderWidth > 0 && !cfg.windowBorderColor ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
+  if (!icon && iconFile) {
+    icon = await windowIcon(iconFile, lib.profileDir(id));
+    if (icon && lib.WINDOWS) {
+      try {
+        lib.writeDesktop(id, cfg);
+      } catch {
+      }
+    }
+  }
+  const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
+  const hosted = needsHost(cfg);
+  const outset = hosted ? outsetOf(cfg) : 0;
+  const dark = !(cfg.colorScheme === "light" && !extension("darkreader"));
+  const pagePreferences = {
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false,
+    backgroundThrottling: cfg.backgroundThrottling,
+    spellcheck: cfg.spellcheck,
+    v8CacheOptions: "bypassHeatCheck",
+    ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
+  };
   win = new BrowserWindow({
     alwaysOnTop: cfg.alwaysOnTop || cfg.trayApp,
-    width: cfg.trayApp ? cfg.trayWidth : state.width || cfg.width,
-    height: cfg.trayApp ? cfg.trayHeight : state.height || cfg.height,
+    width: cfg.trayApp ? cfg.trayWidth + 2 * outset : state.width || cfg.width,
+    height: cfg.trayApp ? cfg.trayHeight + 2 * outset : state.height || cfg.height,
     title: cfg.name,
     icon,
     ...cfg.trayApp ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
-    ...cfg.colorScheme === "light" && !extension("darkreader") ? {} : { backgroundColor: "#15171b" },
+    ...dark ? { backgroundColor: "#15171b" } : {},
     frame: !bare,
     ...bare ? frameOptions(cfg) : {},
-    webPreferences: {
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      backgroundThrottling: cfg.backgroundThrottling,
-      spellcheck: cfg.spellcheck,
-      v8CacheOptions: "bypassHeatCheck",
-      ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
-    }
+    webPreferences: hosted ? { sandbox: true, contextIsolation: true, nodeIntegration: false } : pagePreferences
   });
-  const frame = styleFrame(win, cfg, lineColour);
+  let host = null;
+  if (hosted) {
+    const view = new WebContentsView({ webPreferences: pagePreferences });
+    view.setBackgroundColor(dark ? "#15171b" : "#ffffff");
+    host = { view, contents: win.webContents };
+    win.contentView.addChildView(view);
+    Object.defineProperty(win, "webContents", { value: view.webContents, configurable: true, enumerable: true });
+    view.webContents.on("page-title-updated", (event, title, explicit) => {
+      win.emit("page-title-updated", event, title, explicit);
+      if (!event.defaultPrevented && !win.isDestroyed()) win.setTitle(title);
+    });
+    win.on("focus", () => view.webContents.isDestroyed() || view.webContents.focus());
+    win.on("closed", () => {
+      try {
+        view.webContents.close();
+      } catch {
+      }
+    });
+  }
+  const frame = styleFrame(win, cfg, lineColour, host);
   if (!cfg.trayApp && (cfg.startMaximized || state.maximized)) win.maximize();
   if (!cfg.trayApp || cfg.trayShowAtStart) {
     if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
@@ -470,7 +503,8 @@ async function createWindow() {
     menu: () => win.isDestroyed() ? [] : appMenu(win.webContents, true),
     isBusy: () => menusOpen > 0,
     because,
-    resume: throttle.resumePage
+    resume: throttle.resumePage,
+    outset
   };
   if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);

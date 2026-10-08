@@ -1,7 +1,6 @@
 "use strict";
 const { BrowserWindow, screen } = require("electron");
 const keepInTray = require("./tray");
-const MARGIN = 8;
 const BLUR_WAIT = 180;
 const SAME_CLICK = 400;
 const within = (value, low, high) => Math.max(low, Math.min(value, high));
@@ -16,7 +15,12 @@ function iconSpot(iconBounds) {
   }
 }
 const screens = () => screen.getAllDisplays().sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y);
-function bounds(cfg, spot) {
+function bounds(cfg, spot, outset = 0) {
+  const page = pageBounds(cfg, spot);
+  return { x: page.x - outset, y: page.y - outset, width: page.width + 2 * outset, height: page.height + 2 * outset };
+}
+function pageBounds(cfg, spot) {
+  const MARGIN = cfg.trayMargin;
   let area;
   try {
     const all = cfg.trayScreen > 0 ? screens() : [];
@@ -25,8 +29,8 @@ function bounds(cfg, spot) {
   } catch {
     area = screen.getPrimaryDisplay().workArea;
   }
-  const width = Math.min(cfg.trayWidth, area.width - 2 * MARGIN);
-  const height = Math.min(cfg.trayHeight, area.height - 2 * MARGIN);
+  const width = Math.max(100, Math.min(cfg.trayWidth, area.width - 2 * MARGIN));
+  const height = Math.max(100, Math.min(cfg.trayHeight, area.height - 2 * MARGIN));
   const left = area.x + MARGIN;
   const right = area.x + area.width - width - MARGIN;
   const top = area.y + MARGIN;
@@ -52,11 +56,15 @@ module.exports = function makeTrayApp(window, cfg, options) {
   let spot = null;
   let pinned = false;
   let hidItselfAt = 0;
+  let wake = () => {
+  };
   const show = () => {
     if (window.isDestroyed()) return;
-    window.setBounds(bounds(cfg, spot));
+    window.setBounds(bounds(cfg, spot, options.outset));
     window.show();
+    wake();
     window.focus();
+    window.setSkipTaskbar(true);
   };
   const fromIcon = (iconBounds) => {
     if (Date.now() - hidItselfAt < SAME_CLICK) return;
@@ -99,17 +107,19 @@ module.exports = function makeTrayApp(window, cfg, options) {
       clearTimeout(timer);
       timer = setTimeout(close, cfg.trayCloseAfterSeconds * 1e3);
     };
-    window.on("hide", count);
-    window.on("show", () => {
+    wake = () => {
       clearTimeout(timer);
-      if (!closed) return;
+      if (!closed || window.isDestroyed()) return;
       const url = closed;
       closed = "";
+      options.resume?.();
       options.because?.("the window is shown again after its page was closed");
       wc.once("did-finish-load", () => wc.navigationHistory.clear());
       wc.loadURL(url).catch(() => {
       });
-    });
+    };
+    window.on("hide", count);
+    window.on("show", wake);
     window.on("closed", () => clearTimeout(timer));
     if (!cfg.trayShowAtStart) count();
   }

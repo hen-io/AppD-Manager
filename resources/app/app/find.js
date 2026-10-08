@@ -1,6 +1,7 @@
 "use strict";
 const { WebContentsView, ipcMain, nativeTheme } = require("electron");
 const path = require("path");
+const { pageArea } = require("./frame");
 const WIDTH = 372;
 const HEIGHT = 52;
 const MARGIN = 12;
@@ -50,9 +51,9 @@ function page(dark) {
 }
 function place(window, view) {
   if (window.isDestroyed()) return;
-  const { width } = window.contentView.getBounds();
-  const wide = Math.min(WIDTH, Math.max(160, width - 2 * MARGIN));
-  view.setBounds({ x: Math.max(MARGIN, width - wide - MARGIN), y: MARGIN, width: wide, height: HEIGHT });
+  const area = pageArea(window);
+  const wide = Math.min(WIDTH, Math.max(160, area.width - 2 * MARGIN));
+  view.setBounds({ x: area.x + Math.max(MARGIN, area.width - wide - MARGIN), y: area.y + MARGIN, width: wide, height: HEIGHT });
 }
 function closeFind(window) {
   const bar = bars.get(window);
