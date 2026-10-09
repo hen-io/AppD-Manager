@@ -21,6 +21,7 @@ for (const name of [
   "askUnsaved",
   "runningApps",
   "usage",
+  "lastUsed",
   "pickIcon",
   "pickFolder",
   "fetchIcons",

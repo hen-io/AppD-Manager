@@ -339,9 +339,11 @@ const PREFS = {
   backupBeforeUpdate: true,
   backupsKept: 5,
   showUsage: true,
-  motion: true
+  motion: true,
+  appOrder: "usage"
 };
 const RESTART_ON_SAVE = ["ask", "always", "never"];
+const APP_ORDERS = ["usage", "name", "used", "running"];
 function prefs() {
   const kept = readSettings().manager || {};
   const result = { ...PREFS };
@@ -349,6 +351,7 @@ function prefs() {
     if (typeof kept[key] === typeof PREFS[key]) result[key] = kept[key];
   }
   if (!RESTART_ON_SAVE.includes(result.restartOnSave)) result.restartOnSave = PREFS.restartOnSave;
+  if (!APP_ORDERS.includes(result.appOrder)) result.appOrder = PREFS.appOrder;
   result.backupsKept = Math.min(50, Math.max(1, Math.round(result.backupsKept) || PREFS.backupsKept));
   return result;
 }
@@ -359,6 +362,7 @@ function setPrefs(next) {
   }
   now.backupsKept = Math.min(50, Math.max(1, Math.round(now.backupsKept) || PREFS.backupsKept));
   if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(`"restartOnSave" must be one of: ${RESTART_ON_SAVE.join(", ")}`);
+  if (!APP_ORDERS.includes(now.appOrder)) throw new Error(`"appOrder" must be one of: ${APP_ORDERS.join(", ")}`);
   const settings = readSettings();
   settings.manager = now;
   fs.mkdirSync(root, { recursive: true });
@@ -415,6 +419,22 @@ function setAppsDir(dir) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 const appDir = (id) => path.join(appsDir(), id);
+const usedMark = (id) => path.join(appDir(id), "last-used");
+function markUsed(id) {
+  const file = usedMark(id);
+  const now = /* @__PURE__ */ new Date();
+  fs.utimes(file, now, now, (missing) => {
+    if (missing) fs.writeFile(file, "", () => {
+    });
+  });
+}
+function lastUsed(id) {
+  for (const file of [usedMark(id), path.join(appDir(id), "events.log")]) {
+    const at = fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs;
+    if (at) return at;
+  }
+  return 0;
+}
 const configPath = (id) => path.join(appDir(id), "config.json");
 const profileDir = (id) => path.join(appDir(id), "profile");
 const desktopId = (id) => `appd-${id}`;
@@ -1105,6 +1125,8 @@ module.exports = {
   configPath,
   profileDir,
   desktopId,
+  markUsed,
+  lastUsed,
   checkId,
   newId,
   load,

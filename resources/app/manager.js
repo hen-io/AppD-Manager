@@ -104,6 +104,7 @@ function state() {
     }, {}),
     extensionIcons: extensionIcons(),
     displays: handlers.displays(),
+    lastUsed: handlers.lastUsed(),
     imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
     sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
@@ -305,6 +306,7 @@ const handlers = {
     return result;
   },
   runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
+  lastUsed: () => Object.fromEntries(lib.list().map((id) => [id, lib.lastUsed(id)])),
   displays() {
     const main = screen.getPrimaryDisplay().id;
     return screen.getAllDisplays().sort((a, b) => a.bounds.x - b.bounds.x || a.bounds.y - b.bounds.y).map((display) => ({ bounds: display.bounds, workArea: display.workArea, primary: display.id === main }));

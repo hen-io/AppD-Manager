@@ -494,6 +494,15 @@ async function createWindow() {
     if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
     else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
   }
+  let marked = 0;
+  const markUsed = () => {
+    if (Date.now() - marked < 3e4) return;
+    marked = Date.now();
+    lib.markUsed(id);
+  };
+  markUsed();
+  win.on("focus", markUsed);
+  win.on("show", markUsed);
   note(`started, opening ${plain(startUrl)}`);
   let showing = "";
   win.webContents.on("did-start-navigation", (details) => {
