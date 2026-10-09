@@ -263,6 +263,10 @@ module.exports = function createThrottle(cfg, { note, because }) {
     resumePage,
     releasePage,
     isQuitting: () => quitting,
+    stay: () => {
+      quitting = false;
+      runLimiter();
+    },
     wanted: cfg.pauseWhenUnfocused || cfg.reloadAfterIdleSeconds > 0 || awayPercent < alwaysPercent
   };
 };

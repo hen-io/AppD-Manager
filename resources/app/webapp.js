@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, dialog, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -99,8 +99,33 @@ function restartApp(wc, why = "hard reload, or asked for by the manager") {
   if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
   note(`restarting (${why})`);
   throttle.releasePage();
-  app.relaunch({ args });
+  relaunchWith = args;
   app.quit();
+}
+let relaunchWith = null;
+app.on("will-quit", () => {
+  if (relaunchWith) app.relaunch({ args: relaunchWith });
+});
+function mayLeave(wc) {
+  const window = BrowserWindow.fromWebContents(wc);
+  const options = {
+    type: "question",
+    title: cfg.name,
+    message: "Leave this page?",
+    detail: "It says it has changes that are not saved.",
+    buttons: ["Leave", "Stay"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true
+  };
+  const over = window && !window.isDestroyed() && window.isVisible() ? window : null;
+  const leave = (over ? dialog.showMessageBoxSync(over, options) : dialog.showMessageBoxSync(options)) === 0;
+  if (!leave) {
+    note("kept open: the page has unsaved changes");
+    relaunchWith = null;
+    throttle.stay();
+  }
+  return leave;
 }
 const startUrl = (() => {
   const arg = process.argv.find((value) => value.startsWith("--appd-url="));
@@ -373,6 +398,9 @@ ${cfg.customJs}
     if (input.type === "keyDown" && shortcut(wc, input)) event.preventDefault();
   });
   wc.on("context-menu", (_e, params) => isBar(wc) || contextMenu(wc, params));
+  wc.on("will-prevent-unload", (event) => {
+    if (mayLeave(wc)) event.preventDefault();
+  });
 });
 function readState() {
   try {
@@ -504,10 +532,21 @@ async function createWindow() {
     isBusy: () => menusOpen > 0,
     because,
     resume: throttle.resumePage,
-    outset
+    outset,
+    atHome: startUrl === cfg.url
   };
   if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
+  if (host) {
+    win.on("close", (event) => {
+      const page = host.view.webContents;
+      if (event.defaultPrevented || page.isDestroyed()) return;
+      event.preventDefault();
+      throttle.resumePage();
+      page.once("destroyed", () => win.isDestroyed() || win.destroy());
+      page.close({ waitForBeforeUnload: true });
+    });
+  }
   if (cfg.fixedTitle) win.on("page-title-updated", (event) => event.preventDefault());
   if (extension("twitch")) await extras.enableTwitchAdBlock().catch(() => {
   });

@@ -402,6 +402,12 @@
               Show the window when the app starts
             </label>
             <span class="note below-check">Off: it starts as its icon alone. Its look - round corners, a line around it - is under Window.</span>
+            <label>When the window is opened again, it shows
+              <select name="trayOpenAt">
+                <option value="last" data-note="Where you left off">The page it was on</option>
+                <option value="home" data-note="The address under General - also after its page was closed">The app's own page</option>
+              </select>
+            </label>
             <label>Close the page when the window has been hidden for
               <input name="trayCloseAfterSeconds" type="hidden" data-time="0 86400" data-label="Close the page after">
               <span class="note">0 never closes it. A closed page uses next to nothing; the icon stays, and the page is loaded anew when you open the window again. Not while it is playing sound.</span>
