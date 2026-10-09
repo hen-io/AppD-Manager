@@ -22,14 +22,34 @@ function describeExtension(folder) {
   } catch {
     throw new Error(`${folder} is not an unpacked extension: it has no readable manifest.json.`);
   }
-  const text = (value) => typeof value === "string" && !value.startsWith("__MSG_") ? value : "";
+  let texts = null;
+  const text = (value) => {
+    if (typeof value !== "string") return "";
+    const key = /^__MSG_(.+)__$/.exec(value);
+    if (!key) return value;
+    try {
+      texts ??= JSON.parse(fs.readFileSync(path.join(folder, "_locales", manifest.default_locale || "en", "messages.json"), "utf8"));
+    } catch {
+      texts = {};
+    }
+    const found = Object.keys(texts).find((name) => name.toLowerCase() === key[1].toLowerCase());
+    return found && typeof texts[found].message === "string" ? texts[found].message : "";
+  };
+  const inFolder = (value) => typeof value === "string" ? value.replace(/^[./\\]+/, "") : "";
+  const sizes = Object.keys(manifest.icons || {}).map(Number).filter((size2) => size2 > 0).sort((a, b) => a - b);
+  const size = sizes.filter((one) => one <= 128).pop() ?? sizes[0];
   return {
     name: [text(manifest.name) || path.basename(folder), text(manifest.version)].filter(Boolean).join(" "),
-    about: text(manifest.description) || "Imported Chrome extension",
-    options: text(manifest.options_ui?.page) || text(manifest.options_page)
+    about: text(manifest.description) || "Chrome extension",
+    options: inFolder(manifest.options_ui?.page) || inFolder(manifest.options_page),
+    popup: inFolder((manifest.action || manifest.browser_action || {}).default_popup),
+    icon: size ? inFolder(manifest.icons[size]) : ""
   };
 }
-const startFlags = (cfg) => cfg.trayApp && !WINDOWS ? ["--appd-x11"] : [];
+const startFlags = (cfg) => [
+  ...cfg.trayApp && !WINDOWS ? ["--appd-x11"] : [],
+  ...cfg.language && !WINDOWS ? [`--appd-lang=${cfg.language}`] : []
+];
 function runCommand(id, extra = []) {
   if (!WINDOWS) return [launcher, ["run", id, ...extra]];
   const built = path.join(path.dirname(launcher), "resources", "app") === __dirname;
@@ -39,35 +59,117 @@ const startMenuDir = path.join(process.env.APPDATA || path.join(home, "AppData",
 const windowsAppId = (name) => `hen-io.AppD-Manager.${name}`;
 const pidFile = (id) => path.join(appDir(id), "running.pid");
 const MANAGER_DESKTOP_ID = "appdmanager";
+const TRAY_ACTIONS = { toggle: "Show or hide the window" };
+const HOTKEY = /^((Ctrl|Alt|Shift|Super)\+){1,4}([A-Z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Tab|Up|Down|Left|Right|Home|End|PageUp|PageDown|Insert|Delete|Plus|numadd|numsub|`|-|=|\[|\]|;|'|,|\.|\/)$/;
 const APP_ACTIONS = {
   "hard-reload": "Hard reload",
   "clear-cache": "Empty cache and hard reload"
 };
+const EXTENSION_CATEGORIES = { blocking: "Blocking", video: "Video", look: "Look", chat: "Chat and streams" };
 const EXTENSIONS = {
   adblock: {
-    name: "Ad blocker (web and YouTube)",
-    about: "Blocks ads and trackers on websites, and the ads in YouTube videos. Uses the filter lists uBlock Origin uses, refreshed daily."
+    name: "Ad blocker",
+    about: "Blocks ads and trackers on websites, and the ads in YouTube videos. Uses the filter lists uBlock Origin uses, refreshed daily.",
+    category: "blocking",
+    sites: [],
+    icon: "shield"
   },
   twitch: {
     name: "Twitch ad blocker",
-    about: "Removes the ads in Twitch streams, which the general blocker cannot reach. Uses the TwitchAdSolutions script, fetched from its project on GitHub."
+    about: "Removes the ads in Twitch streams, which the general blocker cannot reach. Uses the TwitchAdSolutions script, fetched from its project on GitHub.",
+    category: "blocking",
+    sites: ["twitch.tv"],
+    icon: "shield-play"
   },
   sponsorblock: {
     name: "SponsorBlock",
-    about: "Offers to skip, or skips, sponsor messages, intros and other parts of YouTube videos that viewers have marked."
+    about: "Offers to skip, or skips, sponsor messages, intros and other parts of YouTube videos that viewers have marked.",
+    category: "video",
+    sites: ["youtube.com"],
+    icon: "skip"
   },
   darkreader: {
     name: "Dark Reader",
-    about: "Gives sites a dark look, also those without one of their own."
+    about: "Gives sites a dark look, also those without one of their own.",
+    category: "look",
+    sites: [],
+    icon: "moon"
   },
   ambientlight: {
     name: "Ambient light for YouTube",
-    about: "A glow around YouTube videos in the colours of the picture. The official extension by Wessel Kroos, fetched from the Chrome Web Store and checked to be that one; its settings are in the YouTube player."
+    about: "A glow around YouTube videos in the colours of the picture. Its settings are in the YouTube player.",
+    category: "video",
+    sites: ["youtube.com"],
+    store: "paponcgjfojgemddooebbgniglhkajkj",
+    by: "Wessel Kroos"
+  },
+  returndislike: {
+    name: "Return YouTube Dislike",
+    about: "Shows how many dislikes a YouTube video has again, from the counts its users gather.",
+    category: "video",
+    sites: ["youtube.com"],
+    store: "gebbhagfogifgggkldgodflihgfeippi",
+    by: "Dmitry Selivanov and community"
+  },
+  unhook: {
+    name: "Unhook",
+    about: "Takes the distractions out of YouTube: recommended videos, Shorts, the home feed, comments, end screens - each one to choose.",
+    category: "video",
+    sites: ["youtube.com"],
+    store: "khncfooichmfjbepaaaebmommgaepoid",
+    by: "Unhook"
+  },
+  enhancer: {
+    name: "Enhancer for YouTube",
+    about: "More controls in the YouTube player: volume and speed with the mouse wheel, a cinema mode, a pinned player, loops, and themes.",
+    category: "video",
+    sites: ["youtube.com"],
+    store: "ponfpcnoihfmfllpaingbgckeeldkhle",
+    by: "Maxime RF"
+  },
+  improveyoutube: {
+    name: "Improve YouTube!",
+    about: "A large set of switches for YouTube: layout, player defaults, quality, hiding parts of the page, shortcuts. Open source.",
+    category: "video",
+    sites: ["youtube.com"],
+    store: "bnomihfieiccainjcjblhegjgglakjdd",
+    by: "ImprovedTube"
+  },
+  videospeed: {
+    name: "Video Speed Controller",
+    about: "Speeds any HTML5 video up or down with the keys (S, D, R, Z, X), with the speed shown in a corner of the player.",
+    category: "video",
+    sites: [],
+    store: "nffaoalbilbmmfgbnbgppjihopabppdk",
+    by: "igrigorik"
+  },
+  betterttv: {
+    name: "BetterTTV",
+    about: "More emotes and chat features for Twitch (and YouTube chat): BetterTTV emotes, split chat, highlights, and many small switches.",
+    category: "chat",
+    sites: ["twitch.tv", "youtube.com"],
+    store: "ajopnjidmegmdimjlfnijceegpefgped",
+    by: "NightDev"
+  },
+  seventv: {
+    name: "7TV",
+    about: "7TV emotes, cosmetics and chat improvements for Twitch (and Kick and YouTube chat).",
+    category: "chat",
+    sites: ["twitch.tv", "kick.com", "youtube.com"],
+    store: "ammjkodgmmoknidbanneddgankgfejfh",
+    by: "7TV"
+  },
+  frankerfacez: {
+    name: "FrankerFaceZ",
+    about: "FrankerFaceZ emotes and a great many settings for Twitch: chat, the player, the layout.",
+    category: "chat",
+    sites: ["twitch.tv"],
+    store: "fadndhdgpmmaapbmfcknlfgcflmmmieb",
+    by: "Dan Salvato and SirStendec"
   }
 };
-const STORE_EXTENSIONS = {
-  ambientlight: "paponcgjfojgemddooebbgniglhkajkj"
-};
+const STORE_EXTENSIONS = Object.fromEntries(Object.entries(EXTENSIONS).filter(([, info]) => info.store).map(([name, info]) => [name, info.store]));
+const STORE_ID = /^[a-p]{32}$/;
 const COLOR_SCHEMES = ["system", "light", "dark"];
 const ACTION_BUTTON = ["off", "top-left", "top-right", "bottom-left", "bottom-right"];
 const SPONSOR_CATEGORIES = {
@@ -117,6 +219,7 @@ const DEFAULTS = {
   trayX: 100,
   trayY: 100,
   trayCloseAfterSeconds: 0,
+  trayHotkey: "",
   trayOpenAt: "last",
   trayHideOnBlur: true,
   trayShowAtStart: false,
@@ -131,14 +234,23 @@ const DEFAULTS = {
   closeToTray: false,
   unreadBadge: true,
   startMaximized: false,
+  startFullScreen: false,
+  startHidden: false,
+  keepAwake: "off",
+  reloadEverySeconds: 0,
+  startMuted: false,
+  language: "",
+  downloadFolder: "",
   userAgent: "",
   openLinks: "browser",
+  linksToApps: true,
   internalHosts: [],
   homeButton: true,
   extensions: [],
   customExtensions: [],
   adBlockHideLeftovers: true,
   adBlockInPageAds: true,
+  adBlockAnnoyances: false,
   adBlockExceptions: [],
   sponsorBlockActions: {
     sponsor: "ask",
@@ -334,6 +446,8 @@ const RULES = {
   windowBorderWidth: { min: 0, max: 12 },
   windowBorderOpacity: { min: 5, max: 100 },
   windowBorderStyle: { oneOf: ["solid", "double", "dashed", "dotted", "groove", "ridge"] },
+  keepAwake: { oneOf: ["off", "display", "system"] },
+  reloadEverySeconds: { min: 0, max: 86400 },
   windowGlow: { min: 0, max: 40 },
   windowGlowSide: { oneOf: ["inner", "outer", "both"] },
   trayMargin: { min: 0, max: 300 },
@@ -379,6 +493,11 @@ function validate(cfg) {
   for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
   }
+  if (cfg.trayHotkey && !HOTKEY.test(cfg.trayHotkey)) throw new Error('"trayHotkey" must be a key combination like Super+Alt+Y or Ctrl+Shift+F9');
+  if (cfg.language && !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(cfg.language)) throw new Error('"language" must be a language code like en-GB or nb');
+  if (cfg.downloadFolder && !path.isAbsolute(cfg.downloadFolder)) throw new Error('"downloadFolder" must be a full path');
+  const oddEntry = cfg.customExtensions.find((entry) => typeof entry !== "string" || !entry || entry.startsWith("store:") && !storeIdOf(entry));
+  if (oddEntry !== void 0) throw new Error(`"${oddEntry}" in "customExtensions" is not an extension`);
   if (cfg.proxy && !/^(https?|socks[45]?):\/\/[^\s/]+(:\d+)?\/?$/i.test(cfg.proxy)) throw new Error('"proxy" must be an address like socks5://127.0.0.1:1080 or http://proxy.lan:3128');
   if (cfg.windowBorderColor && !/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error('"windowBorderColor" must be a colour like #7a7f87, or empty for the colour of the icon');
   if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
@@ -421,7 +540,58 @@ function differing(values, base) {
 }
 const fresh = () => ({ ...DEFAULTS, ...extensionDefaults() });
 const extensionsDir = path.join(root, "Extensions");
-const extensionFolder = (entry) => /[\\/]/.test(entry) ? entry : path.join(extensionsDir, entry);
+const storeDir = path.join(root, "StoreExtensions");
+const storeIdOf = (entry) => typeof entry === "string" && entry.startsWith("store:") && STORE_ID.test(entry.slice(6)) ? entry.slice(6) : "";
+const extensionFolder = (entry) => storeIdOf(entry) ? path.join(storeDir, storeIdOf(entry)) : /[\\/]/.test(entry) ? entry : path.join(extensionsDir, entry);
+function storeLibrary() {
+  const found = {};
+  for (const id of Object.keys(readSettings().storeExtensions || {})) {
+    if (!STORE_ID.test(id)) continue;
+    try {
+      found[id] = describeExtension(path.join(storeDir, id));
+    } catch {
+      found[id] = { name: id, about: "Not fetched yet: it is fetched when an app that has it starts.", options: "", popup: "", icon: "" };
+    }
+  }
+  return found;
+}
+function addStoreExtension(id) {
+  if (!STORE_ID.test(id)) throw new Error(`"${id}" is not an extension id`);
+  const settings = readSettings();
+  settings.storeExtensions = { ...settings.storeExtensions, [id]: { added: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) } };
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+}
+function removeStoreExtension(id) {
+  if (!STORE_ID.test(id)) throw new Error(`"${id}" is not an extension id`);
+  const settings = readSettings();
+  if (settings.storeExtensions) delete settings.storeExtensions[id];
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  if (!Object.values(STORE_EXTENSIONS).includes(id)) fs.rmSync(path.join(storeDir, id), { recursive: true, force: true });
+  dropFromApps(`store:${id}`);
+}
+function dropFromApps(entry) {
+  for (const id of list()) {
+    try {
+      const stored = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
+      if (!Array.isArray(stored.customExtensions) || !stored.customExtensions.includes(entry)) continue;
+      stored.customExtensions = stored.customExtensions.filter((other) => other !== entry);
+      fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
+    } catch {
+    }
+  }
+}
+function extensionUse() {
+  const use = {};
+  for (const id of list()) {
+    try {
+      const cfg = load(id);
+      for (const entry of [...cfg.extensions, ...cfg.customExtensions]) (use[entry] ||= []).push(id);
+    } catch {
+    }
+  }
+  return use;
+}
 function importedExtensions() {
   const found = {};
   if (!fs.existsSync(extensionsDir)) return found;
@@ -447,15 +617,7 @@ function importExtension(folder) {
 function removeImportedExtension(name) {
   if (!ID_RE.test(name)) throw new Error(`invalid extension name "${name}"`);
   fs.rmSync(path.join(extensionsDir, name), { recursive: true, force: true });
-  for (const id of list()) {
-    try {
-      const stored = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
-      if (!Array.isArray(stored.customExtensions) || !stored.customExtensions.includes(name)) continue;
-      stored.customExtensions = stored.customExtensions.filter((other) => other !== name);
-      fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
-    } catch {
-    }
-  }
+  dropFromApps(name);
 }
 function withDefaults(file) {
   const stored = { ...file };
@@ -485,6 +647,7 @@ function withDefaults(file) {
   }
   if (typeof stored.reloadAfterIdleMinutes === "number" && stored.reloadAfterIdleSeconds === void 0) stored.reloadAfterIdleSeconds = stored.reloadAfterIdleMinutes * 60;
   delete stored.reloadAfterIdleMinutes;
+  if (Array.isArray(stored.extensions)) stored.extensions = stored.extensions.filter((name) => name in EXTENSIONS);
   for (const key of ["cpuPercent", "unfocusedCpuPercent"]) {
     if (typeof stored[key] === "number" && stored[key] <= 0) stored[key] = 100;
   }
@@ -799,8 +962,8 @@ function writeDesktop(id, cfg) {
     `Icon=${entryValue(iconFile(id, cfg) || cfg.icon)}`,
     "Categories=Network;",
     `StartupWMClass=${desktopId(id)}`,
-    `Actions=${Object.keys(APP_ACTIONS).join(";")};`
-  ], Object.entries(APP_ACTIONS).flatMap(([action, label]) => [
+    `Actions=${Object.keys({ ...APP_ACTIONS, ...cfg.trayApp ? TRAY_ACTIONS : {} }).join(";")};`
+  ], Object.entries({ ...APP_ACTIONS, ...cfg.trayApp ? TRAY_ACTIONS : {} }).flatMap(([action, label]) => [
     `[Desktop Action ${action}]`,
     `Name=${label}`,
     `Exec=${execArg(launcher)} run ${id}${startFlags(cfg).map((flag) => ` ${flag}`).join("")} --appd-action=${action}`,
@@ -900,6 +1063,8 @@ module.exports = {
   importApps,
   DEFAULTS,
   APP_ACTIONS,
+  TRAY_ACTIONS,
+  HOTKEY,
   EXTENSIONS,
   SPONSOR_CATEGORIES,
   sponsorChoices,
@@ -914,6 +1079,14 @@ module.exports = {
   runCommand,
   managerCommand,
   describeExtension,
+  EXTENSION_CATEGORIES,
+  STORE_ID,
+  storeDir,
+  storeIdOf,
+  storeLibrary,
+  addStoreExtension,
+  removeStoreExtension,
+  extensionUse,
   fresh,
   extensionsDir,
   extensionFolder,

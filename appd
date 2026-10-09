@@ -20,6 +20,13 @@ fi
 x11=0
 for arg in "$@"; do
   [ "$arg" = "--appd-x11" ] && x11=1
+  case "$arg" in
+    --appd-lang=*)
+      lang="${arg#--appd-lang=}"
+      export APPD_SYSTEM_LANGUAGE="${LANGUAGE:-}"
+      export LANGUAGE="${lang//-/_}:${lang%%-*}"
+      ;;
+  esac
 done
 flags=()
 if [ "$x11" = 1 ]; then

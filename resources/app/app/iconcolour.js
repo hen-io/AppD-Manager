@@ -2,7 +2,7 @@
 const { nativeImage } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { lookOfPixels } = require("../manager/ui/colour");
+const { lookOfPixels } = require("../shared/colour");
 const { drawIcon } = require("./icondraw");
 const SIDE = 32;
 function pointsOfBitmap(file) {

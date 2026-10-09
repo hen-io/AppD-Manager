@@ -29,6 +29,45 @@ module.exports = function createThrottle(cfg, { note, because }) {
     stoppedPids = [];
     runLimiter();
   }
+  const QUIET_MS = 1500;
+  const QUIET_SHORT_MS = 300;
+  const STREAM_MS = 2e4;
+  const underWay = /* @__PURE__ */ new Map();
+  let lastAnswer = 0;
+  let watchingRequests = false;
+  function watchRequests() {
+    if (watchingRequests) return;
+    watchingRequests = true;
+    const requests = session.defaultSession.webRequest;
+    requests.onSendHeaders((details) => {
+      underWay.set(details.id, Date.now());
+      if (underWay.size > 400) {
+        const old = Date.now() - 10 * STREAM_MS;
+        for (const [request, since] of underWay) if (since < old) underWay.delete(request);
+      }
+    });
+    const answered = (details) => {
+      if (underWay.delete(details.id)) lastAnswer = Date.now();
+    };
+    requests.onCompleted(answered);
+    requests.onErrorOccurred(answered);
+  }
+  function quietFor(ms) {
+    const now = Date.now();
+    for (const [request, since] of underWay) {
+      if (now - since > 10 * STREAM_MS) underWay.delete(request);
+      else if (now - since < STREAM_MS) return false;
+    }
+    return now - lastAnswer >= ms;
+  }
+  async function quietMoment(stop) {
+    const started = Date.now();
+    for (; ; ) {
+      const waited = Date.now() - started;
+      if (stop() || waited > 3e4 || quietFor(waited > 12e3 ? QUIET_SHORT_MS : QUIET_MS)) return;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
   const LIMIT_PERIOD_MS = 100;
   const LIMIT_MIN_RUN_MS = 2;
   const percent = (value) => value > 0 && value < 100 ? value : 100;
@@ -74,6 +113,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
   process.on("exit", releasePage);
   function watchFocus(window) {
     const wc = window.webContents;
+    if (cfg.pauseWhenUnfocused) watchRequests();
     const GRACE_MS = 3e3;
     let timer = null;
     let pauseTimer = null;
@@ -144,6 +184,8 @@ module.exports = function createThrottle(cfg, { note, because }) {
         await withinMoment(showPicture(view, picture, width));
         if (overtaken()) return;
       }
+      await quietMoment(overtaken);
+      if (overtaken()) return;
       pausePage();
       note("paused (pauseWhenUnfocused)");
       if (cfg.skipMissedUpdates) dropBacklog();
@@ -263,6 +305,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
     resumePage,
     releasePage,
     isQuitting: () => quitting,
+    isPaused: () => stoppedPids.length > 0,
     stay: () => {
       quitting = false;
       runLimiter();

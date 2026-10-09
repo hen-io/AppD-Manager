@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "0.5.3",
+  "version": "1.0.0.RC.1",
   "description": "Easily create standalone container applications for your webapps on Linux and Windows!",
   "author": {
     "name": "hen-io",
@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@ghostery/adblocker": "^2.18.2",
+    "@material/web": "2.5.0",
     "darkreader": "^4.9.133",
-    "electron": "latest"
+    "electron": "latest",
+    "lit": "3.3.3"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

@@ -96,6 +96,13 @@ function state() {
     modes: lib.MODES,
     palettes: lib.PALETTES,
     templates: require("./templates"),
+    extensionCategories: lib.EXTENSION_CATEGORIES,
+    storeLibrary: lib.storeLibrary(),
+    extensionUse: apps.reduce((use, one) => {
+      for (const entry of one.cfg ? [...one.cfg.extensions, ...one.cfg.customExtensions] : []) (use[entry] ||= []).push(one.id);
+      return use;
+    }, {}),
+    extensionIcons: extensionIcons(),
     displays: handlers.displays(),
     imported: lib.importedExtensions(),
     extensions: lib.EXTENSIONS,
@@ -313,6 +320,10 @@ const handlers = {
   launch(id) {
     startApp(id);
   },
+  async pickFolder(title) {
+    const { filePaths } = await dialog.showOpenDialog(win, { title: String(title || "Choose a folder"), properties: ["openDirectory", "createDirectory"] });
+    return filePaths[0] || null;
+  },
   async pickIcon() {
     const { filePaths } = await dialog.showOpenDialog(win, {
       title: "Choose an icon",
@@ -335,6 +346,64 @@ const handlers = {
     fs.mkdirSync(lib.appsDir(), { recursive: true });
     const error = await shell.openPath(lib.appsDir());
     if (error) throw new Error(error);
+  },
+  async setAppExtension(id, entry, on) {
+    lib.checkId(id);
+    const cfg = lib.load(id);
+    const list = entry in lib.EXTENSIONS ? "extensions" : "customExtensions";
+    const others = cfg[list].filter((other) => other !== entry);
+    cfg[list] = on ? [...others, String(entry)] : others;
+    lib.save(id, cfg);
+    const restart = await offerRestart(lib.runningPid(id) ? [id] : []);
+    return { state: state(), restart };
+  },
+  async addStoreExtension(text) {
+    const storeId = storeIdIn(text);
+    if (!storeId) throw new Error("That is neither a link to an extension in the Chrome Web Store nor the id of one (32 letters).");
+    const known = Object.entries(lib.STORE_EXTENSIONS).find(([, id]) => id === storeId);
+    if (known) throw new Error(`"${lib.EXTENSIONS[known[0]].name}" is in the catalog already.`);
+    try {
+      await require("./app/store-extension")(storeId, lib.root);
+    } catch (e) {
+      throw new Error(`The extension could not be fetched: ${e.message}.`);
+    }
+    lib.addStoreExtension(storeId);
+    return { state: state(), entry: `store:${storeId}` };
+  },
+  async removeStoreExtension(storeId) {
+    const info = lib.storeLibrary()[storeId];
+    const response = await ask({
+      icon: "delete",
+      danger: true,
+      buttons: ["Remove", "Cancel"],
+      message: `Remove the extension "${info ? info.name : storeId}"?`,
+      detail: "It is taken out of the library and out of every app that uses it."
+    });
+    if (response !== 0) return null;
+    lib.removeStoreExtension(String(storeId));
+    return { state: state() };
+  },
+  async fetchStorePicture(name) {
+    const storeId = lib.STORE_EXTENSIONS[name];
+    if (!storeId) return extensionIcons();
+    const file = pictureOfStore(storeId);
+    if (!fs.existsSync(file)) {
+      const { net } = require("electron");
+      const page = await (await net.fetch(`https://chromewebstore.google.com/detail/${storeId}`, {
+        headers: { "user-agent": "AppD-Manager (extension catalog)" },
+        credentials: "omit"
+      })).text();
+      const address = /property="og:image" content="(https:\/\/lh3\.googleusercontent\.com\/[^"]+)"/.exec(page)?.[1];
+      if (!address) throw new Error("no picture found");
+      const picture = Buffer.from(await (await net.fetch(address.replace(/=s\d+[^/=]*$/, "=s128"))).arrayBuffer());
+      if (nativeImage.createFromBuffer(picture).isEmpty()) throw new Error("not a picture");
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, nativeImage.createFromBuffer(picture).toPNG());
+    }
+    return extensionIcons();
+  },
+  openStorePage(storeId) {
+    if (lib.STORE_ID.test(String(storeId))) shell.openExternal(`https://chromewebstore.google.com/detail/${storeId}`);
   },
   async importExtension() {
     const { filePaths } = await dialog.showOpenDialog(win, {
@@ -428,6 +497,32 @@ const handlers = {
     return version;
   }
 };
+const pictureOfStore = (storeId) => path.join(lib.storeDir, "pictures", `${storeId}.png`);
+function extensionIcons() {
+  const icons2 = {};
+  const own = (entry, folder) => {
+    try {
+      const info = lib.describeExtension(folder);
+      const url = info.icon && iconPreview(path.join(folder, info.icon));
+      if (url) icons2[entry] = url;
+    } catch {
+    }
+  };
+  for (const [name, storeId] of Object.entries(lib.STORE_EXTENSIONS)) {
+    own(name, path.join(lib.storeDir, storeId));
+    if (!icons2[name]) {
+      const url = iconPreview(pictureOfStore(storeId));
+      if (url) icons2[name] = url;
+    }
+  }
+  for (const storeId of Object.keys(lib.storeLibrary())) own(`store:${storeId}`, path.join(lib.storeDir, storeId));
+  for (const name of Object.keys(lib.importedExtensions())) own(name, lib.extensionFolder(name));
+  return icons2;
+}
+function storeIdIn(text) {
+  const found = /(?:^|[/=\s])([a-p]{32})(?:$|[/?#&\s])/.exec(` ${String(text).trim()} `);
+  return found ? found[1] : "";
+}
 for (const [name, fn] of Object.entries(handlers)) {
   ipcMain.handle(name, async (event, ...args) => {
     try {
@@ -478,11 +573,14 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("window-all-closed", () => app.quit());
   Menu.setApplicationMenu(null);
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     try {
       lib.sync();
     } catch (e) {
       console.error(`appd: ${e.message}`);
+    }
+    if (fs.existsSync(path.join(__dirname, "manager", "src"))) {
+      await require("./manager/build-ui").ensureUi().catch((e) => console.error(`appd: the manager's page could not be built: ${e.message}`));
     }
     createWindow();
   });

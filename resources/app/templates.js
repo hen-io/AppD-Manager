@@ -16,5 +16,6 @@ module.exports = [
   { name: "Outlook", about: "Mail and calendar", url: "https://outlook.office.com", internalHosts: ["login.microsoftonline.com", "login.live.com"] },
   { name: "Proton Mail", about: "Mail", url: "https://mail.proton.me", internalHosts: ["account.proton.me"] },
   { name: "Home Assistant", about: "Put in the address of your own; shows the current state when you come back to it", url: "http://homeassistant.local:8123", skipMissedUpdates: true },
+  { name: "Home Assistant wall panel", about: "A dashboard for a screen on the wall: full screen, the screen stays on", url: "http://homeassistant.local:8123", startFullScreen: true, keepAwake: "display", skipMissedUpdates: true },
   { name: "GitHub", about: "Code and issues", url: "https://github.com" }
 ];

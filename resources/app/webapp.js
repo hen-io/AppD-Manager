@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, dialog, ipcMain, nativeTheme, session, shell, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -17,8 +17,10 @@ const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
 const showLoadingScreen = require("./app/loading");
 const showDownloads = require("./app/downloads");
+const shareScreens = require("./app/share");
 const { openFind, findAgain, isBar } = require("./app/find");
-const storeExtension = require("./app/store-extension");
+const createLinks = require("./app/links");
+const createExtensions = require("./app/extensions");
 const id = process.env.APPD_ID;
 let cfg;
 const settingsText = (settings) => JSON.stringify({ ...settings, autostart: void 0 });
@@ -46,7 +48,8 @@ const HARDWARE_ACCELERATION = [
 ];
 const featureLists = { "enable-features": [], "disable-features": [] };
 const FRAME_LOOK = ["--enable-transparent-visuals"];
-for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...hasLook(cfg) ? FRAME_LOOK : [], ...cfg.flags]) {
+const HOTKEY_DOOR = cfg.trayApp && cfg.trayHotkey && process.env.WAYLAND_DISPLAY ? ["--enable-features=GlobalShortcutsPortal"] : [];
+for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...hasLook(cfg) ? FRAME_LOOK : [], ...HOTKEY_DOOR, ...cfg.flags]) {
   const m = /^--([^=]+)(?:=(.*))?$/.exec(flag.trim());
   if (!m) console.error(`appd: ignoring flag "${flag}"`);
   else if (m[1] in featureLists) featureLists[m[1]].push(...(m[2] || "").split(","));
@@ -58,6 +61,13 @@ for (const [name, values] of Object.entries(featureLists)) {
   if (list.length) app.commandLine.appendSwitch(name, list.join(","));
 }
 if (cfg.ignoreCertificateErrors) app.commandLine.appendSwitch("ignore-certificate-errors");
+if (cfg.language) {
+  app.commandLine.appendSwitch("lang", cfg.language);
+  if (!lib.WINDOWS) {
+    process.env.APPD_SYSTEM_LANGUAGE ??= process.env.LANGUAGE || "";
+    process.env.LANGUAGE = `${cfg.language.replace(/-/g, "_")}:${cfg.language.split("-")[0]}`;
+  }
+}
 if (!cfg.backgroundThrottling) {
   for (const name of ["disable-renderer-backgrounding", "disable-backgrounding-occluded-windows", "disable-background-timer-throttling"]) {
     app.commandLine.appendSwitch(name);
@@ -89,22 +99,32 @@ function isInternal(url) {
     return false;
   }
 }
-function openExternal(url) {
-  if (/^(https?|mailto):/i.test(url)) shell.openExternal(url);
-}
 const { note, because, takeReason, plain } = openLog(path.join(lib.appDir(id), "events.log"));
+const { openExternal, openElsewhere } = createLinks({ id, cfg, lib, note });
+const extensions = createExtensions({ id, cfg, lib, note, icon: () => icon });
 function restartApp(wc, why = "hard reload, or asked for by the manager") {
   const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
-  const args = process.argv.slice(1).filter((arg) => !/^--appd-(url|action)=/.test(arg));
-  if (/^https?:\/\//i.test(url)) args.push(`--appd-url=${url}`);
+  let settings = cfg;
+  try {
+    settings = lib.load(id);
+  } catch {
+  }
+  const [execPath, args] = lib.runCommand(id, [...lib.startFlags(settings), .../^https?:\/\//i.test(url) ? [`--appd-url=${url}`] : []]);
   note(`restarting (${why})`);
   throttle.releasePage();
-  relaunchWith = args;
+  relaunchWith = { execPath, args };
   app.quit();
 }
 let relaunchWith = null;
+let timedReload = false;
 app.on("will-quit", () => {
-  if (relaunchWith) app.relaunch({ args: relaunchWith });
+  if (!relaunchWith) return;
+  if ("APPD_SYSTEM_LANGUAGE" in process.env) {
+    if (process.env.APPD_SYSTEM_LANGUAGE) process.env.LANGUAGE = process.env.APPD_SYSTEM_LANGUAGE;
+    else delete process.env.LANGUAGE;
+    delete process.env.APPD_SYSTEM_LANGUAGE;
+  }
+  app.relaunch(relaunchWith);
 });
 function mayLeave(wc) {
   const window = BrowserWindow.fromWebContents(wc);
@@ -112,7 +132,7 @@ function mayLeave(wc) {
     type: "question",
     title: cfg.name,
     message: "Leave this page?",
-    detail: "It says it has changes that are not saved.",
+    detail: "It may have unsaved changes.",
     buttons: ["Leave", "Stay"],
     defaultId: 1,
     cancelId: 1,
@@ -174,7 +194,7 @@ async function runAction(action, wc) {
 function actionIn(argv) {
   const arg = argv.find((value) => value.startsWith("--appd-action="));
   const action = arg ? arg.slice("--appd-action=".length) : "";
-  return action in lib.APP_ACTIONS ? action : "";
+  return action in lib.APP_ACTIONS || action in lib.TRAY_ACTIONS ? action : "";
 }
 let menusOpen = 0;
 function popUp(items, wc) {
@@ -189,52 +209,6 @@ function popUp(items, wc) {
 }
 let trayIcon = null;
 const zoom = createZoom(cfg);
-const customExtensions = [];
-async function loadCustomExtensions() {
-  const loader = session.defaultSession.extensions || session.defaultSession;
-  for (const [name, storeId] of Object.entries(lib.STORE_EXTENSIONS)) {
-    if (!cfg.extensions.includes(name)) continue;
-    try {
-      storeExtension.adoptRefreshed(storeId, lib.root);
-      await loader.loadExtension(await storeExtension(storeId, lib.root, note), { allowFileAccess: false });
-    } catch (e) {
-      note(`the extension "${lib.EXTENSIONS[name].name}" could not be loaded: ${e.message}`);
-      console.error(`appd: ${lib.EXTENSIONS[name].name}: ${e.message}`);
-    }
-  }
-  for (const entry of cfg.customExtensions) {
-    const folder = lib.extensionFolder(entry);
-    try {
-      const info = lib.describeExtension(folder);
-      const loaded = await loader.loadExtension(folder, { allowFileAccess: false });
-      customExtensions.push({ id: loaded.id, name: info.name, options: info.options });
-    } catch (e) {
-      console.error(`appd: extension ${folder}: ${e.message}`);
-    }
-  }
-}
-function openExtensionSettings(extension2) {
-  const [command, args] = lib.managerCommand([`--appd-edit=${id}:${extension2}`]);
-  const env = { ...process.env };
-  for (const name of ["APPD_ID", "CHROME_DESKTOP", "ELECTRON_RUN_AS_NODE"]) delete env[name];
-  require("child_process").spawn(command, args, { detached: true, stdio: "ignore", env }).on("error", () => {
-  }).unref();
-}
-function openExtensionOptions(extension2) {
-  const options = new BrowserWindow({ width: 900, height: 700, title: extension2.name, icon, autoHideMenuBar: true });
-  options.loadURL(`chrome-extension://${extension2.id}/${extension2.options.replace(/^\/+/, "")}`);
-}
-function extensionMenu() {
-  const items = [
-    ...cfg.extensions.map((name) => ({ label: `${lib.EXTENSIONS[name].name} settings…`, click: () => openExtensionSettings(name) })),
-    ...customExtensions.map((extension2) => ({
-      label: `${extension2.name}${extension2.options ? " options…" : " (no settings page)"}`,
-      enabled: Boolean(extension2.options),
-      click: () => openExtensionOptions(extension2)
-    }))
-  ];
-  return items.length ? [{ type: "separator" }, { label: "Extensions", submenu: items }] : [];
-}
 function appMenu(wc, inTray = false) {
   const window = BrowserWindow.fromWebContents(wc);
   const sep = { type: "separator" };
@@ -244,6 +218,7 @@ function appMenu(wc, inTray = false) {
     sep,
     { label: `Go to ${cfg.name}`, accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
     sep,
+    { label: "Mute sound", type: "checkbox", checked: wc.isAudioMuted(), click: () => wc.setAudioMuted(!wc.isAudioMuted()) },
     ...cfg.allowZoom ? [
       {
         label: `Reset zoom (${zoom.normalPercent}%)`,
@@ -272,7 +247,7 @@ function appMenu(wc, inTray = false) {
       { label: window?.isMaximized() ? "Restore size" : "Maximize", click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
       { label: "Close window", accelerator: "Alt+F4", click: () => window?.close() }
     ],
-    ...extensionMenu()
+    ...extensions.menu()
   ];
 }
 function showActionMenu(wc) {
@@ -319,12 +294,20 @@ function pageShortcut(wc, input, key, ctrl, history) {
   else if (ctrl && key === "0") zoom.reset(wc);
   else if (input.alt && !input.control && key === "arrowleft") history.goBack();
   else if (input.alt && !input.control && key === "arrowright") history.goForward();
-  else if (input.alt && !input.control && key === "home") wc.loadURL(cfg.url);
+  else if (input.alt && !input.control && key === "home" && !extensions.isOwnPage(wc)) wc.loadURL(cfg.url);
   else return false;
   return true;
 }
 function contextMenu(wc, p) {
   const sep = { type: "separator" };
+  if (extensions.isOwnPage(wc)) {
+    const window = BrowserWindow.fromWebContents(wc);
+    return popUp([
+      ...p.isEditable ? [{ role: "cut", enabled: p.editFlags.canCut }, { role: "copy", enabled: p.editFlags.canCopy }, { role: "paste", enabled: p.editFlags.canPaste }, sep] : p.selectionText ? [{ role: "copy" }, sep] : [],
+      { label: "Reload", click: () => wc.reload() },
+      { label: "Close", click: () => window?.close() }
+    ], wc);
+  }
   const items = p.dictionarySuggestions.map((word) => ({
     label: word,
     click: () => wc.replaceMisspelling(word)
@@ -361,8 +344,12 @@ function contextMenu(wc, p) {
 app.on("web-contents-created", (_event, wc) => {
   if (!cfg.userAgent) followGoogleSignIn(wc);
   zoom.follow(wc);
-  if (cfg.customCss.trim()) wc.on("dom-ready", () => wc.insertCSS(cfg.customCss).catch(() => {
-  }));
+  if (cfg.customCss.trim()) {
+    wc.on("dom-ready", () => {
+      if (/^https?:/i.test(wc.getURL())) wc.insertCSS(cfg.customCss).catch(() => {
+      });
+    });
+  }
   if (cfg.customJs.trim()) {
     wc.on("dom-ready", () => {
       if (/^https?:/i.test(wc.getURL())) wc.executeJavaScript(`try {
@@ -391,7 +378,7 @@ ${cfg.customJs}
       return { action: "deny" };
     }
     if (cfg.openLinks === "browser" && isInternal(url)) return appWindow;
-    openExternal(url);
+    openElsewhere(url);
     return { action: "deny" };
   });
   wc.on("before-input-event", (event, input) => {
@@ -399,6 +386,7 @@ ${cfg.customJs}
   });
   wc.on("context-menu", (_e, params) => isBar(wc) || contextMenu(wc, params));
   wc.on("will-prevent-unload", (event) => {
+    if (timedReload) return;
     if (mayLeave(wc)) event.preventDefault();
   });
 });
@@ -455,6 +443,11 @@ async function createWindow() {
     v8CacheOptions: "bypassHeatCheck",
     ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
   };
+  if (cfg.language) {
+    const wanted = [.../* @__PURE__ */ new Set([cfg.language, cfg.language.split("-")[0], "en"])].join(",");
+    session.defaultSession.setUserAgent(app.userAgentFallback, wanted);
+  }
+  const startsHidden = cfg.closeToTray && cfg.startHidden && !cfg.trayApp;
   win = new BrowserWindow({
     alwaysOnTop: cfg.alwaysOnTop || cfg.trayApp,
     width: cfg.trayApp ? cfg.trayWidth + 2 * outset : state.width || cfg.width,
@@ -462,6 +455,7 @@ async function createWindow() {
     title: cfg.name,
     icon,
     ...cfg.trayApp ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
+    ...startsHidden ? { show: false } : {},
     ...dark ? { backgroundColor: "#15171b" } : {},
     frame: !bare,
     ...bare ? frameOptions(cfg) : {},
@@ -487,8 +481,16 @@ async function createWindow() {
     });
   }
   const frame = styleFrame(win, cfg, lineColour, host);
-  if (!cfg.trayApp && (cfg.startMaximized || state.maximized)) win.maximize();
-  if (!cfg.trayApp || cfg.trayShowAtStart) {
+  const sizeUp = () => {
+    if (cfg.startMaximized || state.maximized) win.maximize();
+    if (cfg.startFullScreen) win.setFullScreen(true);
+  };
+  if (startsHidden) win.once("show", sizeUp);
+  else if (!cfg.trayApp) sizeUp();
+  if (cfg.startMuted) win.webContents.setAudioMuted(true);
+  if (cfg.keepAwake !== "off") powerSaveBlocker.start(cfg.keepAwake === "display" ? "prevent-display-sleep" : "prevent-app-suspension");
+  if (startsHidden) {
+  } else if (!cfg.trayApp || cfg.trayShowAtStart) {
     if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
     else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
   }
@@ -515,7 +517,23 @@ async function createWindow() {
   });
   win.webContents.on("unresponsive", () => note("the page does not respond"));
   if (cfg.unreadBadge) showUnreadCount(win, app);
-  showDownloads(session.defaultSession, win, { name: cfg.name, note });
+  showDownloads(session.defaultSession, win, { name: cfg.name, note, folder: cfg.downloadFolder });
+  shareScreens(session.defaultSession, {
+    note,
+    allowed: (request) => cfg.permissions === "all" || cfg.permissions === "app" && isInternal(request.securityOrigin || request.frame?.url || "")
+  });
+  if (cfg.reloadEverySeconds > 0) {
+    setInterval(() => {
+      if (win.isDestroyed() || throttle.isPaused() || win.webContents.isLoadingMainFrame()) return;
+      if (!/^https?:/i.test(win.webContents.getURL())) return;
+      timedReload = true;
+      setTimeout(() => {
+        timedReload = false;
+      }, 3e3);
+      because(`every ${cfg.reloadEverySeconds} s (reloadEverySeconds)`);
+      win.webContents.reload();
+    }, cfg.reloadEverySeconds * 1e3).unref();
+  }
   if (cfg.spellcheck && cfg.spellcheckLanguages.length) {
     const known = session.defaultSession.availableSpellCheckerLanguages;
     const wanted = cfg.spellcheckLanguages.map((code) => known.find((one) => one.toLowerCase() === code.trim().toLowerCase())).filter(Boolean);
@@ -537,6 +555,17 @@ async function createWindow() {
   };
   if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
+  if (startsHidden && !trayIcon) win.show();
+  if (cfg.trayApp && cfg.trayHotkey && trayIcon?.toggle) {
+    let taken = false;
+    try {
+      taken = globalShortcut.register(cfg.trayHotkey, () => trayIcon.toggle());
+    } catch (e) {
+      note(`the key ${cfg.trayHotkey} could not be asked for (${e.message})`);
+    }
+    note(taken ? `the key ${cfg.trayHotkey} shows and hides the window` : `the key ${cfg.trayHotkey} was not given to the app (taken by something else, or the desktop does not hand out keys)`);
+    app.on("will-quit", () => globalShortcut.unregisterAll());
+  }
   if (host) {
     win.on("close", (event) => {
       const page = host.view.webContents;
@@ -553,9 +582,10 @@ async function createWindow() {
   if (extension("adblock")) await extras.enableAdBlock(session.defaultSession, {
     hideLeftovers: cfg.adBlockHideLeftovers,
     inPageAds: cfg.adBlockInPageAds,
+    annoyances: cfg.adBlockAnnoyances,
     exceptions: cfg.adBlockExceptions
   }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
-  await loadCustomExtensions();
+  await extensions.load();
   if (win.isDestroyed()) return;
   if (extension("sponsorblock")) {
     extras.enableSponsorBlock(win.webContents, cfg);
@@ -610,11 +640,21 @@ if (!app.requestSingleInstanceLock()) {
     throttle.resumePage();
     if (argv.includes("--appd-action=restart")) return restartApp(win.webContents);
     const action = actionIn(argv);
+    if (action === "toggle") return trayIcon?.toggle ? trayIcon.toggle() : void 0;
     if (action) runAction(action, win.webContents);
-    if (trayIcon?.show) return trayIcon.show();
-    if (win.isMinimized()) win.restore();
-    win.show();
-    return win.focus();
+    if (trayIcon?.show) trayIcon.show();
+    else {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+    const link = argv.find((value) => value.startsWith("--appd-url="))?.slice("--appd-url=".length);
+    if (!action && link && /^https?:\/\//i.test(link) && URL.canParse(link)) {
+      because("a link clicked in another app");
+      win.webContents.loadURL(link).catch(() => {
+      });
+    }
+    return void 0;
   });
   app.on("window-all-closed", () => app.quit());
   if (lib.WINDOWS) {

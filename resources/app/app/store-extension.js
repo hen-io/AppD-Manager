@@ -33,7 +33,7 @@ function fields(message) {
   return found;
 }
 const idOfKey = (key) => [...crypto.createHash("sha256").update(key).digest().subarray(0, 16)].map((byte) => String.fromCharCode(97 + (byte >> 4)) + String.fromCharCode(97 + (byte & 15))).join("");
-function archiveOf(crx, id) {
+function opened(crx, id) {
   if (crx.toString("latin1", 0, 4) !== "Cr24" || crx.readUInt32LE(4) !== 3) throw new Error("not a CRX3 file");
   const headerLength = crx.readUInt32LE(8);
   const header = crx.subarray(12, 12 + headerLength);
@@ -50,10 +50,11 @@ function archiveOf(crx, id) {
     const signature = (proofFields.find(([n]) => n === 2) || [])[1];
     if (!key || !signature || idOfKey(key) !== id) continue;
     const ok = crypto.createVerify("sha256").update("CRX3 SignedData\0").update(length).update(signed).update(archive).verify({ key, format: "der", type: "spki" }, signature);
-    if (ok) return archive;
+    if (ok) return { archive, key };
   }
   throw new Error(`it is not signed with the key of ${id}`);
 }
+const archiveOf = (crx, id) => opened(crx, id).archive;
 function unzip(archive, folder) {
   let end = archive.length - 22;
   while (end >= 0 && archive.readUInt32LE(end) !== 101010256) end--;
@@ -81,15 +82,88 @@ function unzip(archive, folder) {
     fs.writeFileSync(target, method === 8 ? zlib.inflateRawSync(data) : data);
   }
 }
-async function fetchInto(id, folder) {
-  const res = await net.fetch(storeUrl(id));
+const COMPAT = "appd-compat.js";
+const COMPAT_SCRIPT = `(() => {
+  const storage = globalThis.chrome && globalThis.chrome.storage;
+  if (!storage || !storage.local || storage.appdAtHome) return;
+  const stand = (area) => {
+    try {
+      Object.defineProperty(storage, area, { value: storage.local, configurable: true, enumerable: true });
+    } catch (e) {}
+  };
+  stand('sync');
+  let session;
+  try {
+    session = storage.session;
+  } catch (e) {}
+  if (!session) stand('session');
+  try {
+    const listen = storage.onChanged.addListener.bind(storage.onChanged);
+    storage.onChanged.addListener = (heard) => listen((changes, area) => {
+      heard(changes, area);
+      if (area === 'local') heard(changes, 'sync');
+    });
+    Object.defineProperty(storage, 'appdAtHome', { value: true });
+  } catch (e) {}
+})();
+`;
+const WORKER = "appd-worker.js";
+function makeAtHome(folder, key = null) {
+  const manifestFile = path.join(folder, "manifest.json");
+  if (fs.existsSync(path.join(folder, COMPAT))) return;
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+  if (key && !manifest.key) manifest.key = key.toString("base64");
+  fs.writeFileSync(path.join(folder, COMPAT), COMPAT_SCRIPT);
+  for (const entry of Array.isArray(manifest.content_scripts) ? manifest.content_scripts : []) {
+    if (Array.isArray(entry.js) && entry.js.length && entry.world !== "MAIN") entry.js = [COMPAT, ...entry.js];
+  }
+  const background = manifest.background;
+  if (background && typeof background.service_worker === "string") {
+    const own = `./${background.service_worker.replace(/^[./]+/, "")}`;
+    fs.writeFileSync(path.join(folder, WORKER), background.type === "module" ? `import './${COMPAT}';
+import ${JSON.stringify(own)};
+` : `importScripts(${JSON.stringify(COMPAT)}, ${JSON.stringify(own)});
+`);
+    background.service_worker = WORKER;
+    delete background.scripts;
+  } else if (background && Array.isArray(background.scripts)) {
+    background.scripts = [COMPAT, ...background.scripts];
+  }
+  const pages = [];
+  const walk = (dir, depth) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory() && depth < 4 && entry.name !== "_metadata") walk(path.join(dir, entry.name), depth + 1);
+      else if (entry.isFile() && /\.html?$/i.test(entry.name) && pages.length < 60) pages.push(path.join(dir, entry.name));
+    }
+  };
+  walk(folder, 0);
+  for (const page of pages) {
+    const html = fs.readFileSync(page, "utf8");
+    const tag = `<script src="/${COMPAT}"><\/script>`;
+    const at = /<head[^>]*>/i.exec(html);
+    fs.writeFileSync(page, at ? html.slice(0, at.index + at[0].length) + tag + html.slice(at.index + at[0].length) : tag + html);
+  }
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+}
+async function fetchInto(id, folder, withKey) {
+  let res;
+  for (let tries = 1; ; tries++) {
+    try {
+      res = await net.fetch(storeUrl(id));
+      break;
+    } catch (e) {
+      if (tries === 3) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 800 * tries));
+    }
+  }
   if (!res.ok) throw new Error(`the Chrome Web Store answered ${res.status}`);
-  const archive = archiveOf(Buffer.from(await res.arrayBuffer()), id);
+  const { archive, key } = opened(Buffer.from(await res.arrayBuffer()), id);
   const fresh = `${folder}.new`;
   fs.rmSync(fresh, { recursive: true, force: true });
   fs.mkdirSync(fresh, { recursive: true });
   unzip(archive, fresh);
   if (!fs.existsSync(path.join(fresh, "manifest.json"))) throw new Error("no manifest.json in it");
+  makeAtHome(fresh, withKey ? key : null);
   fs.rmSync(folder, { recursive: true, force: true });
   fs.renameSync(fresh, folder);
 }
@@ -103,10 +177,16 @@ module.exports = async function storeExtension(id, root, note = () => {
     age = Date.now() - fs.statSync(manifest).mtimeMs;
   } catch {
   }
-  if (age === Infinity) await fetchInto(id, folder);
-  else if (age >= REFRESH_AFTER_MS) {
+  if (age === Infinity) await fetchInto(id, folder, true);
+  else makeAtHome(folder);
+  if (age !== Infinity && age >= REFRESH_AFTER_MS) {
+    let hasKey = false;
+    try {
+      hasKey = Boolean(JSON.parse(fs.readFileSync(manifest, "utf8")).key);
+    } catch {
+    }
     const later = `${folder}.next`;
-    fetchInto(id, later).catch((e) => note(`could not refresh the extension ${id}: ${e.message}`));
+    fetchInto(id, later, hasKey).catch((e) => note(`could not refresh the extension ${id}: ${e.message}`));
   }
   return folder;
 };

@@ -1,7 +1,16 @@
 "use strict";
 const { Notification, shell } = require("electron");
+const fs = require("fs");
 const path = require("path");
-module.exports = function showDownloads(ses, window, { name, note }) {
+function freeName(folder, name) {
+  const { name: stem, ext } = path.parse(name || "download");
+  for (let count = 1; count < 1e3; count++) {
+    const file = path.join(folder, count === 1 ? `${stem}${ext}` : `${stem} (${count})${ext}`);
+    if (!fs.existsSync(file)) return file;
+  }
+  return path.join(folder, `${stem} ${Date.now()}${ext}`);
+}
+module.exports = function showDownloads(ses, window, { name, note, folder = "" }) {
   const running = /* @__PURE__ */ new Map();
   const showProgress = () => {
     if (window.isDestroyed()) return;
@@ -11,6 +20,14 @@ module.exports = function showDownloads(ses, window, { name, note }) {
     return void 0;
   };
   ses.on("will-download", (_event, item) => {
+    if (folder) {
+      try {
+        fs.mkdirSync(folder, { recursive: true });
+        item.setSavePath(freeName(folder, path.basename(item.getFilename())));
+      } catch (e) {
+        note(`downloads: ${folder} cannot be used (${e.message}); asking where to save`);
+      }
+    }
     running.set(item, -1);
     item.on("updated", () => {
       const total = item.getTotalBytes();

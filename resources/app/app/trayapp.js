@@ -151,8 +151,14 @@ module.exports = function makeTrayApp(window, cfg, options) {
     if (!cfg.trayShowAtStart) count();
   }
   if (cfg.trayShowAtStart) show();
+  const toggle = () => {
+    if (window.isDestroyed()) return;
+    if (window.isVisible()) window.hide();
+    else show();
+  };
   return {
     show,
+    toggle,
     refresh: tray.refresh,
     isPinned: () => pinned,
     pin: (on) => {

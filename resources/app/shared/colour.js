@@ -57,4 +57,4 @@ function lookOfPixels(data) {
   }
   return look(mixed, themeHue((Math.atan2(y, x) * 180 / Math.PI + 360) % 360), false);
 }
-if (typeof module === "object") module.exports = { lookOfPixels };
+module.exports = { lookOfPixels };
