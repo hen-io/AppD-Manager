@@ -161,6 +161,10 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   ipcMain.on("appd-tabs-close", (event, index) => owns(event) && closeTab(Number(index)));
   ipcMain.on("appd-tabs-hover", (event, on) => owns(event) && hover(Boolean(on)));
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
+  bar.webContents.on("input-event", (_event, input) => {
+    if (!autoHide || !input.type.startsWith("mouse")) return;
+    hover(input.type !== "mouseLeave");
+  });
   const appIcon = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || "");
   const logo = iconOf(path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
   const managed = cfg.tabTheme === "manager";
@@ -247,6 +251,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     view.setVisible(false);
     view.setBounds(pageRect());
     container.addChildView(view);
+    if (autoHide) container.addChildView(bar);
     tab.view = view;
     wire(tab);
     onPage(view.webContents, tab);
@@ -413,6 +418,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     chrome.add(welcome.webContents);
     welcome.setBackgroundColor(background);
     container.addChildView(welcome);
+    if (autoHide) container.addChildView(bar);
     welcome.setBounds(pageRect());
     welcome.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).catch(() => {
     });
