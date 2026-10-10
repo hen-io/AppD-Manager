@@ -601,6 +601,12 @@ module.exports = {
       appearance: "Appearance",
       mode: "Light or dark",
       colours: "Colours",
+      customTitle: "Your colours",
+      customNote: "Pick two colours and how strong the colours are. Everything else - backgrounds, buttons, text - is worked out from them, in light and dark.",
+      customMain: "Main colour",
+      customAccent: "Accent colour",
+      customVivid: "Strength of the colours",
+      customReset: "Back to the starting colours",
       extensions: "Extensions",
       extensionsNote: "These settings apply to every app that uses the extension, unless an app overrides them. When you save, running apps that are affected can be restarted.",
       updates: "Updates",
@@ -770,7 +776,7 @@ module.exports = {
     }
   },
   modes: { system: "As the desktop", light: "Light", dark: "Dark" },
-  palettes: { ocean: "Ocean", indigo: "Indigo", violet: "Violet", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose" },
+  palettes: { ocean: "Ocean", indigo: "Indigo", violet: "Violet", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose", custom: "Custom" },
   extensionKinds: { blocking: "Blocking", video: "Video", look: "Look", chat: "Chat and streams" },
   catalog: {
     adblock: {
@@ -850,7 +856,7 @@ module.exports = {
     badTab: "tab {number} must have a name and a url (and keepAlive, if any, true or false)",
     badTabUrl: 'tab {number} has an invalid address "{url}" (it must start with http:// or https://)',
     badId: 'invalid app id "{id}" (use a-z, 0-9, - and _)',
-    unknownLook: "unknown mode or palette",
+    unknownLook: "unknown mode or palette, or custom colours that are not two colours like #3b6cf0 and a strength from 50 to 200",
     unknownExtension: 'unknown extension "{name}" (known: {known})',
     unknownSponsorKind: 'unknown SponsorBlock category "{name}" in "{key}" (known: {known})',
     sponsorColour: '"sponsorBlockColors.{kind}" must be a colour like #00d400',

@@ -385,14 +385,27 @@ function setPrefs(next) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return now;
 }
+const DEFAULT_CUSTOM = { primary: "#3b6cf0", accent: "#00a7c9", vivid: 150 };
+const COLOUR_HEX = /^#[0-9a-f]{6}$/i;
+const customLooks = (value) => plainObject(value) && COLOUR_HEX.test(value.primary) && COLOUR_HEX.test(value.accent) && Number.isFinite(value.vivid) && value.vivid >= 50 && value.vivid <= 200;
 function appearance() {
   const kept = readSettings().appearance || {};
-  return { mode: kept.mode in MODES ? kept.mode : "system", palette: kept.palette in PALETTES ? kept.palette : DEFAULT_PALETTE };
+  const custom = plainObject(kept.custom) ? kept.custom : {};
+  return {
+    mode: kept.mode in MODES ? kept.mode : "system",
+    palette: kept.palette in PALETTES ? kept.palette : DEFAULT_PALETTE,
+    custom: {
+      primary: COLOUR_HEX.test(custom.primary) ? custom.primary.toLowerCase() : DEFAULT_CUSTOM.primary,
+      accent: COLOUR_HEX.test(custom.accent) ? custom.accent.toLowerCase() : DEFAULT_CUSTOM.accent,
+      vivid: Number.isFinite(custom.vivid) ? Math.min(200, Math.max(50, Math.round(custom.vivid))) : DEFAULT_CUSTOM.vivid
+    }
+  };
 }
 function setAppearance(next) {
   const settings = readSettings();
-  settings.appearance = { ...appearance(), ...next };
-  if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES)) throw new Error(text.errors.unknownLook);
+  const now = appearance();
+  settings.appearance = { ...now, ...next, custom: { ...now.custom, ...next.custom } };
+  if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES) || !customLooks(settings.appearance.custom)) throw new Error(text.errors.unknownLook);
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return appearance();
@@ -1119,6 +1132,7 @@ module.exports = {
   startFlags,
   MODES,
   PALETTES,
+  DEFAULT_CUSTOM,
   appearance,
   setAppearance,
   STORE_EXTENSIONS,

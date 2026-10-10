@@ -97,6 +97,7 @@ function state() {
     prefs: lib.prefs(),
     modes: lib.MODES,
     palettes: lib.PALETTES,
+    customDefault: lib.DEFAULT_CUSTOM,
     templates: require("./templates"),
     extensionCategories: lib.EXTENSION_CATEGORIES,
     storeLibrary: lib.storeLibrary(),
@@ -232,7 +233,11 @@ const handlers = {
   },
   setPrefs: (next) => lib.setPrefs(Object(next)),
   setAppearance(next) {
-    const now = lib.setAppearance({ ...next.mode ? { mode: String(next.mode) } : {}, ...next.palette ? { palette: String(next.palette) } : {} });
+    const now = lib.setAppearance({
+      ...next.mode ? { mode: String(next.mode) } : {},
+      ...next.palette ? { palette: String(next.palette) } : {},
+      ...next.custom && typeof next.custom === "object" ? { custom: next.custom } : {}
+    });
     nativeTheme.themeSource = now.mode;
     return now;
   },
@@ -562,7 +567,7 @@ function createWindow() {
     leaving = true;
     win.close();
   });
-  win.loadFile(path.join(__dirname, "manager", "index.html"), { query: { palette: lib.appearance().palette } });
+  win.loadFile(path.join(__dirname, "manager", "index.html"), { query: { palette: lib.appearance().palette, custom: JSON.stringify(lib.appearance().custom) } });
 }
 if (!app.requestSingleInstanceLock()) {
   app.quit();
