@@ -301,6 +301,7 @@ const DEFAULTS = {
   darkSepia: 0,
   colorScheme: "system",
   actionButton: "off",
+  confirmClose: false,
   windowDecorations: true,
   fixedTitle: false,
   defaultZoom: 100,

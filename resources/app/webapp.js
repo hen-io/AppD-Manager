@@ -646,6 +646,28 @@ async function createWindow() {
     note(taken ? `the key ${cfg.trayHotkey} shows and hides the window` : `the key ${cfg.trayHotkey} was not given to the app (taken by something else, or the desktop does not hand out keys)`);
     app.on("will-quit", () => globalShortcut.unregisterAll());
   }
+  if (cfg.confirmClose && !lib.isTray(cfg)) {
+    win.on("close", (event) => {
+      if (event.defaultPrevented || throttle.isQuitting()) return;
+      const list = tabs ? tabs.summary().map((tab) => `${tab.loaded ? "●" : "○"} ${tab.name}`).join("\n") : "";
+      const answer = dialog.showMessageBoxSync(win, {
+        type: "question",
+        title: cfg.name,
+        message: fill(t.confirmClose.message, { name: cfg.name }),
+        detail: list ? `${t.confirmClose.tabs}
+
+${list}` : "",
+        buttons: t.confirmClose.buttons,
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true
+      });
+      if (answer !== 0) {
+        event.preventDefault();
+        note("closing cancelled in the question");
+      }
+    });
+  }
   if (tabs) {
     win.on("close", (event) => {
       if (event.defaultPrevented) return;

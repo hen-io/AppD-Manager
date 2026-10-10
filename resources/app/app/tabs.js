@@ -308,6 +308,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     open,
     shortcut,
     closeAll,
+    summary: () => [...tabs.filter((tab) => tab.view), ...tabs.filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
     isChrome: (contents) => chrome.has(contents),
     current: () => tabs[active].view?.webContents ?? bar.webContents,
     index: () => active,
