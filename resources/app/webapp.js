@@ -489,7 +489,7 @@ async function createWindow() {
       accent,
       note,
       saveTab,
-      startTab: cfg.tabRememberLast ? Number(state.tab) || 0 : 0,
+      startTab: cfg.tabRememberLast ? Number(state.tab) || 0 : -1,
       onPage: (wc) => {
         preparePage(wc);
         watchPage(wc);
@@ -653,9 +653,7 @@ async function createWindow() {
         type: "question",
         title: cfg.name,
         message: fill(t.confirmClose.message, { name: cfg.name }),
-        detail: list ? `${t.confirmClose.tabs}
-
-${list}` : "",
+        detail: list,
         buttons: t.confirmClose.buttons,
         defaultId: 1,
         cancelId: 1,

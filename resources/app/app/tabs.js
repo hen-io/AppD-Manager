@@ -1,5 +1,5 @@
 "use strict";
-const { View, WebContentsView, app, ipcMain, clipboard } = require("electron");
+const { View, WebContentsView, app, ipcMain, clipboard, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const barPage = require("./tabbar");
@@ -34,7 +34,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     timer: null,
     unloading: false
   }));
-  let active = Math.min(Math.max(0, startTab), tabs.length - 1);
+  let active = startTab < 0 ? -1 : Math.min(startTab, tabs.length - 1);
+  let welcome = null;
   let size = { width: 0, height: 0 };
   let ready = false;
   let finished = false;
@@ -59,6 +60,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     bar.setBounds(barRect());
     const page = pageRect();
     for (const tab of tabs) tab.view?.setBounds(page);
+    welcome?.setBounds(page);
   }
   let pushTimer = null;
   function push() {
@@ -80,8 +82,37 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     }, 30);
   }
   const pictures = /* @__PURE__ */ new Map();
+  const mdiFile = path.join(lib.appDir(process.env.APPD_ID), "mdi-icons.json");
+  let mdi = {};
+  try {
+    mdi = JSON.parse(fs.readFileSync(mdiFile, "utf8"));
+  } catch {
+  }
+  const fetching = /* @__PURE__ */ new Set();
+  function fetchMdi(name) {
+    if (fetching.has(name)) return;
+    fetching.add(name);
+    net.fetch(`https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/${name}.svg`).then((res) => res.ok ? res.text() : "").then((svg) => {
+      const outline = /\sd="([^"]+)"/.exec(svg)?.[1];
+      if (!outline) return note(`the icon "mdi:${name}" was not found`);
+      mdi[name] = outline;
+      pictures.delete(`mdi:${name}`);
+      try {
+        fs.writeFileSync(mdiFile, JSON.stringify(mdi));
+      } catch {
+      }
+      push();
+    }).catch(() => {
+    }).finally(() => fetching.delete(name));
+  }
   function iconOf(value) {
     if (!value) return null;
+    const named = /^mdi[:-]([a-z0-9]+(?:-[a-z0-9]+)*)$/i.exec(value);
+    if (named) {
+      const name = named[1].toLowerCase();
+      if (!mdi[name]) fetchMdi(name);
+      return mdi[name] ? { kind: "mdi", value: mdi[name] } : null;
+    }
     if (pictures.has(value)) return pictures.get(value);
     let found = null;
     if (/^(https?:\/\/|data:image\/)/i.test(value)) found = { kind: "image", value };
@@ -104,7 +135,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   });
   ipcMain.on("appd-tabs-select", (event, index) => owns(event) && select(Number(index)));
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
-  const logo = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
+  const logo = iconOf(path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
   bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({ dark, accent, logo, position: cfg.tabBarPosition, icons: cfg.tabShowIcons, badges: cfg.tabShowBadges, names: cfg.tabShowNames, collapse: cfg.tabCollapseUnloaded }))}`).catch(() => {
   });
   const signal = (pids, name) => {
@@ -237,7 +268,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     const changed = previous !== next;
     active = index;
     ensure(next);
-    if (changed && previous.view) {
+    if (welcome) closeWelcome();
+    if (changed && previous?.view) {
       previous.view.setVisible(false);
       startIdle(previous);
     }
@@ -276,7 +308,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (!input.control || input.alt || input.meta) return false;
     const key = input.key.toLowerCase();
     if (key === "tab" && !input.shift || key === "pagedown") select((active + 1) % tabs.length);
-    else if (key === "tab" && input.shift || key === "pageup") select((active - 1 + tabs.length) % tabs.length);
+    else if (key === "tab" && input.shift || key === "pageup") select((Math.max(active, 0) - 1 + tabs.length) % tabs.length);
     else if (/^[1-9]$/.test(key) && !input.shift) select(key === "9" ? tabs.length - 1 : Math.min(Number(key) - 1, tabs.length - 1));
     else return false;
     return true;
@@ -288,18 +320,39 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     } catch {
       return;
     }
-    const found = tabs.find((tab) => URL.canParse(tab.cfg.url) && new URL(tab.cfg.url).hostname === host) ?? tabs[active];
+    const found = tabs.find((tab) => URL.canParse(tab.cfg.url) && new URL(tab.cfg.url).hostname === host) ?? tabs[Math.max(0, active)];
     select(found.index);
     found.view?.webContents.loadURL(url).catch(() => {
     });
   }
   function start({ url } = {}) {
-    if (url) {
-      open(url);
-    } else {
-      select(active, { focus: false });
+    if (url) open(url);
+    else if (active >= 0) select(active, { focus: false });
+    else showWelcome();
+    if (!cfg.tabLazyLoad && active >= 0) for (const tab of tabs) ensure(tab);
+  }
+  function showWelcome() {
+    const escape = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}">
+      <body style="margin:0;height:100vh;display:grid;place-items:center;background:${background};color:${dark ? "#e4e6ec" : "#1c1e23"};font:500 18px system-ui,sans-serif;text-align:center;user-select:none">
+      <div>${logo ? `<img src="${logo}" width="72" height="72" style="border-radius:16px;margin-bottom:18px"><br>` : ""}${escape(cfg.name)}
+      <div style="margin-top:8px;font:400 15px system-ui,sans-serif;opacity:.65">${escape(t.choose)}</div></div>`;
+    welcome = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    chrome.add(welcome.webContents);
+    welcome.setBackgroundColor(background);
+    container.addChildView(welcome);
+    welcome.setBounds(pageRect());
+    welcome.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).catch(() => {
+    });
+  }
+  function closeWelcome() {
+    const view = welcome;
+    welcome = null;
+    try {
+      container.removeChildView(view);
+      view.webContents.close();
+    } catch {
     }
-    if (!cfg.tabLazyLoad) for (const tab of tabs) ensure(tab);
   }
   function closeAll(done) {
     const live = tabs.filter((tab) => tab.view);
@@ -331,9 +384,9 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     closeAll,
     summary: () => [...tabs.filter((tab) => tab.view), ...tabs.filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
     isChrome: (contents) => chrome.has(contents),
-    current: () => tabs[active].view?.webContents ?? bar.webContents,
+    current: () => tabs[active]?.view?.webContents ?? bar.webContents,
     index: () => active,
-    homeUrl: () => tabs[active].cfg.url,
+    homeUrl: () => (tabs[active] ?? tabs[0]).cfg.url,
     hosts: () => tabs.map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),
     pages: () => tabs.filter((tab) => tab.view && !tab.paused).map((tab) => tab.view.webContents),
     all: () => tabs.filter((tab) => tab.view).map((tab) => tab.view.webContents)

@@ -36,6 +36,7 @@ module.exports = function barPage({ dark, accent, position, icons, badges, names
     button.small { flex: 0 0 auto; min-width: 0; ${vertical ? "width: auto; align-self: flex-start; padding: 0 12px;" : "padding: 0 14px;"} }
     button.small .name, button.small .badge, button.plain .name { display: none; }
     button.plain { flex: 0 0 auto; min-width: 56px; ${vertical ? "justify-content: center; padding: 0;" : "padding: 0 18px;"} }
+    .glyph-svg { width: 20px; height: 20px; fill: currentColor; opacity: 1; }
     .glyph { display: grid; place-items: center; font: 16px/1 system-ui, "Noto Color Emoji", sans-serif; }
     button.idle { opacity: .6; }
     button.idle[aria-selected=true] { opacity: 1; }
@@ -69,7 +70,12 @@ module.exports = function barPage({ dark, accent, position, icons, badges, names
         button.setAttribute('aria-selected', String(index === state.active));
         button.title = tab.name + (tab.state === 'paused' ? ' (paused)' : tab.state === 'unloaded' ? ' (not loaded)' : '');
         const letter = () => make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' });
-        if (tab.icon && tab.icon.kind === 'text') {
+        if (tab.icon && tab.icon.kind === 'mdi') {
+          const face = icon(tab.icon.value, '');
+          face.setAttribute('class', 'face glyph-svg');
+          face.removeChild(face.lastChild);
+          button.append(face);
+        } else if (tab.icon && tab.icon.kind === 'text') {
           button.append(make('span', { className: 'face glyph', textContent: tab.icon.value }));
         } else if (tab.icon && tab.icon.kind === 'image') {
           const face = make('img', { className: 'face', alt: '', src: tab.icon.value, draggable: false });
