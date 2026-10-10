@@ -325,8 +325,8 @@ module.exports = {
     updateChannel: {
       label: "Release branch",
       options: {
-        main: ["Stable", "Normal releases"],
-        beta: ["BETA", "WARNING: BETA releases might contain bugs, remember to keep backups of your configuration!"]
+        main: ["Stable", "Main releases"],
+        beta: ["BETA", "BETA releases might contain bugs, remember to keep backups of your configuration!"]
       }
     },
     backupBeforeUpdate: {
@@ -596,8 +596,8 @@ module.exports = {
       checking: "Checking…",
       available: "Version {version} is available.",
       availableBeta: "Beta version {version} is available.",
-      newest: "You have the newest version.",
-      newestBeta: "You have the newest version (beta versions included).",
+      newest: "You have the newest version!",
+      newestBeta: "You have the newest version!",
       failed: "Could not check for updates: {why}",
       downloading: "Downloading…",
       updated: "Updated to {version}. Restarting…",
