@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { text, fill } = require("./shared/text");
 const home = os.homedir();
 const root = path.join(home, ".AppD-manager");
 const settingsPath = path.join(root, "settings.json");
@@ -20,10 +21,10 @@ function describeExtension(folder) {
   try {
     manifest = JSON.parse(fs.readFileSync(path.join(folder, "manifest.json"), "utf8"));
   } catch {
-    throw new Error(`${folder} is not an unpacked extension: it has no readable manifest.json.`);
+    throw new Error(fill(text.errors.notExtensionFolder, { folder }));
   }
   let texts = null;
-  const text = (value) => {
+  const said = (value) => {
     if (typeof value !== "string") return "";
     const key = /^__MSG_(.+)__$/.exec(value);
     if (!key) return value;
@@ -39,8 +40,8 @@ function describeExtension(folder) {
   const sizes = Object.keys(manifest.icons || {}).map(Number).filter((size2) => size2 > 0).sort((a, b) => a - b);
   const size = sizes.filter((one) => one <= 128).pop() ?? sizes[0];
   return {
-    name: [text(manifest.name) || path.basename(folder), text(manifest.version)].filter(Boolean).join(" "),
-    about: text(manifest.description) || "Chrome extension",
+    name: [said(manifest.name) || path.basename(folder), said(manifest.version)].filter(Boolean).join(" "),
+    about: said(manifest.description) || text.library.chromeExtension,
     options: inFolder(manifest.options_ui?.page) || inFolder(manifest.options_page),
     popup: inFolder((manifest.action || manifest.browser_action || {}).default_popup),
     icon: size ? inFolder(manifest.icons[size]) : ""
@@ -59,24 +60,19 @@ const startMenuDir = path.join(process.env.APPDATA || path.join(home, "AppData",
 const windowsAppId = (name) => `hen-io.AppD-Manager.${name}`;
 const pidFile = (id) => path.join(appDir(id), "running.pid");
 const MANAGER_DESKTOP_ID = "appdmanager";
-const TRAY_ACTIONS = { toggle: "Show or hide the window" };
+const TRAY_ACTIONS = text.app.trayActions;
 const HOTKEY = /^((Ctrl|Alt|Shift|Super)\+){1,4}([A-Z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Tab|Up|Down|Left|Right|Home|End|PageUp|PageDown|Insert|Delete|Plus|numadd|numsub|`|-|=|\[|\]|;|'|,|\.|\/)$/;
-const APP_ACTIONS = {
-  "hard-reload": "Hard reload",
-  "clear-cache": "Empty cache and hard reload"
-};
+const APP_ACTIONS = text.app.actions;
 const APP_TYPES = {
   app: {
-    name: "App",
-    about: "A window of its own, with an entry in the desktop's menu and a place in the taskbar",
+    ...text.appTypes.app,
     icon: "window",
     menu: true,
     tray: false,
     actions: {}
   },
   tray: {
-    name: "Tray app",
-    about: "Sits in the system tray: a click on its icon opens a small window. Not in the menu, not in the taskbar",
+    ...text.appTypes.tray,
     icon: "tray",
     menu: false,
     tray: true,
@@ -85,125 +81,100 @@ const APP_TYPES = {
 };
 const appType = (cfg) => APP_TYPES[cfg.type] || APP_TYPES.app;
 const isTray = (cfg) => appType(cfg).tray;
-const EXTENSION_CATEGORIES = { blocking: "Blocking", video: "Video", look: "Look", chat: "Chat and streams" };
+const EXTENSION_CATEGORIES = text.extensionKinds;
 const EXTENSIONS = {
   adblock: {
-    name: "Ad blocker",
-    about: "Blocks ads and trackers on websites, and the ads in YouTube videos. Uses the filter lists uBlock Origin uses, refreshed daily.",
     category: "blocking",
     sites: [],
     icon: "shield"
   },
   twitch: {
-    name: "Twitch ad blocker",
-    about: "Removes the ads in Twitch streams, which the general blocker cannot reach. Uses the TwitchAdSolutions script, fetched from its project on GitHub.",
     category: "blocking",
     sites: ["twitch.tv"],
     icon: "shield-play"
   },
   sponsorblock: {
-    name: "SponsorBlock",
-    about: "Offers to skip, or skips, sponsor messages, intros and other parts of YouTube videos that viewers have marked.",
     category: "video",
     sites: ["youtube.com"],
     icon: "skip"
   },
   darkreader: {
-    name: "Dark Reader",
-    about: "Gives sites a dark look, also those without one of their own.",
     category: "look",
     sites: [],
     icon: "moon"
   },
   ambientlight: {
-    name: "Ambient light for YouTube",
-    about: "A glow around YouTube videos in the colours of the picture. Its settings are in the YouTube player.",
     category: "video",
     sites: ["youtube.com"],
     store: "paponcgjfojgemddooebbgniglhkajkj",
     by: "Wessel Kroos"
   },
   returndislike: {
-    name: "Return YouTube Dislike",
-    about: "Shows how many dislikes a YouTube video has again, from the counts its users gather.",
     category: "video",
     sites: ["youtube.com"],
     store: "gebbhagfogifgggkldgodflihgfeippi",
     by: "Dmitry Selivanov and community"
   },
   unhook: {
-    name: "Unhook",
-    about: "Takes the distractions out of YouTube: recommended videos, Shorts, the home feed, comments, end screens - each one to choose.",
     category: "video",
     sites: ["youtube.com"],
     store: "khncfooichmfjbepaaaebmommgaepoid",
     by: "Unhook"
   },
   enhancer: {
-    name: "Enhancer for YouTube",
-    about: "More controls in the YouTube player: volume and speed with the mouse wheel, a cinema mode, a pinned player, loops, and themes.",
     category: "video",
     sites: ["youtube.com"],
     store: "ponfpcnoihfmfllpaingbgckeeldkhle",
     by: "Maxime RF"
   },
   improveyoutube: {
-    name: "Improve YouTube!",
-    about: "A large set of switches for YouTube: layout, player defaults, quality, hiding parts of the page, shortcuts. Open source.",
     category: "video",
     sites: ["youtube.com"],
     store: "bnomihfieiccainjcjblhegjgglakjdd",
     by: "ImprovedTube"
   },
   videospeed: {
-    name: "Video Speed Controller",
-    about: "Speeds any HTML5 video up or down with the keys (S, D, R, Z, X), with the speed shown in a corner of the player.",
     category: "video",
     sites: [],
     store: "nffaoalbilbmmfgbnbgppjihopabppdk",
     by: "igrigorik"
   },
   betterttv: {
-    name: "BetterTTV",
-    about: "More emotes and chat features for Twitch (and YouTube chat): BetterTTV emotes, split chat, highlights, and many small switches.",
     category: "chat",
     sites: ["twitch.tv", "youtube.com"],
     store: "ajopnjidmegmdimjlfnijceegpefgped",
     by: "NightDev"
   },
   seventv: {
-    name: "7TV",
-    about: "7TV emotes, cosmetics and chat improvements for Twitch (and Kick and YouTube chat).",
     category: "chat",
     sites: ["twitch.tv", "kick.com", "youtube.com"],
     store: "ammjkodgmmoknidbanneddgankgfejfh",
     by: "7TV"
   },
   frankerfacez: {
-    name: "FrankerFaceZ",
-    about: "FrankerFaceZ emotes and a great many settings for Twitch: chat, the player, the layout.",
     category: "chat",
     sites: ["twitch.tv"],
     store: "fadndhdgpmmaapbmfcknlfgcflmmmieb",
     by: "Dan Salvato and SirStendec"
   }
 };
+for (const [name, info] of Object.entries(EXTENSIONS)) Object.assign(info, text.catalog[name]);
 const STORE_EXTENSIONS = Object.fromEntries(Object.entries(EXTENSIONS).filter(([, info]) => info.store).map(([name, info]) => [name, info.store]));
 const STORE_ID = /^[a-p]{32}$/;
 const COLOR_SCHEMES = ["system", "light", "dark"];
 const ACTION_BUTTON = ["off", "top-left", "top-right", "bottom-left", "bottom-right"];
 const SPONSOR_CATEGORIES = {
-  sponsor: { label: "Sponsor messages", color: "#00d400" },
-  selfpromo: { label: "Unpaid or self-promotion", color: "#ffff00" },
-  interaction: { label: "Reminders to like, subscribe or follow", color: "#cc00ff" },
-  intro: { label: "Intros and title sequences", color: "#00ffff" },
-  outro: { label: "Endcards and credits", color: "#0202ed" },
-  preview: { label: "Recaps and previews", color: "#008fd6" },
-  hook: { label: "Hooks and greetings", color: "#395699" },
-  filler: { label: "Tangents and jokes", color: "#7300ff" },
-  music_offtopic: { label: "Non-music parts of music videos", color: "#ff9900" },
-  poi_highlight: { label: "Highlight (the point of the video)", color: "#ff1684" },
-  exclusive_access: { label: "Exclusive access (whole video)", color: "#008a5c" }
+  sponsor: { label: text.sponsorKinds.sponsor, color: "#00d400" },
+  selfpromo: { label: text.sponsorKinds.selfpromo, color: "#ffff00" },
+  interaction: { label: text.sponsorKinds.interaction, color: "#cc00ff" },
+  intro: { label: text.sponsorKinds.intro, color: "#00ffff" },
+  outro: { label: text.sponsorKinds.outro, color: "#0202ed" },
+  preview: { label: text.sponsorKinds.preview, color: "#008fd6" },
+  hook: { label: text.sponsorKinds.hook, color: "#395699" },
+  filler: { label: text.sponsorKinds.filler, color: "#7300ff" },
+  music_offtopic: { label: text.sponsorKinds.music_offtopic, color: "#ff9900" },
+  poi_highlight: { label: text.sponsorKinds.poi_highlight, color: "#ff1684" },
+  exclusive_access: { label: text.sponsorKinds.exclusive_access, color: "#008a5c" }
 };
 const SPONSOR_ACTIONS = ["off", "show", "ask", "skip"];
 const SPONSOR_CHOICES = { poi_highlight: ["off", "ask", "skip"], exclusive_access: ["off", "show"] };
@@ -224,7 +195,7 @@ const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DEFAULTS = {
   name: "",
   url: "",
-  description: "AppD Manager application",
+  description: text.library.defaultDescription,
   icon: "applications-internet",
   width: 1280,
   height: 800,
@@ -342,9 +313,9 @@ const EXTENSION_KEYS = {
   sponsorblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("sponsorBlock") || key === "youtubeQuality"),
   darkreader: ["darkBrightness", "darkContrast", "darkSepia"]
 };
-const MODES = { system: "As the desktop", light: "Light", dark: "Dark" };
+const MODES = text.modes;
 const DEFAULT_PALETTE = "ocean";
-const PALETTES = { ocean: "Ocean", indigo: "Indigo", violet: "Violet", teal: "Teal", forest: "Forest", amber: "Amber", coral: "Coral", rose: "Rose" };
+const PALETTES = text.palettes;
 function readSettings() {
   try {
     return JSON.parse(fs.readFileSync(settingsPath, "utf8"));
@@ -361,7 +332,8 @@ const PREFS = {
   showUsage: true,
   motion: true,
   appOrder: "usage",
-  updateChannel: "main"
+  updateChannel: "main",
+  restartAppsOnUpdate: true
 };
 const RESTART_ON_SAVE = ["ask", "always", "never"];
 const UPDATE_CHANNELS = ["main", "beta"];
@@ -384,9 +356,9 @@ function setPrefs(next) {
     if (key in next && typeof next[key] === typeof PREFS[key]) now[key] = next[key];
   }
   now.backupsKept = Math.min(50, Math.max(1, Math.round(now.backupsKept) || PREFS.backupsKept));
-  if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(`"restartOnSave" must be one of: ${RESTART_ON_SAVE.join(", ")}`);
-  if (!APP_ORDERS.includes(now.appOrder)) throw new Error(`"appOrder" must be one of: ${APP_ORDERS.join(", ")}`);
-  if (!UPDATE_CHANNELS.includes(now.updateChannel)) throw new Error(`"updateChannel" must be one of: ${UPDATE_CHANNELS.join(", ")}`);
+  if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(fill(text.errors.oneOf, { key: "restartOnSave", values: RESTART_ON_SAVE.join(", ") }));
+  if (!APP_ORDERS.includes(now.appOrder)) throw new Error(fill(text.errors.oneOf, { key: "appOrder", values: APP_ORDERS.join(", ") }));
+  if (!UPDATE_CHANNELS.includes(now.updateChannel)) throw new Error(fill(text.errors.oneOf, { key: "updateChannel", values: UPDATE_CHANNELS.join(", ") }));
   const settings = readSettings();
   settings.manager = now;
   fs.mkdirSync(root, { recursive: true });
@@ -400,7 +372,7 @@ function appearance() {
 function setAppearance(next) {
   const settings = readSettings();
   settings.appearance = { ...appearance(), ...next };
-  if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES)) throw new Error("unknown mode or palette");
+  if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES)) throw new Error(text.errors.unknownLook);
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return appearance();
@@ -419,9 +391,9 @@ async function moveApps(target) {
     const source = path.join(from, id);
     const dest = path.join(target, id);
     if (runningPid(id)) {
-      result.left.push(`${id} (running)`);
+      result.left.push(fill(text.library.running, { id }));
     } else if (fs.existsSync(dest)) {
-      result.left.push(`${id} (already exists there)`);
+      result.left.push(fill(text.library.existsThere, { id }));
     } else {
       try {
         fs.renameSync(source, dest);
@@ -465,7 +437,7 @@ const desktopId = (id) => `appd-${id}`;
 const desktopPath = (name) => path.join(desktopDir, `${name}.desktop`);
 function checkId(id) {
   if (!ID_RE.test(id || "")) {
-    throw new Error(`invalid app id "${id || ""}" (use a-z, 0-9, - and _)`);
+    throw new Error(fill(text.errors.badId, { id: id || "" }));
   }
 }
 function newId(name) {
@@ -516,36 +488,36 @@ const RULES = {
 function validate(cfg) {
   for (const [key, def] of Object.entries(DEFAULTS)) {
     if (typeof cfg[key] !== typeof def || Array.isArray(cfg[key]) !== Array.isArray(def)) {
-      throw new Error(`"${key}" must be ${Array.isArray(def) ? "an array" : `a ${typeof def}`}`);
+      throw new Error(Array.isArray(def) ? fill(text.errors.mustBeArray, { key }) : fill(text.errors.mustBe, { key, type: typeof def }));
     }
     const rule = RULES[key];
-    if (rule?.oneOf && !rule.oneOf.includes(cfg[key])) throw new Error(`"${key}" must be one of: ${rule.oneOf.join(", ")}`);
+    if (rule?.oneOf && !rule.oneOf.includes(cfg[key])) throw new Error(fill(text.errors.oneOf, { key, values: rule.oneOf.join(", ") }));
     if (rule && "min" in rule && !(cfg[key] >= rule.min && cfg[key] <= rule.max)) {
-      throw new Error(`"${key}" must be a number from ${rule.min} to ${rule.max}`);
+      throw new Error(fill(text.errors.range, { key, min: rule.min, max: rule.max }));
     }
   }
-  if (!URL.canParse(cfg.url)) throw new Error(`invalid url "${cfg.url}"`);
+  if (!URL.canParse(cfg.url)) throw new Error(fill(text.errors.badUrl, { url: cfg.url }));
   const unknown = cfg.extensions.find((name) => !(name in EXTENSIONS));
-  if (unknown !== void 0) throw new Error(`unknown extension "${unknown}" (known: ${Object.keys(EXTENSIONS).join(", ")})`);
+  if (unknown !== void 0) throw new Error(fill(text.errors.unknownExtension, { name: unknown, known: Object.keys(EXTENSIONS).join(", ") }));
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
-    if (!cfg[key]) throw new Error(`"${key}" must be an object`);
+    if (!cfg[key]) throw new Error(fill(text.errors.mustBeObject, { key }));
     const odd = Object.keys(cfg[key]).find((name) => !(name in SPONSOR_CATEGORIES));
-    if (odd !== void 0) throw new Error(`unknown SponsorBlock category "${odd}" in "${key}" (known: ${Object.keys(SPONSOR_CATEGORIES).join(", ")})`);
+    if (odd !== void 0) throw new Error(fill(text.errors.unknownSponsorKind, { name: odd, key, known: Object.keys(SPONSOR_CATEGORIES).join(", ") }));
   }
   for (const [category, action] of Object.entries(cfg.sponsorBlockActions)) {
-    if (!sponsorChoices(category).includes(action)) throw new Error(`"sponsorBlockActions.${category}" must be one of: ${sponsorChoices(category).join(", ")}`);
+    if (!sponsorChoices(category).includes(action)) throw new Error(fill(text.errors.oneOf, { key: `sponsorBlockActions.${category}`, values: sponsorChoices(category).join(", ") }));
   }
   for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
-    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`"sponsorBlockColors.${category}" must be a colour like #00d400`);
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(fill(text.errors.sponsorColour, { kind: category }));
   }
-  if (cfg.trayHotkey && !HOTKEY.test(cfg.trayHotkey)) throw new Error('"trayHotkey" must be a key combination like Super+Alt+Y or Ctrl+Shift+F9');
-  if (cfg.language && !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(cfg.language)) throw new Error('"language" must be a language code like en-GB or nb');
-  if (cfg.downloadFolder && !path.isAbsolute(cfg.downloadFolder)) throw new Error('"downloadFolder" must be a full path');
+  if (cfg.trayHotkey && !HOTKEY.test(cfg.trayHotkey)) throw new Error(text.errors.hotkey);
+  if (cfg.language && !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(cfg.language)) throw new Error(text.errors.language);
+  if (cfg.downloadFolder && !path.isAbsolute(cfg.downloadFolder)) throw new Error(text.errors.downloadFolder);
   const oddEntry = cfg.customExtensions.find((entry) => typeof entry !== "string" || !entry || entry.startsWith("store:") && !storeIdOf(entry));
-  if (oddEntry !== void 0) throw new Error(`"${oddEntry}" in "customExtensions" is not an extension`);
-  if (cfg.proxy && !/^(https?|socks[45]?):\/\/[^\s/]+(:\d+)?\/?$/i.test(cfg.proxy)) throw new Error('"proxy" must be an address like socks5://127.0.0.1:1080 or http://proxy.lan:3128');
-  if (cfg.windowBorderColor && !/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error('"windowBorderColor" must be a colour like #7a7f87, or empty for the colour of the icon');
-  if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error('"sponsorBlockServer" must be an address starting with https://');
+  if (oddEntry !== void 0) throw new Error(fill(text.errors.customExtension, { entry: oddEntry }));
+  if (cfg.proxy && !/^(https?|socks[45]?):\/\/[^\s/]+(:\d+)?\/?$/i.test(cfg.proxy)) throw new Error(text.errors.proxy);
+  if (cfg.windowBorderColor && !/^#[0-9a-f]{6}$/i.test(cfg.windowBorderColor)) throw new Error(text.errors.borderColour);
+  if (!/^https?:\/\/[^\s/]+/i.test(cfg.sponsorBlockServer)) throw new Error(text.errors.sponsorServer);
 }
 function extensionDefaults() {
   const stored = readSettings().extensionSettings || {};
@@ -595,20 +567,20 @@ function storeLibrary() {
     try {
       found[id] = describeExtension(path.join(storeDir, id));
     } catch {
-      found[id] = { name: id, about: "Not fetched yet: it is fetched when an app that has it starts.", options: "", popup: "", icon: "" };
+      found[id] = { name: id, about: text.library.notFetched, options: "", popup: "", icon: "" };
     }
   }
   return found;
 }
 function addStoreExtension(id) {
-  if (!STORE_ID.test(id)) throw new Error(`"${id}" is not an extension id`);
+  if (!STORE_ID.test(id)) throw new Error(fill(text.errors.notExtensionId, { id }));
   const settings = readSettings();
   settings.storeExtensions = { ...settings.storeExtensions, [id]: { added: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) } };
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 function removeStoreExtension(id) {
-  if (!STORE_ID.test(id)) throw new Error(`"${id}" is not an extension id`);
+  if (!STORE_ID.test(id)) throw new Error(fill(text.errors.notExtensionId, { id }));
   const settings = readSettings();
   if (settings.storeExtensions) delete settings.storeExtensions[id];
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
@@ -651,7 +623,7 @@ function importedExtensions() {
 function importExtension(folder) {
   const info = describeExtension(folder);
   const source = path.resolve(folder);
-  if (source.startsWith(extensionsDir + path.sep)) throw new Error("That extension is in the library already.");
+  if (source.startsWith(extensionsDir + path.sep)) throw new Error(text.errors.extensionInLibrary);
   const name = info.name.toLowerCase().replace(/ [\d.]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "extension";
   const target = path.join(extensionsDir, name);
   fs.rmSync(target, { recursive: true, force: true });
@@ -660,7 +632,7 @@ function importExtension(folder) {
   return name;
 }
 function removeImportedExtension(name) {
-  if (!ID_RE.test(name)) throw new Error(`invalid extension name "${name}"`);
+  if (!ID_RE.test(name)) throw new Error(fill(text.errors.badExtensionName, { name }));
   fs.rmSync(path.join(extensionsDir, name), { recursive: true, force: true });
   dropFromApps(name);
 }
@@ -726,7 +698,7 @@ function load(id) {
   try {
     raw = fs.readFileSync(configPath(id), "utf8");
   } catch {
-    throw new Error(`no app "${id}" (expected ${configPath(id)})`);
+    throw new Error(fill(text.errors.noApp, { id, file: configPath(id) }));
   }
   let cfg;
   try {
@@ -776,7 +748,7 @@ function remove(id) {
 }
 function restore(id) {
   checkId(id);
-  if (fs.existsSync(appDir(id))) throw new Error(`There is an app "${id}" again already.`);
+  if (fs.existsSync(appDir(id))) throw new Error(fill(text.errors.appAgain, { id }));
   fs.mkdirSync(appsDir(), { recursive: true });
   fs.renameSync(path.join(trashDir, id), appDir(id));
 }
@@ -786,12 +758,12 @@ function emptyTrash(id) {
 }
 function clearData(id) {
   checkId(id);
-  if (runningPid(id)) throw new Error("Close the app first.");
+  if (runningPid(id)) throw new Error(text.errors.closeFirst);
   fs.rmSync(profileDir(id), { recursive: true, force: true });
 }
 function duplicate(id) {
   const cfg = load(id);
-  const name = `${cfg.name} (copy)`;
+  const name = fill(text.library.copyName, { name: cfg.name });
   const copy = newId(name);
   save(copy, { ...cfg, name, icon: iconFile(id, cfg) || cfg.icon, autostart: false });
   return copy;
@@ -810,7 +782,7 @@ function exportApps() {
   return { what: "AppD-Manager apps", version: 1, extensionSettings: readSettings().extensionSettings || null, apps };
 }
 function importApps(data) {
-  if (!data || data.what !== "AppD-Manager apps" || !Array.isArray(data.apps)) throw new Error("This is not a file of exported AppD-Manager apps.");
+  if (!data || data.what !== "AppD-Manager apps" || !Array.isArray(data.apps)) throw new Error(text.errors.notExport);
   const result = { added: [], skipped: [] };
   try {
     if (data.extensionSettings && !readSettings().extensionSettings) setExtensionDefaults(data.extensionSettings);
@@ -987,13 +959,13 @@ function syncWindows(ids, problems) {
   written = writeShortcut(manager, {
     target,
     args: shortcutArgs(args.filter((arg) => !arg.startsWith("--appd-run="))),
-    description: "Add, change and remove web apps",
+    description: text.library.managerComment,
     icon: path.join(__dirname, "manager", "icon.ico"),
     iconIndex: 0,
     appUserModelId: windowsAppId("manager")
   }) && written;
   if (!written) {
-    problems.push("The Start menu is brought up to date the next time AppD-Manager is opened.");
+    problems.push(text.library.startMenuLater);
     return problems;
   }
   for (const file of fs.readdirSync(startMenuDir)) {
@@ -1057,7 +1029,7 @@ function setAutostart(id, cfg) {
 function writeManagerDesktop() {
   writeEntry(MANAGER_DESKTOP_ID, [
     "Name=AppD-Manager",
-    "Comment=Add, change and remove web apps",
+    `Comment=${text.library.managerComment}`,
     `Exec=${execArg(launcher)} manager`,
     `Icon=${entryValue(path.join(__dirname, "manager", "icon.svg"))}`,
     "Categories=Utility;",

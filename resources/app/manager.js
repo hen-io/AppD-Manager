@@ -4,6 +4,8 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
+const { text, fill, counted } = require("./shared/text");
+const t = text.manager;
 const update = require("./update");
 const icons = require("./icons");
 const desktopFile = `${lib.MANAGER_DESKTOP_ID}.desktop`;
@@ -33,9 +35,9 @@ async function mayLeave() {
   if (!unsaved) return true;
   const response = await ask({
     icon: "save",
-    buttons: ["Save", "Discard", "Cancel"],
-    message: "Save the changes?",
-    detail: "The app you are editing has changes that are not saved."
+    buttons: t.unsaved.buttons,
+    message: t.unsaved.message,
+    detail: t.unsaved.detail
   });
   if (response === 2) return false;
   if (response === 0) return Boolean(await win.webContents.executeJavaScript("saveBeforeClose()").catch(() => false));
@@ -122,13 +124,13 @@ function state() {
   };
 }
 async function changeAppsDir(dir) {
-  if (process.env.APPD_APPS_DIR) throw new Error("The location is fixed by the APPD_APPS_DIR environment variable.");
+  if (process.env.APPD_APPS_DIR) throw new Error(t.folder.fixed);
   const { moved, left } = await lib.moveApps(dir || lib.defaultAppsDir);
   lib.setAppsDir(dir);
   lib.sync();
   const parts = [];
-  if (moved.length) parts.push(`Moved ${moved.length === 1 ? "1 app" : `${moved.length} apps`}.`);
-  if (left.length) parts.push(`Still in the old folder: ${left.join(", ")}.`);
+  if (moved.length) parts.push(counted(t.folder.moved, moved.length));
+  if (left.length) parts.push(fill(t.folder.left, { apps: left.join(", ") }));
   return { ...state(), message: parts.join(" "), problem: left.length > 0 };
 }
 function ask(question) {
@@ -146,17 +148,17 @@ async function offerRestart(ids) {
   });
   const one = ids.length === 1;
   const mode = lib.prefs().restartOnSave;
-  const kept = one ? "The app keeps its old settings until it is started again." : "The running apps keep their old settings until they are started again.";
+  const kept = t.restart.kept[one ? 0 : 1];
   if (mode === "never") return kept;
   const response = mode === "always" ? 0 : await ask({
     icon: "restart",
-    buttons: [one ? "Restart now" : "Restart them now", "Later"],
-    message: one ? `Restart "${names[0]}" now?` : `Restart ${ids.length} running apps now?`,
-    detail: (one ? "The app is running and keeps" : names.join(", ") + " are running and keep") + " the old settings until restarted. Restarting closes the window; anything not saved in the page is lost."
+    buttons: [t.restart.now[one ? 0 : 1], t.restart.later],
+    message: counted(t.restart.message, ids.length, { name: names[0] }),
+    detail: counted(t.restart.detail, ids.length, { names: names.join(", ") })
   });
   if (response !== 0) return kept;
   for (const id of ids) restartApp(id);
-  return one ? "The app restarts with the new settings, on the page it was on." : "The running apps restart with the new settings, each on the page it was on.";
+  return t.restart.done[one ? 0 : 1];
 }
 function startApp(id, extra = []) {
   const cfg = lib.load(id);
@@ -197,8 +199,8 @@ const handlers = {
     for (const key of Object.keys(lib.DEFAULTS)) {
       if (key in input) cfg[key] = input[key];
     }
-    if (!cfg.name) throw new Error("Give the app a name.");
-    if (!cfg.url) throw new Error("Give the app a URL.");
+    if (!cfg.name) throw new Error(t.save.noName);
+    if (!cfg.url) throw new Error(t.save.noUrl);
     id ||= lib.newId(cfg.name);
     lib.save(id, cfg);
     lib.sync();
@@ -210,9 +212,9 @@ const handlers = {
     const response = !lib.prefs().confirmRemove ? 0 : await ask({
       icon: "delete",
       danger: true,
-      buttons: ["Remove", "Cancel"],
-      message: `Remove "${id}"?`,
-      detail: `This deletes ${lib.appDir(id)}, including the app's logins and data, and takes it out of the menu.`
+      buttons: t.remove.buttons,
+      message: fill(t.remove.message, { id }),
+      detail: fill(t.remove.detail, { folder: lib.appDir(id) })
     });
     if (response !== 0) return { removed: false };
     if (lib.close(id)) {
@@ -236,32 +238,32 @@ const handlers = {
   },
   async exportApps() {
     const { filePath } = await dialog.showSaveDialog(win, {
-      title: "Export the apps",
+      title: t.backup.exportTitle,
       defaultPath: `appd-manager-apps-${(/* @__PURE__ */ new Date()).toLocaleDateString("sv")}.json`,
-      filters: [{ name: "AppD-Manager apps", extensions: ["json"] }]
+      filters: [{ name: t.backup.fileKind, extensions: ["json"] }]
     });
     if (!filePath) return null;
     const data = lib.exportApps();
     fs.writeFileSync(filePath, JSON.stringify(data));
-    return `${data.apps.length} ${data.apps.length === 1 ? "app" : "apps"} exported to ${filePath}.`;
+    return counted(t.backup.exported, data.apps.length, { file: filePath });
   },
   async importApps() {
     const { filePaths } = await dialog.showOpenDialog(win, {
-      title: "Import apps",
+      title: t.backup.importTitle,
       properties: ["openFile"],
-      filters: [{ name: "AppD-Manager apps", extensions: ["json"] }]
+      filters: [{ name: t.backup.fileKind, extensions: ["json"] }]
     });
     if (!filePaths[0]) return null;
     let data;
     try {
       data = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
     } catch {
-      throw new Error("That file cannot be read as exported apps.");
+      throw new Error(t.backup.unreadable);
     }
     const { added, skipped } = lib.importApps(data);
     lib.sync();
-    const parts = [`${added.length} ${added.length === 1 ? "app" : "apps"} imported${added.length ? `: ${added.join(", ")}` : ""}.`];
-    if (skipped.length) parts.push(`Left out: ${skipped.join("; ")}.`);
+    const parts = [added.length ? counted(t.backup.imported, added.length, { apps: added.join(", ") }) : t.backup.importedNone];
+    if (skipped.length) parts.push(fill(t.backup.leftOut, { apps: skipped.join("; ") }));
     return { state: state(), message: parts.join(" "), problem: skipped.length > 0 };
   },
   duplicate(id) {
@@ -274,9 +276,9 @@ const handlers = {
     const response = await ask({
       icon: "delete",
       danger: true,
-      buttons: ["Delete the data", "Cancel"],
-      message: `Delete the data of "${lib.load(id).name}"?`,
-      detail: "This signs the app out everywhere and deletes its cookies, cache and remembered window size. Its settings and icon stay. The app is closed first if it is running."
+      buttons: t.clearData.buttons,
+      message: fill(t.clearData.message, { name: lib.load(id).name }),
+      detail: t.clearData.detail
     });
     if (response !== 0) return false;
     if (lib.close(id)) {
@@ -288,9 +290,9 @@ const handlers = {
   async askUnsaved() {
     const response = await ask({
       icon: "save",
-      buttons: ["Save", "Discard", "Cancel"],
-      message: "Save the changes?",
-      detail: "The app you are editing has changes that are not saved."
+      buttons: t.unsaved.buttons,
+      message: t.unsaved.message,
+      detail: t.unsaved.detail
     });
     return ["save", "discard", "stay"][response];
   },
@@ -324,21 +326,21 @@ const handlers = {
     startApp(id);
   },
   async pickFolder(title) {
-    const { filePaths } = await dialog.showOpenDialog(win, { title: String(title || "Choose a folder"), properties: ["openDirectory", "createDirectory"] });
+    const { filePaths } = await dialog.showOpenDialog(win, { title: String(title || text.ui.form.chooseFolderTitle), properties: ["openDirectory", "createDirectory"] });
     return filePaths[0] || null;
   },
   async pickIcon() {
     const { filePaths } = await dialog.showOpenDialog(win, {
-      title: "Choose an icon",
+      title: t.pick.icon,
       properties: ["openFile"],
-      filters: [{ name: "Images", extensions: ["png", "svg"] }]
+      filters: [{ name: t.pick.images, extensions: ["png", "svg"] }]
     });
     return filePaths[0] ? { path: filePaths[0], url: iconPreview(filePaths[0]) } : null;
   },
   fetchIcons: (url) => icons.fetchIcons(url),
   async pickAppsDir() {
     const { filePaths } = await dialog.showOpenDialog(win, {
-      title: "Choose the folder that holds your apps",
+      title: t.pick.appsFolder,
       defaultPath: lib.appsDir(),
       properties: ["openDirectory", "createDirectory"]
     });
@@ -360,15 +362,15 @@ const handlers = {
     const restart = await offerRestart(lib.runningPid(id) ? [id] : []);
     return { state: state(), restart };
   },
-  async addStoreExtension(text) {
-    const storeId = storeIdIn(text);
-    if (!storeId) throw new Error("That is neither a link to an extension in the Chrome Web Store nor the id of one (32 letters).");
+  async addStoreExtension(text2) {
+    const storeId = storeIdIn(text2);
+    if (!storeId) throw new Error(t.extension.notOne);
     const known = Object.entries(lib.STORE_EXTENSIONS).find(([, id]) => id === storeId);
-    if (known) throw new Error(`"${lib.EXTENSIONS[known[0]].name}" is in the catalog already.`);
+    if (known) throw new Error(fill(t.extension.inCatalog, { name: lib.EXTENSIONS[known[0]].name }));
     try {
       await require("./app/store-extension")(storeId, lib.root);
     } catch (e) {
-      throw new Error(`The extension could not be fetched: ${e.message}.`);
+      throw new Error(fill(t.extension.notFetched, { why: e.message }));
     }
     lib.addStoreExtension(storeId);
     return { state: state(), entry: `store:${storeId}` };
@@ -378,9 +380,9 @@ const handlers = {
     const response = await ask({
       icon: "delete",
       danger: true,
-      buttons: ["Remove", "Cancel"],
-      message: `Remove the extension "${info ? info.name : storeId}"?`,
-      detail: "It is taken out of the library and out of every app that uses it."
+      buttons: t.extension.removeButtons,
+      message: fill(t.extension.removeMessage, { name: info ? info.name : storeId }),
+      detail: t.extension.removeDetail
     });
     if (response !== 0) return null;
     lib.removeStoreExtension(String(storeId));
@@ -397,9 +399,9 @@ const handlers = {
         credentials: "omit"
       })).text();
       const address = /property="og:image" content="(https:\/\/lh3\.googleusercontent\.com\/[^"]+)"/.exec(page)?.[1];
-      if (!address) throw new Error("no picture found");
+      if (!address) throw new Error(text.errors.noPicture);
       const picture = Buffer.from(await (await net.fetch(address.replace(/=s\d+[^/=]*$/, "=s128"))).arrayBuffer());
-      if (nativeImage.createFromBuffer(picture).isEmpty()) throw new Error("not a picture");
+      if (nativeImage.createFromBuffer(picture).isEmpty()) throw new Error(text.errors.notPicture);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, nativeImage.createFromBuffer(picture).toPNG());
     }
@@ -410,7 +412,7 @@ const handlers = {
   },
   async importExtension() {
     const { filePaths } = await dialog.showOpenDialog(win, {
-      title: "Choose the folder of an unpacked extension (it holds manifest.json)",
+      title: t.pick.extensionFolder,
       properties: ["openDirectory"]
     });
     if (!filePaths[0]) return null;
@@ -422,9 +424,9 @@ const handlers = {
     const response = await ask({
       icon: "delete",
       danger: true,
-      buttons: ["Remove", "Cancel"],
-      message: `Remove the extension "${info ? info.name : name}"?`,
-      detail: "It is taken out of the library and out of every app that uses it."
+      buttons: t.extension.removeButtons,
+      message: fill(t.extension.removeMessage, { name: info ? info.name : name }),
+      detail: t.extension.removeDetail
     });
     if (response !== 0) return null;
     lib.removeImportedExtension(String(name));
@@ -438,9 +440,9 @@ const handlers = {
     if (running.length) {
       const response = await ask({
         icon: "exit",
-        buttons: ["Exit", "Cancel"],
-        message: "Exit AppD-Manager?",
-        detail: `This also closes the ${running.length === 1 ? "app that is" : `${running.length} apps that are`} running.`
+        buttons: t.exit.buttons,
+        message: t.exit.message,
+        detail: counted(t.exit.detail, running.length)
       });
       if (response !== 0) return false;
     }
@@ -453,13 +455,13 @@ const handlers = {
   async showLog(id) {
     lib.checkId(id);
     const file = path.join(lib.appDir(id), "events.log");
-    if (!fs.existsSync(file)) throw new Error("Nothing is logged yet: the log starts the next time the app does.");
+    if (!fs.existsSync(file)) throw new Error(t.noLog);
     const error = await shell.openPath(file);
     if (error) throw new Error(error);
   },
   showConfig(id) {
     lib.checkId(id);
-    if (!fs.existsSync(lib.configPath(id))) throw new Error(`${lib.configPath(id)} does not exist.`);
+    if (!fs.existsSync(lib.configPath(id))) throw new Error(fill(t.noFile, { file: lib.configPath(id) }));
     shell.showItemInFolder(lib.configPath(id));
   },
   openAuthorLink() {
@@ -474,17 +476,17 @@ const handlers = {
     if (error) throw new Error(error);
   },
   async askUpdate(info) {
-    const how = info.blocked || `You have ${info.current}. Updating takes a moment and restarts AppD-Manager; your apps are not touched.`;
-    const buttons = info.blocked ? ["OK", "Open release page"] : ["Update now", "Later", "Open release page"];
+    const how = info.blocked || fill(t.update.how, { current: info.current });
+    const buttons = info.blocked ? [t.update.ok, t.update.releasePage] : [t.update.now, t.update.later, t.update.releasePage];
     const response = await ask({
       icon: "update",
       buttons,
       cancel: info.blocked ? 0 : 1,
-      message: `AppD-Manager ${info.latest} is available${info.beta ? " (beta)" : ""}`,
+      message: fill(info.beta ? t.update.messageBeta : t.update.message, { version: info.latest }),
       release: { name: info.name, tag: info.tag, latest: info.latest, notes: info.notes },
       detail: how
     });
-    if (buttons[response] === "Open release page") handlers.openReleasePage(info.url);
+    if (buttons[response] === t.update.releasePage) handlers.openReleasePage(info.url);
     return !info.blocked && response === 0;
   },
   openReleasePage(url) {
@@ -522,14 +524,14 @@ function extensionIcons() {
   for (const name of Object.keys(lib.importedExtensions())) own(name, lib.extensionFolder(name));
   return icons2;
 }
-function storeIdIn(text) {
-  const found = /(?:^|[/=\s])([a-p]{32})(?:$|[/?#&\s])/.exec(` ${String(text).trim()} `);
+function storeIdIn(text2) {
+  const found = /(?:^|[/=\s])([a-p]{32})(?:$|[/?#&\s])/.exec(` ${String(text2).trim()} `);
   return found ? found[1] : "";
 }
 for (const [name, fn] of Object.entries(handlers)) {
   ipcMain.handle(name, async (event, ...args) => {
     try {
-      if (!win || win.isDestroyed() || event.senderFrame !== win.webContents.mainFrame) throw new Error("Not allowed from here.");
+      if (!win || win.isDestroyed() || event.senderFrame !== win.webContents.mainFrame) throw new Error(t.notAllowed);
       return { value: await fn(...args) };
     } catch (e) {
       return { error: e.message };
@@ -542,7 +544,7 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 520,
-    title: "AppD-Manager",
+    title: t.windowTitle,
     icon: path.join(__dirname, "manager", lib.WINDOWS ? "icon.ico" : "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "manager", "preload.js"),

@@ -2,6 +2,8 @@
 const { WebContentsView, ipcMain, nativeTheme } = require("electron");
 const path = require("path");
 const { pageArea } = require("./frame");
+const { text } = require("../shared/text");
+const t = text.app.find;
 const WIDTH = 372;
 const HEIGHT = 52;
 const MARGIN = 12;
@@ -22,11 +24,11 @@ function page(dark) {
     button:hover { background: ${faint}; }
     svg { width: 18px; height: 18px; fill: currentColor; vertical-align: middle; }
   </style><body>
-    <input id="text" placeholder="Find in page" spellcheck="false" autofocus>
+    <input id="text" placeholder="${t.placeholder}" spellcheck="false" autofocus>
     <span id="count"></span>
-    <button id="up" title="Previous (Shift+Enter)"><svg viewBox="0 0 24 24"><path d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/></svg></button>
-    <button id="down" title="Next (Enter)"><svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg></button>
-    <button id="close" title="Close (Escape)"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/></svg></button>
+    <button id="up" title="${t.previous}"><svg viewBox="0 0 24 24"><path d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/></svg></button>
+    <button id="down" title="${t.next}"><svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg></button>
+    <button id="close" title="${t.close}"><svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/></svg></button>
   <script>
     const text = document.getElementById('text');
     const count = document.getElementById('count');
@@ -105,10 +107,10 @@ const windowOf = (sender) => {
   const window = owners.get(sender);
   return window && !window.isDestroyed() && bars.get(window)?.view.webContents === sender ? window : null;
 };
-ipcMain.on("appd-find", (event, text, forward, next) => {
+ipcMain.on("appd-find", (event, text2, forward, next) => {
   const window = windowOf(event.sender);
   if (!window) return;
-  const wanted = String(text ?? "");
+  const wanted = String(text2 ?? "");
   if (!wanted) {
     window.webContents.stopFindInPage("clearSelection");
     event.sender.send("appd-find-count", 0, 0);

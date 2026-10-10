@@ -1,5 +1,6 @@
 "use strict";
 const { Menu, Tray, nativeImage } = require("electron");
+const { text } = require("../shared/text");
 module.exports = function keepInTray(window, { name, icon, isQuitting, quit, note, menu = () => [], show }) {
   let tray;
   try {
@@ -28,7 +29,7 @@ module.exports = function keepInTray(window, { name, icon, isQuitting, quit, not
       { label: seen ? `Hide ${name}` : `Show ${name}`, click: () => toggle() },
       ...own.length ? [{ type: "separator" }, ...own] : [],
       { type: "separator" },
-      { label: "Quit", click: quit }
+      { label: text.app.tray.quit, click: quit }
     ]));
   };
   tray.setToolTip(name);

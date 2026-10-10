@@ -12,6 +12,8 @@ const { frameOptions, styleFrame, isBare, hasLook, needsHost, wantsIconColour, o
 const iconColour = require("./app/iconcolour");
 const { windowIcon } = require("./app/icondraw");
 const watchForUpdate = require("./app/updated");
+const { text, fill } = require("./shared/text");
+const t = text.app;
 const openLog = require("./app/log");
 const createZoom = require("./app/zoom");
 const createThrottle = require("./app/throttle");
@@ -131,9 +133,9 @@ function mayLeave(wc) {
   const options = {
     type: "question",
     title: cfg.name,
-    message: "Leave this page?",
-    detail: "It may have unsaved changes.",
-    buttons: ["Leave", "Stay"],
+    message: t.leave.message,
+    detail: t.leave.detail,
+    buttons: t.leave.buttons,
     defaultId: 1,
     cancelId: 1,
     noLink: true
@@ -213,39 +215,39 @@ function appMenu(wc, inTray = false) {
   const window = BrowserWindow.fromWebContents(wc);
   const sep = { type: "separator" };
   return [
-    { label: "Reload", accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
+    { label: t.menu.reload, accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
-    { label: `Go to ${cfg.name}`, accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
+    { label: fill(t.menu.goHome, { name: cfg.name }), accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
     sep,
-    { label: "Mute sound", type: "checkbox", checked: wc.isAudioMuted(), click: () => wc.setAudioMuted(!wc.isAudioMuted()) },
+    { label: t.menu.mute, type: "checkbox", checked: wc.isAudioMuted(), click: () => wc.setAudioMuted(!wc.isAudioMuted()) },
     ...cfg.allowZoom ? [
       {
-        label: `Reset zoom (${zoom.normalPercent}%)`,
+        label: fill(t.menu.resetZoom, { percent: zoom.normalPercent }),
         accelerator: "Ctrl+0",
         enabled: zoom.isChanged(),
         click: () => zoom.reset(wc)
       }
     ] : [],
     ...lib.isTray(cfg) ? [] : [{
-      label: "Full screen",
+      label: t.menu.fullScreen,
       accelerator: "F11",
       type: "checkbox",
       checked: Boolean(window?.isFullScreen()),
       click: () => window?.setFullScreen(!window.isFullScreen())
     }],
     ...lib.isTray(cfg) && cfg.trayHideOnBlur && trayIcon?.pin ? [sep, {
-      label: "Keep open",
+      label: t.menu.keepOpen,
       type: "checkbox",
       checked: trayIcon.isPinned(),
       click: () => trayIcon.pin(!trayIcon.isPinned())
     }] : [],
-    ...lib.isTray(cfg) && !inTray ? [{ label: "Hide", click: () => window?.hide() }, sep, { label: `Quit ${cfg.name}`, click: () => app.quit() }] : [],
+    ...lib.isTray(cfg) && !inTray ? [{ label: t.menu.hide, click: () => window?.hide() }, sep, { label: fill(t.menu.quit, { name: cfg.name }), click: () => app.quit() }] : [],
     ...cfg.windowDecorations || lib.isTray(cfg) ? [] : [
       sep,
-      { label: "Minimize", click: () => window?.minimize() },
-      { label: window?.isMaximized() ? "Restore size" : "Maximize", click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
-      { label: "Close window", accelerator: "Alt+F4", click: () => window?.close() }
+      { label: t.menu.minimize, click: () => window?.minimize() },
+      { label: window?.isMaximized() ? t.menu.restoreSize : t.menu.maximize, click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
+      { label: t.menu.closeWindow, accelerator: "Alt+F4", click: () => window?.close() }
     ],
     ...extensions.menu()
   ];
@@ -304,8 +306,8 @@ function contextMenu(wc, p) {
     const window = BrowserWindow.fromWebContents(wc);
     return popUp([
       ...p.isEditable ? [{ role: "cut", enabled: p.editFlags.canCut }, { role: "copy", enabled: p.editFlags.canCopy }, { role: "paste", enabled: p.editFlags.canPaste }, sep] : p.selectionText ? [{ role: "copy" }, sep] : [],
-      { label: "Reload", click: () => wc.reload() },
-      { label: "Close", click: () => window?.close() }
+      { label: t.menu.reload, click: () => wc.reload() },
+      { label: t.menu.close, click: () => window?.close() }
     ], wc);
   }
   const items = p.dictionarySuggestions.map((word) => ({
@@ -315,15 +317,15 @@ function contextMenu(wc, p) {
   items.push(sep);
   if (p.linkURL) {
     items.push(
-      { label: "Open Link in Browser", click: () => openExternal(p.linkURL) },
-      { label: "Copy Link Address", click: () => clipboard.writeText(p.linkURL) },
+      { label: t.menu.openLink, click: () => openExternal(p.linkURL) },
+      { label: t.menu.copyLink, click: () => clipboard.writeText(p.linkURL) },
       sep
     );
   }
   if (p.mediaType === "image") {
     items.push(
-      { label: "Copy Image", click: () => wc.copyImageAt(p.x, p.y) },
-      { label: "Copy Image Address", click: () => clipboard.writeText(p.srcURL) },
+      { label: t.menu.copyImage, click: () => wc.copyImageAt(p.x, p.y) },
+      { label: t.menu.copyImageAddress, click: () => clipboard.writeText(p.srcURL) },
       sep
     );
   }
@@ -404,8 +406,8 @@ const homeButtonScript = `(() => {
   host.id = 'appd-home-button';
   host.style.cssText = 'all:initial;position:fixed;left:${cfg.actionButton === "bottom-left" ? 58 : 16}px;bottom:${cfg.actionButton === "bottom-left" ? 12 : 16}px;z-index:2147483647';
   const button = document.createElement('button');
-  button.textContent = ${JSON.stringify(`← ${cfg.name}`)};
-  button.title = ${JSON.stringify(`Back to ${cfg.name} (Alt+Home)`)};
+  button.textContent = ${JSON.stringify(fill(t.homeButton.label, { name: cfg.name }))};
+  button.title = ${JSON.stringify(fill(t.homeButton.tip, { name: cfg.name }))};
   button.style.cssText = 'all:initial;font:600 13px system-ui,sans-serif;padding:8px 14px;border-radius:999px;'
     + 'background:rgba(35,38,41,.9);color:#fff;border:1px solid rgba(255,255,255,.3);'
     + 'box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;opacity:.7';
@@ -605,6 +607,7 @@ async function createWindow() {
   if (throttle.wanted) throttle.watchFocus(win);
   watchForUpdate((version) => {
     if (throttle.isQuitting() || win.isDestroyed()) return;
+    if (!lib.prefs().restartAppsOnUpdate) return note(`AppD-Manager was updated to ${version}; the app goes on with the version it started with until it is closed`);
     restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
   });
   win.on("close", () => {

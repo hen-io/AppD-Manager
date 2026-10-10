@@ -2,6 +2,7 @@
 const { app, BrowserWindow, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { text, fill } = require("./shared/text");
 const TIMEOUT_MS = 1e4;
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_CANDIDATES = 8;
@@ -12,7 +13,7 @@ app.on("will-quit", () => {
 });
 async function get(url) {
   const res = await net.fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`${res.status} for ${url}`);
+  if (!res.ok) throw new Error(fill(text.errors.answered, { status: res.status, url }));
   return res;
 }
 function attributes(tag) {
@@ -90,7 +91,7 @@ const decodeScript = (dataUrl) => `(async () => {
   return { width: canvas.width, height: canvas.height, png: canvas.toDataURL('image/png') };
 })()`;
 async function fetchIcons(pageUrl) {
-  if (!/^https?:\/\//i.test(pageUrl) || !URL.canParse(pageUrl)) throw new Error("Enter the URL of the app first.");
+  if (!/^https?:\/\//i.test(pageUrl) || !URL.canParse(pageUrl)) throw new Error(text.errors.urlFirst);
   const urls = await candidates(pageUrl);
   const files = await Promise.all(urls.map(download));
   const dir = fs.mkdtempSync(path.join(app.getPath("temp"), "appd-icons-"));

@@ -5,6 +5,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const lib = require("./lib");
+const { text, fill } = require("./shared/text");
+const t = text.updating;
 const REPO = "hen-io/AppD-Manager";
 const API = `https://api.github.com/repos/${REPO}`;
 const rawUrl = (tag, file) => `https://raw.githubusercontent.com/${REPO}/${tag}/${file}`;
@@ -31,11 +33,11 @@ function packageCommand() {
   if (has("dnf")) return "sudo dnf upgrade --refresh appd-manager";
   if (has("pacman")) return "sudo pacman -Sy appd-manager";
   if (has("apt")) return "sudo apt update && sudo apt install --only-upgrade appd-manager";
-  return "your system's package manager";
+  return t.packageManager;
 }
 async function download(url) {
   const res = await net.fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${url}`);
+  if (!res.ok) throw new Error(fill(t.github, { status: res.status, url }));
   return res;
 }
 const parts = (version) => String(version).replace(/^v/, "").split(/[.-]/).map((n) => parseInt(n, 10) || 0);
@@ -77,7 +79,7 @@ async function latestRelease(channel = "main") {
   }
   const res = await net.fetch(`${API}/releases/latest`, { cache: "no-store" });
   if (res.ok) return described(await res.json());
-  if (res.status !== 404) throw new Error(`GitHub answered ${res.status} for ${API}/releases/latest`);
+  if (res.status !== 404) throw new Error(fill(t.github, { status: res.status, url: `${API}/releases/latest` }));
   const tags = await (await download(`${API}/tags?per_page=100`)).json();
   const versions = tags.map((tag2) => tag2.name).filter((name) => /^v?\d+(\.\d+)*$/.test(name));
   const tag = versions.reduce((best, name) => best === null || isNewer(name, best) ? name : best, null);
@@ -110,14 +112,14 @@ async function check() {
   return { current, latest, tag, name, notes, url, available, blocked, channel, beta };
 }
 async function whyNot(tag) {
-  if (!isBuild) return "This copy runs from the source folder and cannot install another version of itself.";
+  if (!isBuild) return t.fromSource;
   if (lib.WINDOWS && !writable()) {
-    return `AppD-Manager cannot write to its own folder (${installDir}): move it to a folder of your own, or download the version from the release page.`;
+    return fill(t.notWritable, { folder: installDir });
   }
-  if (packaged()) return `This copy was installed by the system's package manager, so its version is changed there: ${packageCommand()}`;
+  if (packaged()) return fill(t.packaged, { command: packageCommand() });
   const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
   if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {
-    return `Version ${tag.replace(/^v/, "")} needs another runtime (Electron ${runtime.trim()}; this one is ${process.versions.electron}): run the install script of that version.`;
+    return fill(t.otherRuntime, { version: tag.replace(/^v/, ""), needed: runtime.trim(), have: process.versions.electron });
   }
   return "";
 }
@@ -168,9 +170,9 @@ function purgeBackups() {
 async function install(tag) {
   const info = tag ? { tag: String(tag) } : await check();
   if (tag) {
-    if (!/^[\w.+-]+$/.test(info.tag)) throw new Error(`"${info.tag}" is not a version.`);
+    if (!/^[\w.+-]+$/.test(info.tag)) throw new Error(fill(t.notVersion, { tag: info.tag }));
     info.blocked = await whyNot(info.tag);
-  } else if (!info.available) throw new Error("AppD-Manager is already up to date.");
+  } else if (!info.available) throw new Error(t.upToDate);
   if (info.blocked) throw new Error(info.blocked);
   if (lib.prefs().backupBeforeUpdate) backup();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "appd-update-"));
@@ -183,10 +185,10 @@ async function install(tag) {
     const src = path.join(tmp, "src");
     fs.mkdirSync(src);
     const tar = spawnSync("tar", ["-xzf", archive, "-C", src, "--strip-components=1"], { encoding: "utf8" });
-    if (tar.status !== 0) throw new Error(`Could not unpack the update: ${tar.stderr || tar.error?.message}`);
+    if (tar.status !== 0) throw new Error(fill(t.notUnpacked, { why: tar.stderr || tar.error?.message }));
     const newApp = path.join(src, "resources", "app");
     if (!fs.existsSync(path.join(newApp, "main.js")) || !fs.existsSync(path.join(src, "appd"))) {
-      throw new Error("The download is not an AppD-Manager build.");
+      throw new Error(t.notBuild);
     }
     const version = JSON.parse(fs.readFileSync(path.join(newApp, "package.json"), "utf8")).version;
     fs.rmSync(staged, { recursive: true, force: true });

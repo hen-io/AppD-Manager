@@ -2,6 +2,8 @@
 const { BrowserWindow, screen, session } = require("electron");
 const storeExtension = require("./store-extension");
 const { launch } = require("./links");
+const { text, fill } = require("../shared/text");
+const t = text.app.extensions;
 module.exports = function createExtensions({ id, cfg, lib, note, icon }) {
   const loaded = [];
   async function load() {
@@ -68,22 +70,22 @@ module.exports = function createExtensions({ id, cfg, lib, note, icon }) {
   }
   function menu() {
     const sep = { type: "separator" };
-    const builtIn = cfg.extensions.filter((name) => !lib.STORE_EXTENSIONS[name]).map((name) => ({ label: `${lib.EXTENSIONS[name].name}: settings…`, click: () => openInManager(name) }));
+    const builtIn = cfg.extensions.filter((name) => !lib.STORE_EXTENSIONS[name]).map((name) => ({ label: fill(t.builtInSettings, { name: lib.EXTENSIONS[name].name }), click: () => openInManager(name) }));
     const others = loaded.map((extension) => {
-      const own = extension.popup && { label: "Menu…", click: () => openPage(extension, extension.popup, true) };
-      const settings = extension.options && extension.options !== extension.popup && { label: "Settings…", click: () => openPage(extension, extension.options, false) };
+      const own = extension.popup && { label: t.menu, click: () => openPage(extension, extension.popup, true) };
+      const settings = extension.options && extension.options !== extension.popup && { label: t.settings, click: () => openPage(extension, extension.options, false) };
       if (own && settings) return { label: extension.name, submenu: [own, settings] };
       const only = own || settings;
-      return only ? { label: `${extension.name}: ${only.label.toLowerCase()}`, click: only.click } : { label: `${extension.name} (nothing to open)`, enabled: false };
+      return only ? { label: fill(t.one, { name: extension.name, what: only.label.toLowerCase() }), click: only.click } : { label: fill(t.nothing, { name: extension.name }), enabled: false };
     });
     return [sep, {
-      label: "Extensions",
+      label: t.title,
       submenu: [
         ...builtIn,
         ...builtIn.length && others.length ? [sep] : [],
         ...others,
         ...builtIn.length || others.length ? [sep] : [],
-        { label: "More extensions…", click: () => openInManager("store") }
+        { label: t.more, click: () => openInManager("store") }
       ]
     }];
   }

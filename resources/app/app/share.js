@@ -1,5 +1,7 @@
 "use strict";
 const { BrowserWindow, Menu, desktopCapturer } = require("electron");
+const { text, fill } = require("../shared/text");
+const t = text.app.share;
 module.exports = function shareScreens(ses, { allowed, note }) {
   ses.setDisplayMediaRequestHandler(async (request, answer) => {
     const refuse = () => {
@@ -30,11 +32,11 @@ module.exports = function shareScreens(ses, { allowed, note }) {
     const windows = sources.filter((source) => !source.id.startsWith("screen:"));
     const short = (name) => name.length > 60 ? `${name.slice(0, 57)}…` : name;
     Menu.buildFromTemplate([
-      { label: "Share with this page:", enabled: false },
-      ...screens.map((source, index) => ({ label: screens.length > 1 ? `Screen ${index + 1}` : "The whole screen", click: pick(source) })),
-      ...windows.length ? [{ type: "separator" }, ...windows.slice(0, 30).map((source) => ({ label: short(source.name) || "A window", click: pick(source) }))] : [],
+      { label: t.title, enabled: false },
+      ...screens.map((source, index) => ({ label: screens.length > 1 ? fill(t.screen, { number: index + 1 }) : t.wholeScreen, click: pick(source) })),
+      ...windows.length ? [{ type: "separator" }, ...windows.slice(0, 30).map((source) => ({ label: short(source.name) || t.window, click: pick(source) }))] : [],
       { type: "separator" },
-      { label: "Nothing", click: () => {
+      { label: t.nothing, click: () => {
       } }
     ]).popup({
       window: BrowserWindow.getFocusedWindow() ?? void 0,

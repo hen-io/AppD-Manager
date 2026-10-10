@@ -1,34 +1,20 @@
 "use strict";
 const fs = require("fs");
+const { text, fill } = require("./shared/text");
 const path = require("path");
 const lib = require("./lib");
-const USAGE = `Usage:
-  appd [manager]                        open AppD-Manager (the GUI)
-  appd add <id> <url> [key=value ...]   create an app (and its menu entry)
-  appd set <id> key=value ...           change settings of an app
-  appd list                             show all apps
-  appd run <id>                         start an app
-  appd sync                             rebuild menu entries after editing files by hand
-  appd rm <id>                          remove an app, its folder and its data
-  appd version                          show the AppD-Manager version
-
-Keys: ${Object.keys(lib.DEFAULTS).join(", ")}
-Apps folder: ${lib.appsDir()}   (one folder per app, settings in <id>/config.json)
-Change it in the manager, or set "appsDir" in ${lib.settingsPath}
-
-Example:
-  appd add mail https://mail.proton.me name="Proton Mail" icon=~/icons/proton.png`;
+const USAGE = fill(text.cli.usage.join("\n"), { keys: Object.keys(lib.DEFAULTS).join(", "), folder: lib.appsDir(), settings: lib.settingsPath });
 function applySettings(cfg, pairs) {
   for (const pair of pairs) {
     const eq = pair.indexOf("=");
     const key = pair.slice(0, eq);
     let value = pair.slice(eq + 1);
-    if (eq < 1 || !(key in lib.DEFAULTS)) throw new Error(`unknown setting "${pair}"`);
+    if (eq < 1 || !(key in lib.DEFAULTS)) throw new Error(fill(text.cli.unknownSetting, { pair }));
     if (typeof lib.DEFAULTS[key] !== "string") {
       try {
         value = JSON.parse(value);
       } catch {
-        throw new Error(`"${key}" needs a JSON value, got "${value}"`);
+        throw new Error(fill(text.cli.needsJson, { key, value }));
       }
     } else if (key === "icon" && fs.existsSync(value)) {
       value = path.resolve(value);
@@ -49,7 +35,7 @@ function main([command, id, ...rest]) {
       if (fs.existsSync(lib.appDir(id))) throw new Error(`app "${id}" already exists`);
       lib.save(id, applySettings({ ...lib.fresh(), name: id, url }, pairs));
       sync();
-      console.log(`Created ${lib.configPath(id)}`);
+      console.log(fill(text.cli.created, { file: lib.configPath(id) }));
       break;
     }
     case "set":
@@ -63,7 +49,7 @@ function main([command, id, ...rest]) {
           const cfg = lib.load(appId);
           console.log(`${appId}	${cfg.name}	${cfg.url}`);
         } catch (e) {
-          console.log(`${appId}	(broken: ${e.message})`);
+          console.log(`${appId}	${fill(text.cli.broken, { why: e.message })}`);
         }
       }
       break;

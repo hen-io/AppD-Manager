@@ -2,6 +2,7 @@
 const { Notification, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { text } = require("../shared/text");
 function freeName(folder, name) {
   const { name: stem, ext } = path.parse(name || "download");
   for (let count = 1; count < 1e3; count++) {
@@ -43,7 +44,7 @@ module.exports = function showDownloads(ses, window, { name, note, folder = "" }
       note(`download ${worked ? "finished" : "failed"}: ${path.basename(file)}`);
       if (!Notification.isSupported()) return;
       const notice = new Notification({
-        title: worked ? "Download finished" : "Download failed",
+        title: worked ? text.app.download.finished : text.app.download.failed,
         body: `${path.basename(file)}
 ${name}`,
         silent: true
