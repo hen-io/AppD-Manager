@@ -330,7 +330,7 @@ module.exports = {
       }
     },
     backupBeforeUpdate: {
-      label: "Back up before installing another version",
+      label: "Back up before installing updates or downgrading AppD-Manager",
       note: "The program as it is, every app's settings and icon, and the manager's settings, in a folder named after the date, time and version."
     },
     backupsKept: { label: "Backups to keep", note: "Older backups are deleted when a new one is made, and whenever AppD-Manager starts." }
