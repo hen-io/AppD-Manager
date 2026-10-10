@@ -72,8 +72,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
         active,
         tabs: tabs.map((tab) => ({
           name: tab.cfg.name,
-          favicon: tab.favicon,
-          icon: iconOf(tab.cfg.icon),
+          favicon: cfg.tabShowIcons ? tab.favicon : "",
+          icon: cfg.tabShowIcons ? iconOf(tab.cfg.icon) || appIcon : null,
           badge: tab.badge,
           audible: tab.audible,
           state: tab.paused ? "paused" : !tab.view ? "unloaded" : tab.loading ? "loading" : "live"
@@ -135,6 +135,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   });
   ipcMain.on("appd-tabs-select", (event, index) => owns(event) && select(Number(index)));
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
+  const appIcon = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || "");
   const logo = iconOf(path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
   bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({ dark, accent, logo, position: cfg.tabBarPosition, icons: cfg.tabShowIcons, badges: cfg.tabShowBadges, names: cfg.tabShowNames, collapse: cfg.tabCollapseUnloaded }))}`).catch(() => {
   });

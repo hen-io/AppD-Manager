@@ -383,9 +383,9 @@ function setPrefs(next) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return now;
 }
-const DEFAULT_CUSTOM = { primary: "#3b6cf0", accent: "#00a7c9", vivid: 150 };
+const DEFAULT_CUSTOM = { primary: "#3b6cf0", accent: "#00a7c9", secondary: "#8a5cf0", surface: "#4a6fb5", vivid: 150 };
 const COLOUR_HEX = /^#[0-9a-f]{6}$/i;
-const customLooks = (value) => plainObject(value) && COLOUR_HEX.test(value.primary) && COLOUR_HEX.test(value.accent) && Number.isFinite(value.vivid) && value.vivid >= 50 && value.vivid <= 200;
+const customLooks = (value) => plainObject(value) && ["primary", "accent", "secondary", "surface"].every((key) => COLOUR_HEX.test(value[key])) && Number.isFinite(value.vivid) && value.vivid >= 50 && value.vivid <= 200;
 function appearance() {
   const kept = readSettings().appearance || {};
   const custom = plainObject(kept.custom) ? kept.custom : {};
@@ -395,6 +395,8 @@ function appearance() {
     custom: {
       primary: COLOUR_HEX.test(custom.primary) ? custom.primary.toLowerCase() : DEFAULT_CUSTOM.primary,
       accent: COLOUR_HEX.test(custom.accent) ? custom.accent.toLowerCase() : DEFAULT_CUSTOM.accent,
+      secondary: COLOUR_HEX.test(custom.secondary) ? custom.secondary.toLowerCase() : COLOUR_HEX.test(custom.primary) ? custom.primary.toLowerCase() : DEFAULT_CUSTOM.secondary,
+      surface: COLOUR_HEX.test(custom.surface) ? custom.surface.toLowerCase() : COLOUR_HEX.test(custom.primary) ? custom.primary.toLowerCase() : DEFAULT_CUSTOM.surface,
       vivid: Number.isFinite(custom.vivid) ? Math.min(200, Math.max(50, Math.round(custom.vivid))) : DEFAULT_CUSTOM.vivid
     }
   };
