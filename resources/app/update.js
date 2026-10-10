@@ -85,20 +85,24 @@ async function latestRelease(channel = "main") {
   const tag = versions.reduce((best, name) => best === null || isNewer(name, best) ? name : best, null);
   return tag ? { tag, name: "", notes: "", url: releasesUrl, date: "", beta: false } : null;
 }
-async function publishedAt(version) {
+async function releaseOf(version) {
   try {
     for (const tag of [`v${version}`, version]) {
       const res = await net.fetch(`${API}/releases/tags/${encodeURIComponent(tag)}`, { cache: "no-store" });
-      if (res.ok) return String((await res.json()).published_at || "");
+      if (res.ok) {
+        const release = await res.json();
+        return { date: String(release.published_at || ""), beta: Boolean(release.prerelease) };
+      }
     }
   } catch {
   }
-  return "";
+  return null;
 }
-async function isUpdate(release, current) {
+async function isUpdate(release, current, channel) {
   if (!release || release.tag.replace(/^v/, "") === current) return false;
-  const mine = release.date && await publishedAt(current);
-  if (mine) return Date.parse(release.date) > Date.parse(mine);
+  const mine = await releaseOf(current);
+  if (mine?.beta && channel === "main") return true;
+  if (mine?.date && release.date) return Date.parse(release.date) > Date.parse(mine.date);
   return isNewer(release.tag, current);
 }
 async function check() {
@@ -107,7 +111,7 @@ async function check() {
   const release = await latestRelease(channel);
   const { tag = null, name = "", notes = "", url = releasesUrl, beta = false } = release || {};
   const latest = tag ? tag.replace(/^v/, "") : current;
-  const available = await isUpdate(release, current);
+  const available = await isUpdate(release, current, channel);
   const blocked = available ? await whyNot(tag) : "";
   return { current, latest, tag, name, notes, url, available, blocked, channel, beta };
 }
@@ -124,9 +128,10 @@ async function whyNot(tag) {
   return "";
 }
 async function releases() {
+  const wantBeta = lib.prefs().updateChannel === "beta";
   const list = await (await download(`${API}/releases?per_page=30`)).json();
   const current = app.getVersion();
-  return list.filter((release) => !release.draft && /^[\w.+-]+$/.test(release.tag_name || "")).map((release) => ({
+  return list.filter((release) => !release.draft && /^[\w.+-]+$/.test(release.tag_name || "") && Boolean(release.prerelease) === wantBeta).map((release) => ({
     tag: release.tag_name,
     version: release.tag_name.replace(/^v/, ""),
     name: String(release.name || "").trim(),
