@@ -323,14 +323,14 @@ module.exports = {
       note: "Each app comes back on the page it was on, running the new version. Off: an app keeps the old version until you close it."
     },
     updateChannel: {
-      label: "Versions to get",
+      label: "Release branch",
       options: {
-        main: ["Main branch", "The releases everybody gets"],
-        beta: ["Beta versions too", "Test versions as soon as they are out: newer, and less tried"]
+        main: ["Stable", "Normal releases"],
+        beta: ["BETA", "WARNING: BETA releases might contain bugs, remember to keep backups of your configuration!"]
       }
     },
     backupBeforeUpdate: {
-      label: "Back up before installing another version",
+      label: "Back up before installing updates or downgrading AppD-Manager",
       note: "The program as it is, every app's settings and icon, and the manager's settings, in a folder named after the date, time and version."
     },
     backupsKept: { label: "Backups to keep", note: "Older backups are deleted when a new one is made, and whenever AppD-Manager starts." }

@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Easily create standalone container applications for your webapps on Linux and Windows!",
   "author": {
     "name": "hen-io",
