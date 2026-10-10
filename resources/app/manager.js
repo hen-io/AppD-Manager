@@ -29,6 +29,7 @@ let lastUse = { at: 0, apps: {} };
 const UNDO_MS = 12e3;
 lib.emptyTrash();
 update.purgeBackups();
+let disk = { at: 0, value: null, pending: null };
 let unsaved = false;
 let leaving = false;
 async function mayLeave() {
@@ -314,6 +315,19 @@ const handlers = {
     return result;
   },
   runningApps: () => lib.list().filter((id) => lib.runningPid(id)),
+  diskUse(fresh) {
+    if (fresh || !disk.value || Date.now() - disk.at > 12e4) {
+      disk.pending ||= lib.diskUse().then((value) => {
+        disk = { at: Date.now(), value, pending: null };
+        return value;
+      }, () => {
+        disk.pending = null;
+        return disk.value || {};
+      });
+      return disk.pending;
+    }
+    return disk.value;
+  },
   lastUsed: () => Object.fromEntries(lib.list().map((id) => [id, lib.lastUsed(id)])),
   displays() {
     const main = screen.getPrimaryDisplay().id;

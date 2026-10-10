@@ -309,6 +309,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       return;
     }
     if (mode === "unload") return unload(tab);
+    pause(tab);
+  }
+  function pause(tab) {
+    if (!tab.view || tab.index === active || tab.paused || win.isDestroyed()) return;
+    const contents = tab.view.webContents;
     const pids = pidsOf(contents);
     const others = new Set(tabs.filter((other) => other !== tab && other.view && !other.paused).flatMap((other) => pidsOf(other.view.webContents)));
     for (const frame of win.webContents.mainFrame.framesInSubtree) others.add(frame.osProcessId);
@@ -394,17 +399,12 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     const items = [
       ...tab.view ? [{ label: t.reload, click: () => tab.view?.webContents.reload() }] : [{ label: t.load, click: () => ensure(tab) }],
       ...tab.view ? [{ label: t.close, click: () => closeTab(index) }] : [],
-      ...tab.view && tab.index !== active && process.platform !== "win32" ? [{ label: tab.paused ? t.resume : t.pause, click: () => tab.paused ? resume(tab) : settleNow(tab) }] : [],
+      ...tab.view && tab.index !== active && process.platform !== "win32" ? [{ label: tab.paused ? t.resume : t.pause, click: () => tab.paused ? resume(tab) : pause(tab) }] : [],
       { type: "separator" },
       { label: t.copy, click: () => clipboard.writeText(tab.view?.webContents.getURL() || tab.cfg.url) },
       { label: t.browser, click: () => openExternal(tab.view?.webContents.getURL() || tab.cfg.url) }
     ];
     menu(items, bar.webContents);
-  }
-  function settleNow(tab) {
-    const before = mode;
-    if (before === "unload") return;
-    settle(tab);
   }
   function shortcut(input) {
     if (!input.control || input.alt || input.meta) return false;

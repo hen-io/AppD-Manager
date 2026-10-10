@@ -73,7 +73,7 @@ function described(release) {
 }
 async function latestRelease(channel = "main") {
   if (channel === "beta") {
-    const list = (await (await download(`${API}/releases?per_page=30`)).json()).filter((release) => !release.draft && release.published_at);
+    const list = (await (await download(`${API}/releases?per_page=100`)).json()).filter((release) => !release.draft && release.published_at);
     const newest = list.reduce((best, release) => !best || Date.parse(release.published_at) > Date.parse(best.published_at) ? release : best, null);
     if (newest) return described(newest);
   }
@@ -129,9 +129,10 @@ async function whyNot(tag) {
 }
 async function releases() {
   const wantBeta = lib.prefs().updateChannel === "beta";
-  const list = await (await download(`${API}/releases?per_page=30`)).json();
+  const list = await (await download(`${API}/releases?per_page=100`)).json();
   const current = app.getVersion();
-  return list.filter((release) => !release.draft && /^[\w.+-]+$/.test(release.tag_name || "") && Boolean(release.prerelease) === wantBeta).map((release) => ({
+  const newest = (x, y) => Date.parse(y.published_at || 0) - Date.parse(x.published_at || 0);
+  return list.filter((release) => !release.draft && /^[\w.+-]+$/.test(release.tag_name || "") && Boolean(release.prerelease) === wantBeta).sort(newest).map((release) => ({
     tag: release.tag_name,
     version: release.tag_name.replace(/^v/, ""),
     name: String(release.name || "").trim(),

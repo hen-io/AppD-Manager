@@ -331,6 +331,7 @@ const DEFAULTS = {
   spellcheck: true,
   spellcheckLanguages: [],
   ignoreCertificateErrors: false,
+  devTools: false,
   flags: [],
   configVersion: 5
 };
@@ -844,6 +845,35 @@ function clearData(id) {
   fs.rmSync(profileDir(id), { recursive: true, force: true });
   for (let n = 2; n <= MAX_INSTANCES; n++) fs.rmSync(instanceDir(id, n), { recursive: true, force: true });
 }
+async function folderSize(dir) {
+  let total = 0;
+  const left = [dir];
+  while (left.length) {
+    const folder = left.pop();
+    let entries;
+    try {
+      entries = await fs.promises.readdir(folder, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const file = path.join(folder, entry.name);
+      if (entry.isDirectory()) left.push(file);
+      else if (entry.isFile()) {
+        try {
+          total += (await fs.promises.stat(file)).size;
+        } catch {
+        }
+      }
+    }
+  }
+  return total;
+}
+async function diskUse() {
+  const use = {};
+  for (const id of list()) use[id] = await folderSize(appDir(id));
+  return use;
+}
 const MAX_INSTANCES = 9;
 const instanceDir = (id, n) => n > 1 ? `${profileDir(id)}-${n}` : profileDir(id);
 function freeInstance(id) {
@@ -1231,6 +1261,7 @@ module.exports = {
   profileDir,
   instanceDir,
   freeInstance,
+  diskUse,
   desktopId,
   markUsed,
   lastUsed,

@@ -296,8 +296,10 @@ function pageShortcut(wc, input, key, ctrl, history) {
   if (key === "f5" || ctrl && !input.shift && key === "r") because("F5 or Ctrl+R") || wc.reload();
   else if (ctrl && input.shift && key === "r") because("Ctrl+Shift+R") || wc.reloadIgnoringCache();
   else if (ctrl && input.shift && key === "delete") runAction("clear-cache", wc);
-  else if (key === "f12" || ctrl && input.shift && key === "i") wc.toggleDevTools();
-  else if (key === "f11") {
+  else if (key === "f12" || ctrl && input.shift && key === "i") {
+    if (cfg.devTools && !wc.isDevToolsOpened()) wc.openDevTools({ mode: "detach" });
+    else wc.toggleDevTools();
+  } else if (key === "f11") {
     const w = BrowserWindow.fromWebContents(wc);
     w?.setFullScreen(!w.isFullScreen());
   } else if (ctrl && (key === "=" || key === "+")) zoom.zoomBy(wc, 1);
@@ -588,6 +590,7 @@ async function createWindow() {
       });
     }
     if (cfg.startMuted) wc.setAudioMuted(true);
+    if (cfg.devTools) wc.once("dom-ready", () => wc.isDestroyed() || wc.isDevToolsOpened() || wc.openDevTools({ mode: "detach" }));
     throttle.watchPage(wc);
   }
   function preparePage(wc) {

@@ -253,6 +253,10 @@ module.exports = {
       placeholder: "en-US",
       note: "One per line, such as en-US, nb or de. Empty = system language. Right-click an underlined word for suggestions."
     },
+    devTools: {
+      label: "Open the developer tools (inspect element) in a separate window",
+      note: "They open with the app, for the site's own page. F12 closes and opens them. A multi-tab app gets one window per loaded tab."
+    },
     ignoreCertificateErrors: {
       label: "Ignore certificate errors (accept invalid, expired and self-signed certificates)",
       note: "Only for apps on your own network, such as a device with a self-signed certificate. When on, the app no longer verifies that any site is who it claims to be."
@@ -443,7 +447,8 @@ module.exports = {
     chromeWebStore: "Chrome Web Store",
     findExtension: "Find an extension…",
     findExtensionLabel: "Find an extension",
-    usage: { both: "{cpu}% CPU · {memory}", mb: "{amount} MB", gb: "{amount} GB" },
+    usage: { both: "{cpu}% CPU · {memory}", kb: "{amount} kB", mb: "{amount} MB", gb: "{amount} GB" },
+    ago: { never: "Not used yet", now: "Used just now", minutes: "Used {n} min ago", hours: "Used {n} h ago", yesterday: "Used yesterday", days: "Used {n} days ago", months: "Used {n} months ago" },
     apps: ["app", "apps"],
     icons: ["icon", "icons"],
     sidebar: {
@@ -456,6 +461,8 @@ module.exports = {
       smaller: "Make the sidebar smaller",
       larger: "Show the whole sidebar",
       find: "Find an app…",
+      groupShow: "Show the {kind}",
+      groupHide: "Hide the {kind}",
       findLabel: "Find an app",
       exit: "Exit",
       exitTip: "Exit: closes AppD-Manager and every running app",
@@ -463,6 +470,31 @@ module.exports = {
     },
     home: {
       title: "Your apps",
+      summary: "{apps} · {running} running",
+      find: "Find an app…",
+      stats: {
+        apps: "Apps",
+        appsNone: "Any website can be one",
+        running: "Running",
+        runningNone: "Nothing is running",
+        closeAll: "Close all",
+        disk: "On disk",
+        diskLargest: "Largest: {name} · {size}",
+        diskAdding: "Adding it up…",
+        version: "Version",
+        upToDate: "Up to date",
+        available: "{version} is available",
+        notChecked: "Not checked for updates",
+        updates: "Updates"
+      },
+      recent: "Recently used",
+      recentTip: "Open {name}",
+      filters: { all: "All", running: "Running", autostart: "Start at login" },
+      nothingHere: "No app here",
+      nothingHereNote: "No app matches this filter.",
+      closeAllAsk: "Close every running app?",
+      closeAllDetail: "Their windows close, as if you had closed each one yourself: {names}.",
+      closeAllButtons: ["Close all", "Cancel"],
       nothingFound: "Nothing found",
       nothingFoundNote: "No app has that in its name or address.",
       noApps: "No apps yet",
@@ -499,6 +531,10 @@ module.exports = {
       closeApp: "Close app",
       launchApp: "Launch app",
       more: "More",
+      back: "Back to Home (Alt+Left)",
+      onDisk: "{size} on disk",
+      findSetting: "Find a setting…",
+      noSetting: "No setting is called that.",
       template: "Start from a template…",
       templateNote: "Fills in the name, address and suitable settings. You can still change everything.",
       icon: "Icon",
@@ -656,7 +692,35 @@ module.exports = {
       name: "AppD-Manager {version}",
       runsOn: "Runs on Electron {electron} (Chromium {chromium}).",
       madeBy: "Made by {name}",
-      projectPage: "Project page"
+      projectPage: "Project page",
+      keys: {
+        title: "Keyboard shortcuts",
+        manager: {
+          title: "In AppD-Manager",
+          list: [
+            ["Ctrl+N", "New app"],
+            ["Ctrl+1 · 2 · 3", "Home, Extensions, Settings"],
+            ["Alt+←", "Back to Home"],
+            ["Ctrl+F", "Find an app"],
+            ["Ctrl+S", "Save the app you are editing"],
+            ["Double click", "On a running app: bring its window to the front"]
+          ]
+        },
+        apps: {
+          title: "In an app's window",
+          list: [
+            ["F5 · Ctrl+R", "Reload (Ctrl+Shift+R: without the cache)"],
+            ["Alt+← · Alt+→", "Back and forward"],
+            ["Alt+Home", "The app's start page"],
+            ["Ctrl+F", "Find in the page"],
+            ["Ctrl + · − · 0", "Zoom in, out, and back to normal"],
+            ["F11", "Full screen"],
+            ["Ctrl+P", "Print"],
+            ["Ctrl+Tab · Ctrl+1…9", "Multi-tab apps: next tab, tab by number"],
+            ["Right click", "The app's menu"]
+          ]
+        }
+      }
     },
     update: {
       checking: "Checking…",
@@ -793,14 +857,17 @@ module.exports = {
   appTypes: {
     app: {
       name: "App",
+      plural: "Apps",
       about: "A window of its own, with an entry in the desktop's menu and a place in the taskbar"
     },
     multitab: {
       name: "Multi-tab app",
+      plural: "Multi-tab apps",
       about: "One window with a bar of tabs, a site in each. Tabs you are not using can be slowed down, paused or unloaded to save memory and power"
     },
     tray: {
       name: "Tray app",
+      plural: "Tray apps",
       about: "Sits in the system tray: a click on its icon opens a small window. Not in the menu, not in the taskbar"
     }
   },

@@ -22,6 +22,7 @@ for (const name of [
   "askUnsaved",
   "runningApps",
   "usage",
+  "diskUse",
   "lastUsed",
   "pickIcon",
   "pickFolder",
