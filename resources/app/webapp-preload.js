@@ -8,6 +8,15 @@ if (window.top === window) {
     if (filters.styles) webFrame.insertCSS(filters.styles);
   }
 }
+if (window.top === window) {
+  window.addEventListener("keydown", (event) => {
+    if (!event.ctrlKey && !event.altKey && !/^F\d+$/.test(event.key)) return;
+    setTimeout(() => {
+      if (event.defaultPrevented) return;
+      ipcRenderer.send("appd-page-key", { key: event.key, control: event.ctrlKey, alt: event.altKey, shift: event.shiftKey, meta: event.metaKey });
+    });
+  }, true);
+}
 const CORNERS = {
   "top-left": "top:12px;left:12px",
   "top-right": "top:12px;right:12px",

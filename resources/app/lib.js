@@ -223,6 +223,7 @@ const DEFAULTS = {
   tabBarSize: 100,
   tabTheme: "manager",
   tabBarAutoHide: false,
+  tabWindows: false,
   tabBarHideSeconds: 1.8,
   tabShowNames: true,
   tabCollapseUnloaded: true,

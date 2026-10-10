@@ -106,6 +106,10 @@ module.exports = {
     },
     tabBarSize: { label: "Size of the tab bar" },
     tabBarAutoHide: { label: "Hide the tab bar until the mouse is at its edge", note: "A small handle at the edge shows where; the bar comes over the page and goes again when the mouse leaves it." },
+    tabWindows: {
+      label: "Each loaded tab in a window of its own",
+      note: "Alt-Tab and the taskbar then list the tabs. Each window has the tab bar; closing one closes its tab, closing the first closes the app. Tabs in a window are slowed down when not focused, never paused or unloaded."
+    },
     tabBarHideSeconds: { label: "Hide it again after the mouse has left for" },
     tabInactiveAfterSeconds: { label: "After" },
     tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
@@ -113,7 +117,7 @@ module.exports = {
       label: "Open on start",
       options: {
         last: ["The tab you left", "Where you were when the app was closed"],
-        first: ["The first tab", "Always the first one in the list"],
+        first: ["The first tab", "The home tab if one is set, else the first in the list"],
         none: ["No tab", "Nothing is loaded; a screen asks you to select a tab"]
       }
     },

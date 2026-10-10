@@ -278,8 +278,17 @@ ipcMain.on("appd-page-filters", (event, url) => {
   }
   event.returnValue = filters;
 });
-function shortcut(wc, input) {
+function pageFirst(input) {
+  const key = input.key.toLowerCase();
+  const ctrl = input.control && !input.alt && !input.meta;
+  return ctrl && ["f", "g", "p"].includes(key) || key === "f3" || input.alt && !input.control && ["arrowleft", "arrowright", "home"].includes(key);
+}
+ipcMain.on("appd-page-key", (event, input) => {
+  if (input && typeof input.key === "string" && pageFirst(input)) shortcut(event.sender, input, true);
+});
+function shortcut(wc, input, fromPage = false) {
   if (isChrome(wc)) return false;
+  if (!fromPage && pageFirst(input)) return false;
   const key = input.key.toLowerCase();
   const ctrl = input.control && !input.alt;
   if (tabs?.shortcut(input)) return true;
@@ -294,7 +303,7 @@ function shortcut(wc, input) {
 }
 function pageShortcut(wc, input, key, ctrl, history) {
   if (key === "f5" || ctrl && !input.shift && key === "r") because("F5 or Ctrl+R") || wc.reload();
-  else if (ctrl && input.shift && key === "r") because("Ctrl+Shift+R") || wc.reloadIgnoringCache();
+  else if (ctrl && input.shift && key === "r") runAction("hard-reload", wc);
   else if (ctrl && input.shift && key === "delete") runAction("clear-cache", wc);
   else if (key === "f12" || ctrl && input.shift && key === "i") {
     if (cfg.devTools && !wc.isDevToolsOpened()) wc.openDevTools({ mode: "detach" });
@@ -454,7 +463,7 @@ async function createWindow() {
     backgroundThrottling: cfg.backgroundThrottling,
     spellcheck: cfg.spellcheck,
     v8CacheOptions: "bypassHeatCheck",
-    ...cfg.actionButton !== "off" || extension("adblock") || extension("twitch") ? { preload: path.join(__dirname, "webapp-preload.js") } : {}
+    preload: path.join(__dirname, "webapp-preload.js")
   };
   if (cfg.language) {
     const wanted = [.../* @__PURE__ */ new Set([cfg.language, cfg.language.split("-")[0], "en"])].join(",");
@@ -490,7 +499,7 @@ async function createWindow() {
       background: dark ? "#15171b" : "#ffffff",
       note,
       saveTab,
-      startTab: cfg.tabStart === "last" ? Number(state.tab) || 0 : cfg.tabStart === "first" ? 0 : -1,
+      startTab: cfg.tabStart === "last" ? Number(state.tab) || 0 : cfg.tabStart === "first" ? Math.max(0, cfg.tabs.findIndex((tab) => tab.home)) : -1,
       onPage: (wc) => {
         preparePage(wc);
         watchPage(wc);
@@ -498,7 +507,26 @@ async function createWindow() {
       },
       throttle,
       menu: popUp,
-      openExternal
+      openExternal,
+      newWindow: (tabHost) => {
+        const [x, y] = win.getPosition();
+        const [width, height] = win.getSize();
+        const window = new BrowserWindow({
+          x: x + 32,
+          y: y + 32,
+          width,
+          height,
+          title: cfg.name,
+          icon,
+          frame: !bare,
+          ...bare ? frameOptions(cfg) : {},
+          ...dark ? { backgroundColor: "#15171b" } : {},
+          webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
+        });
+        window.contentView.addChildView(tabHost.view);
+        styleFrame(window, cfg, lineColour, { ...tabHost, contents: window.webContents });
+        return window;
+      }
     });
     host = { view: tabs.container, contents: win.webContents, inset: tabs.inset, layout: tabs.layout };
     Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });
