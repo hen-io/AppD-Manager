@@ -325,8 +325,8 @@ module.exports = {
     updateChannel: {
       label: "Release branch",
       options: {
-        main: ["Stable", "Normal releases"],
-        beta: ["BETA", "WARNING: BETA releases might contain bugs, remember to keep backups of your configuration!"]
+        main: ["Stable", "Main releases"],
+        beta: ["BETA", "BETA releases might contain bugs, remember to keep backups of your configuration!"]
       }
     },
     backupBeforeUpdate: {
