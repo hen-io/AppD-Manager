@@ -28,7 +28,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     [role=tablist] { display: flex; flex-direction: ${vertical ? "column" : "row"}; ${vertical ? "flex: 1; min-height: 0; width: 100%;" : "flex: 1; min-width: 0; height: 100%;"} ${vertical ? "padding: 8px 8px; gap: 2px; overflow-y: auto;" : "overflow-x: auto;"} scrollbar-width: none; }
     [role=tablist]::-webkit-scrollbar { display: none; }
     button { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: flex-start; gap: 10px;
-      ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 0 0 148px; width: 148px; height: 100%; padding: 0 10px 0 14px;"}
+      ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 0 0 185px; width: 185px; height: 100%; padding: 0 10px 0 14px;"}
       color: var(--quiet); cursor: pointer; overflow: hidden; transition: background .15s, color .15s, opacity .2s; }
     button + button::before { content: ""; position: absolute; background: var(--line); pointer-events: none; ${vertical ? "left: 14px; right: 14px; top: -1px; height: 1px;" : "left: 0; top: 24%; bottom: 24%; width: 1px;"} }
     ${vertical ? "button[aria-selected=true]::before, button[aria-selected=true] + button::before { opacity: 0; }" : ""}

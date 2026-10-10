@@ -79,7 +79,7 @@ module.exports = {
       note: `Your zoom lasts until the page reloads or the app restarts. "Reset zoom" in the app's menu (Ctrl+0) returns to the default.`
     },
     hideScrollbars: { label: "Hide scrollbars (pages still scroll)" },
-    confirmClose: { label: "Ask before closing the app", note: 'Closing the window asks "Are you sure?". For a multi-tab app the question lists the tabs, the loaded ones first.' },
+    confirmClose: { label: "Ask before closing the app", note: 'Closing the window asks "Are you sure?". For a multi-tab app the question lists the tabs that are loaded.' },
     tabBarPosition: {
       label: "Tab bar",
       options: { top: ["Top", "Above the page"], bottom: "Bottom", left: ["Left", "A column beside the page: room for long names"] }

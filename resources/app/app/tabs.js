@@ -437,7 +437,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     for (const tab of tabs) resume(tab);
     if (!live.length) {
       finished = true;
-      return done();
+      return setImmediate(done);
     }
     let left = live.length;
     for (const tab of live) {

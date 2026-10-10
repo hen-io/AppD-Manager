@@ -646,7 +646,7 @@ async function createWindow() {
     win.on("close", (event) => {
       if (event.defaultPrevented || throttle.isQuitting()) return;
       if (tabs && !tabs.summary().some((tab) => tab.loaded)) return;
-      const list = tabs ? tabs.summary().map((tab) => `${tab.loaded ? "●" : "○"} ${tab.name}`).join("\n") : "";
+      const list = tabs ? tabs.summary().filter((tab) => tab.loaded).map((tab) => tab.name).join("\n") : "";
       const answer = dialog.showMessageBoxSync(win, {
         type: "question",
         title: cfg.name,
@@ -699,7 +699,7 @@ async function createWindow() {
     restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
   });
   win.on("close", () => {
-    if (lib.isTray(cfg)) return;
+    if (lib.isTray(cfg) || win.isDestroyed()) return;
     const { width, height } = win.getNormalBounds();
     try {
       fs.writeFileSync(statePath, JSON.stringify({ ...readState(), width, height, maximized: win.isMaximized() }));
