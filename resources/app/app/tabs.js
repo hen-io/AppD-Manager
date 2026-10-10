@@ -1,12 +1,14 @@
 "use strict";
 const { View, WebContentsView, app, ipcMain, clipboard } = require("electron");
+const fs = require("fs");
 const path = require("path");
 const barPage = require("./tabbar");
 const { text } = require("../shared/text");
 const t = text.app.tab;
-const BAR = { top: 48, bottom: 48, left: 208 };
+const BAR = { top: 48, bottom: 48, left: 208, leftSmall: 64 };
 const UNREAD = /[([](\d{1,5})\+?[)\]]/;
 const RETRY_MS = 15e3;
+const PICTURES = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon" };
 module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, dark, accent, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal }) {
   const container = new View();
   win.contentView.addChildView(container);
@@ -36,7 +38,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   let size = { width: 0, height: 0 };
   let ready = false;
   let finished = false;
-  const barSize = BAR[cfg.tabBarPosition] ?? BAR.top;
+  const barSize = cfg.tabBarPosition === "left" && !cfg.tabShowNames ? BAR.leftSmall : BAR[cfg.tabBarPosition] ?? BAR.top;
   const inset = {
     top: cfg.tabBarPosition === "top" ? barSize : 0,
     bottom: cfg.tabBarPosition === "bottom" ? barSize : 0,
@@ -69,12 +71,30 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
         tabs: tabs.map((tab) => ({
           name: tab.cfg.name,
           favicon: tab.favicon,
+          icon: iconOf(tab.cfg.icon),
           badge: tab.badge,
           audible: tab.audible,
           state: tab.paused ? "paused" : !tab.view ? "unloaded" : tab.loading ? "loading" : "live"
         }))
       });
     }, 30);
+  }
+  const pictures = /* @__PURE__ */ new Map();
+  function iconOf(value) {
+    if (!value) return null;
+    if (pictures.has(value)) return pictures.get(value);
+    let found = null;
+    if (/^(https?:\/\/|data:image\/)/i.test(value)) found = { kind: "image", value };
+    else if (/[\\/]|\.(png|svg|jpe?g|webp|gif|ico)$/i.test(value)) {
+      try {
+        const type = PICTURES[path.extname(value).toLowerCase()];
+        const file = path.resolve(lib.appDir(process.env.APPD_ID), value);
+        if (type) found = { kind: "image", value: `data:${type};base64,${fs.readFileSync(file).toString("base64")}` };
+      } catch {
+      }
+    } else found = { kind: "text", value: [...value].slice(0, 4).join("") };
+    pictures.set(value, found);
+    return found;
   }
   const owns = (event) => event.sender === bar.webContents;
   ipcMain.on("appd-tabs-ready", (event) => {
@@ -84,7 +104,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   });
   ipcMain.on("appd-tabs-select", (event, index) => owns(event) && select(Number(index)));
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
-  bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({ dark, accent, position: cfg.tabBarPosition, icons: cfg.tabShowIcons, badges: cfg.tabShowBadges }))}`).catch(() => {
+  const logo = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
+  bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({ dark, accent, logo, position: cfg.tabBarPosition, icons: cfg.tabShowIcons, badges: cfg.tabShowBadges, names: cfg.tabShowNames, collapse: cfg.tabCollapseUnloaded }))}`).catch(() => {
   });
   const signal = (pids, name) => {
     for (const pid of pids) {

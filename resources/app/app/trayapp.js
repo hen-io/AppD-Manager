@@ -57,37 +57,11 @@ module.exports = function makeTrayApp(window, cfg, options) {
   let pinned = false;
   let hidItselfAt = 0;
   let wake = () => false;
-  const page = window.webContents;
-  let leadsTo = "";
-  let headingHome = Boolean(options.atHome);
-  page.on("did-stop-loading", () => {
-    if (!headingHome) return;
-    headingHome = false;
-    leadsTo = page.getURL();
-  });
-  const sameAddress = (a, b) => {
-    try {
-      return new URL(a).href === new URL(b).href;
-    } catch {
-      return a === b;
-    }
-  };
-  const goHome = () => {
-    if (cfg.trayOpenAt !== "home" || page.isLoadingMainFrame()) return;
-    const now = page.getURL();
-    if (!/^https?:/i.test(now) || sameAddress(now, cfg.url) || leadsTo && sameAddress(now, leadsTo)) return;
-    options.resume?.();
-    options.because?.("the window is opened again: back to the app's own page (trayOpenAt)");
-    headingHome = true;
-    page.loadURL(cfg.url).catch(() => {
-    });
-  };
   const show = () => {
     if (window.isDestroyed()) return;
-    const opening = !window.isVisible();
     window.setBounds(bounds(cfg, spot, options.outset));
     window.show();
-    if (!wake() && opening) goHome();
+    wake();
     window.focus();
     window.setSkipTaskbar(true);
   };
@@ -136,7 +110,6 @@ module.exports = function makeTrayApp(window, cfg, options) {
       clearTimeout(timer);
       if (!closed || window.isDestroyed()) return false;
       const url = cfg.trayOpenAt === "home" ? cfg.url : closed;
-      headingHome = url === cfg.url;
       closed = "";
       options.resume?.();
       options.because?.("the window is shown again after its page was closed");

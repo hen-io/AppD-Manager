@@ -1,6 +1,6 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, accent, position, icons, badges }) {
+module.exports = function barPage({ dark, accent, position, icons, badges, names, collapse, logo }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
   const surface = dark ? "#1b1d21" : "#f6f7fb";
@@ -15,8 +15,9 @@ module.exports = function barPage({ dark, accent, position, icons, badges }) {
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; background: var(--surface); color: var(--ink);
       font: 500 14px/20px system-ui, "Roboto", sans-serif; user-select: none; -webkit-user-select: none; }
-    body { border-${vertical ? "right" : bottom ? "top" : "bottom"}: 1px solid var(--line); }
-    [role=tablist] { display: flex; flex-direction: ${vertical ? "column" : "row"}; height: 100%; ${vertical ? "padding: 8px 8px; gap: 2px; overflow-y: auto;" : "overflow-x: auto;"} scrollbar-width: none; }
+    body { display: flex; flex-direction: ${vertical ? "column" : "row"}; align-items: center; border-${vertical ? "right" : bottom ? "top" : "bottom"}: 1px solid var(--line); }
+    .logo { flex: none; width: 28px; height: 28px; object-fit: contain; border-radius: 7px; ${vertical ? "margin: 10px 0 4px;" : "margin: 0 6px 0 14px;"} pointer-events: none; }
+    [role=tablist] { display: flex; flex-direction: ${vertical ? "column" : "row"}; ${vertical ? "flex: 1; min-height: 0; width: 100%;" : "flex: 1; min-width: 0; height: 100%;"} ${vertical ? "padding: 8px 8px; gap: 2px; overflow-y: auto;" : "overflow-x: auto;"} scrollbar-width: none; }
     [role=tablist]::-webkit-scrollbar { display: none; }
     button { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: ${vertical ? "flex-start" : "center"}; gap: 10px;
       ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 1 1 0; min-width: 96px; max-width: 260px; height: 100%; padding: 0 16px;"}
@@ -32,6 +33,10 @@ module.exports = function barPage({ dark, accent, position, icons, badges }) {
     .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .badge { flex: none; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font: 700 11px/18px system-ui, sans-serif; text-align: center; }
     .mark { flex: none; width: 14px; height: 14px; fill: currentColor; opacity: .75; }
+    button.small { flex: 0 0 auto; min-width: 0; ${vertical ? "width: auto; align-self: flex-start; padding: 0 12px;" : "padding: 0 14px;"} }
+    button.small .name, button.small .badge, button.plain .name { display: none; }
+    button.plain { flex: 0 0 auto; min-width: 56px; ${vertical ? "justify-content: center; padding: 0;" : "padding: 0 18px;"} }
+    .glyph { display: grid; place-items: center; font: 16px/1 system-ui, "Noto Color Emoji", sans-serif; }
     button.idle { opacity: .6; }
     button.idle[aria-selected=true] { opacity: 1; }
     .bar { position: absolute; ${vertical ? "left: 14px; right: 14px; bottom: 2px;" : `left: 0; right: 0; ${bottom ? "top" : "bottom"}: 0;`} height: 2px; overflow: hidden; display: none; }
@@ -41,12 +46,11 @@ module.exports = function barPage({ dark, accent, position, icons, badges }) {
     .ripple { position: absolute; border-radius: 50%; background: color-mix(in srgb, var(--accent) 35%, transparent); transform: scale(0); animation: ripple .5s ease-out forwards; pointer-events: none; }
     @keyframes ripple { to { transform: scale(1); opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-  </style><body><div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
-    const OPTIONS = ${json({ icons, badges })};
+  </style><body>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
+    const OPTIONS = ${json({ icons, badges, names, collapse })};
     const list = document.getElementById('tabs');
     const SPEAKER = 'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4M3 9v6h4l5 5V4L7 9z';
     const PAUSE = 'M14 19h4V5h-4M6 19h4V5H6z';
-    const SLEEP = 'M12.43 2.3c-2.38-.59-4.68-.27-6.63.64a.5.5 0 0 0-.1.85C8.27 5.8 9.8 8.64 9.8 11.8c0 3.17-1.53 6.01-4.1 8.01a.5.5 0 0 0 .1.85c1.95.9 4.25 1.23 6.63.64 4.1-1.02 7.15-4.58 7.15-8.8 0-4.23-3.05-7.79-7.15-8.8z';
     const make = (tag, props = {}) => Object.assign(document.createElement(tag), props);
     const icon = (path, label) => {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -60,11 +64,18 @@ module.exports = function barPage({ dark, accent, position, icons, badges }) {
     };
     function show(state) {
       list.replaceChildren(...state.tabs.map((tab, index) => {
-        const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : ''].join(' ').trim() });
+        const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : '', OPTIONS.collapse && tab.state === 'unloaded' ? 'small' : '', OPTIONS.names ? '' : 'plain'].join(' ').trim() });
         button.setAttribute('role', 'tab');
         button.setAttribute('aria-selected', String(index === state.active));
         button.title = tab.name + (tab.state === 'paused' ? ' (paused)' : tab.state === 'unloaded' ? ' (not loaded)' : '');
-        if (OPTIONS.icons) {
+        const letter = () => make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' });
+        if (tab.icon && tab.icon.kind === 'text') {
+          button.append(make('span', { className: 'face glyph', textContent: tab.icon.value }));
+        } else if (tab.icon && tab.icon.kind === 'image') {
+          const face = make('img', { className: 'face', alt: '', src: tab.icon.value, draggable: false });
+          face.addEventListener('error', () => face.replaceWith(letter()));
+          button.append(face);
+        } else if (OPTIONS.icons || !OPTIONS.names || (OPTIONS.collapse && tab.state === 'unloaded')) {
           if (tab.favicon) {
             const face = make('img', { className: 'face', alt: '', src: tab.favicon, draggable: false });
             face.addEventListener('error', () => face.replaceWith(make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' })));
@@ -77,7 +88,6 @@ module.exports = function barPage({ dark, accent, position, icons, badges }) {
         if (OPTIONS.badges && tab.badge > 0) button.append(make('span', { className: 'badge', textContent: tab.badge > 99 ? '99+' : String(tab.badge) }));
         if (tab.audible) button.append(icon(SPEAKER, 'Playing sound'));
         else if (tab.state === 'paused') button.append(icon(PAUSE, 'Paused'));
-        else if (tab.state === 'unloaded') button.append(icon(SLEEP, 'Not loaded'));
         button.append(make('span', { className: 'bar' }));
         button.addEventListener('pointerdown', (event) => {
           if (event.button !== 0) return;

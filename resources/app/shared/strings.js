@@ -98,6 +98,8 @@ module.exports = {
     tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
     tabRememberLast: { label: "Start on the tab you left" },
     tabShowIcons: { label: "Show the sites' pictures in the tabs" },
+    tabShowNames: { label: "Show the tabs' names", note: "Off: the tabs are pictures only (the name is in the tip). A tab without a picture of its own shows the site's, or its first letter." },
+    tabCollapseUnloaded: { label: "Shrink tabs that are not loaded", note: "A tab not opened yet, or unloaded, is shown as its picture alone until it is loaded." },
     tabShowBadges: { label: "Show unread counts in the tabs", note: 'The number a site puts in its title, "(3) Inbox".' },
     trayWidth: { label: "Window width" },
     trayHeight: { label: "Window height" },
@@ -139,9 +141,10 @@ module.exports = {
       note: `Ctrl, Alt, Shift or Super plus a key, for example Super+Alt+Y. Works from anywhere if your desktop allows it; on Wayland it may ask you first. If it does nothing, assign a shortcut to this app's "Show or hide the window" action in your desktop's shortcut settings (KDE: System Settings, Keyboard, Shortcuts).`
     },
     trayOpenAt: {
-      label: "When reopened, show",
+      label: "When the page was closed, show",
+      note: 'Only after the page has been closed ("Unload the page when hidden for", below): until then the window shows the page you left. Off while the page is never closed.',
       options: {
-        last: ["The last page", "Where you left off"],
+        last: ["The last page", "Where you left off, also after the page was closed"],
         home: ["The app's start page", "The URL under General"]
       }
     },
@@ -337,7 +340,6 @@ module.exports = {
       }
     },
     showUsage: { label: "Show CPU and memory use of running apps" },
-    appOrder: { label: "Order of the apps in the sidebar" },
     motion: { label: "Animations", note: "Off: views, menus and sliders switch instantly instead of animating." },
     checkUpdates: { label: "Look for a new version every time AppD-Manager starts" },
     restartAppsOnUpdate: {
@@ -356,12 +358,6 @@ module.exports = {
       note: "The program as it is, every app's settings and icon, and the manager's settings, in a folder named after the date, time and version."
     },
     backupsKept: { label: "Backups to keep", note: "Older backups are deleted when a new one is made, and whenever AppD-Manager starts." }
-  },
-  appOrders: {
-    usage: ["Resource use", "Running apps first, the one using the most on top"],
-    name: "Name",
-    used: ["Last used", "The app you used last comes first"],
-    running: ["Running first", "Then by name"]
   },
   sponsorActions: { off: "Off", show: "Show on the seek bar only", ask: "Ask before skipping", skip: "Skip automatically" },
   sponsorActionsFor: {
@@ -438,7 +434,6 @@ module.exports = {
       settings: "Settings",
       smaller: "Make the sidebar smaller",
       larger: "Show the whole sidebar",
-      order: "Order of the apps",
       find: "Find an app…",
       findLabel: "Find an app",
       exit: "Exit",
@@ -462,6 +457,10 @@ module.exports = {
       tabName: "Name",
       tabUrl: "Address",
       tabKeepAlive: "Never pause or unload this tab",
+      tabIcon: "Icon",
+      tabIconPlaceholder: "An emoji, a picture address, or a file",
+      tabIconChoose: "Choose a picture",
+      tabIconClear: "Use the site's own",
       tabAdd: "Add a tab",
       tabUp: "Move earlier",
       tabDown: "Move later",

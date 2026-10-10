@@ -220,6 +220,8 @@ const DEFAULTS = {
   tabRememberLast: true,
   tabShowIcons: true,
   tabShowBadges: true,
+  tabShowNames: true,
+  tabCollapseUnloaded: true,
   trayWidth: 420,
   trayHeight: 640,
   trayAtIcon: true,
@@ -351,13 +353,11 @@ const PREFS = {
   backupsKept: 5,
   showUsage: true,
   motion: true,
-  appOrder: "usage",
   updateChannel: "main",
   restartAppsOnUpdate: true
 };
 const RESTART_ON_SAVE = ["ask", "always", "never"];
 const UPDATE_CHANNELS = ["main", "beta"];
-const APP_ORDERS = ["usage", "name", "used", "running"];
 function prefs() {
   const kept = readSettings().manager || {};
   const result = { ...PREFS };
@@ -365,7 +365,6 @@ function prefs() {
     if (typeof kept[key] === typeof PREFS[key]) result[key] = kept[key];
   }
   if (!RESTART_ON_SAVE.includes(result.restartOnSave)) result.restartOnSave = PREFS.restartOnSave;
-  if (!APP_ORDERS.includes(result.appOrder)) result.appOrder = PREFS.appOrder;
   if (!UPDATE_CHANNELS.includes(result.updateChannel)) result.updateChannel = PREFS.updateChannel;
   result.backupsKept = Math.min(50, Math.max(1, Math.round(result.backupsKept) || PREFS.backupsKept));
   return result;
@@ -377,7 +376,6 @@ function setPrefs(next) {
   }
   now.backupsKept = Math.min(50, Math.max(1, Math.round(now.backupsKept) || PREFS.backupsKept));
   if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(fill(text.errors.oneOf, { key: "restartOnSave", values: RESTART_ON_SAVE.join(", ") }));
-  if (!APP_ORDERS.includes(now.appOrder)) throw new Error(fill(text.errors.oneOf, { key: "appOrder", values: APP_ORDERS.join(", ") }));
   if (!UPDATE_CHANNELS.includes(now.updateChannel)) throw new Error(fill(text.errors.oneOf, { key: "updateChannel", values: UPDATE_CHANNELS.join(", ") }));
   const settings = readSettings();
   settings.manager = now;
@@ -536,7 +534,7 @@ function validate(cfg) {
   if (isMultiTab(cfg)) {
     if (!cfg.tabs.length) throw new Error(text.errors.noTabs);
     cfg.tabs.forEach((tab, index) => {
-      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean") {
+      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean" || tab.icon !== void 0 && typeof tab.icon !== "string") {
         throw new Error(fill(text.errors.badTab, { number: index + 1 }));
       }
       if (!/^https?:\/\//i.test(tab.url) || !URL.canParse(tab.url)) throw new Error(fill(text.errors.badTabUrl, { number: index + 1, url: tab.url }));
@@ -687,7 +685,7 @@ function settleTabs(cfg) {
     if (!plainObject(tab)) return tab;
     const url = typeof tab.url === "string" ? tab.url.trim() : tab.url;
     const name = typeof tab.name === "string" ? tab.name.trim() : tab.name;
-    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, keepAlive: tab.keepAlive === true };
+    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", keepAlive: tab.keepAlive === true };
   });
   if (isMultiTab(cfg) && typeof cfg.tabs[0]?.url === "string") cfg.url = cfg.tabs[0].url;
   return cfg;
@@ -783,6 +781,18 @@ function save(id, cfg) {
     const name = `icon${path.extname(icon).toLowerCase()}`;
     fs.copyFileSync(icon, path.join(appDir(id), name));
     cfg = { ...cfg, icon: name };
+  }
+  if (cfg.tabs.some((tab) => path.isAbsolute(tab.icon || ""))) {
+    cfg = {
+      ...cfg,
+      tabs: cfg.tabs.map((tab, index) => {
+        if (!path.isAbsolute(tab.icon || "") || !fs.statSync(tab.icon, { throwIfNoEntry: false })?.isFile()) return tab;
+        if (path.dirname(tab.icon) === appDir(id)) return { ...tab, icon: path.basename(tab.icon) };
+        const name = `tab-icon-${index + 1}${path.extname(tab.icon).toLowerCase()}`;
+        fs.copyFileSync(tab.icon, path.join(appDir(id), name));
+        return { ...tab, icon: name };
+      })
+    };
   }
   const stored = { ...cfg };
   for (const key of ALL_EXTENSION_KEYS) delete stored[key];

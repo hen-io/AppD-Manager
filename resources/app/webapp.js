@@ -630,8 +630,7 @@ async function createWindow() {
     isBusy: () => menusOpen > 0,
     because,
     resume: throttle.resumePage,
-    outset,
-    atHome: startUrl === cfg.url
+    outset
   };
   if (lib.isTray(cfg)) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
