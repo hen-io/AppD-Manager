@@ -1,17 +1,20 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, accent, position, icons, badges, names, collapse, logo }) {
+module.exports = function barPage({ dark, hues, position, icons, badges, names, collapse, logo }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
-  const surface = dark ? "#1b1d21" : "#f6f7fb";
-  const ink = dark ? "#e4e6ec" : "#1c1e23";
-  const quiet = dark ? "#a9adb8" : "#5a5f6a";
-  const line = dark ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.1)";
+  const role = (light, darker, hue = "--hue") => `oklch(${dark ? darker[0] : light[0]}% calc(${dark ? darker[1] : light[1]} * var(--vivid)) var(${hue}))`;
+  const surface = role([94, 0.04], [21.5, 0.046], "--hue-s");
+  const ink = role([14, 0.025], [95.5, 0.012], "--hue-s");
+  const quiet = role([33, 0.06], [85, 0.045], "--hue-s");
+  const line = role([77, 0.06], [42, 0.06], "--hue-s");
+  const accent = role([44, 0.14], [84, 0.11], "--hue-2");
+  const tone = role([88, 0.11], [36, 0.13], "--hue-2");
+  const onAccent = dark ? role([0, 0], [24, 0.07], "--hue-2") : "#ffffff";
+  const vars = Object.entries(hues).map(([name, value]) => `${name}: ${value};`).join(" ");
   return `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}"><style>
-    :root { --surface: ${surface}; --ink: ${ink}; --quiet: ${quiet}; --line: ${line}; --accent: ${accent};
-      --on-accent: ${dark ? "#101216" : "#ffffff"};
-      --tone: color-mix(in srgb, var(--accent) ${dark ? 24 : 16}%, var(--surface));
-      --label-accent: color-mix(in srgb, var(--accent) ${dark ? 62 : 82}%, ${dark ? "#ffffff" : "#000000"}); }
+    :root { ${vars} --surface: ${surface}; --ink: ${ink}; --quiet: ${quiet}; --line: ${line}; --accent: ${accent};
+      --on-accent: ${onAccent}; --tone: ${tone}; --label-accent: ${accent}; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; background: var(--surface); color: var(--ink);
       font: 500 14px/20px system-ui, "Roboto", sans-serif; user-select: none; -webkit-user-select: none; }

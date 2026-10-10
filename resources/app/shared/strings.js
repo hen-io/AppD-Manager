@@ -79,7 +79,7 @@ module.exports = {
       note: `Your zoom lasts until the page reloads or the app restarts. "Reset zoom" in the app's menu (Ctrl+0) returns to the default.`
     },
     hideScrollbars: { label: "Hide scrollbars (pages still scroll)" },
-    confirmClose: { label: "Ask before closing the app", note: "Closing the window asks first. For a multi-tab app the question lists the tabs, the loaded ones first." },
+    confirmClose: { label: "Ask before closing the app", note: 'Closing the window asks "Are you sure?". For a multi-tab app the question lists the tabs, the loaded ones first.' },
     tabBarPosition: {
       label: "Tab bar",
       options: { top: ["Top", "Above the page"], bottom: "Bottom", left: ["Left", "A column beside the page: room for long names"] }
@@ -744,7 +744,7 @@ module.exports = {
     },
     actions: { "hard-reload": "Hard reload", "clear-cache": "Empty cache and hard reload" },
     trayActions: { toggle: "Show or hide the window" },
-    confirmClose: { message: "Close {name}?", buttons: ["Close", "Keep open"] },
+    confirmClose: { message: "Are you sure?", buttons: ["Close", "Keep open"] },
     leave: { message: "Leave this page?", detail: "It may have unsaved changes.", buttons: ["Leave", "Stay"] },
     homeButton: { label: "← {name}", tip: "Back to {name} (Alt+Home)" },
     tray: { quit: "Quit" },

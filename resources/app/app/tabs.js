@@ -1,15 +1,16 @@
 "use strict";
-const { View, WebContentsView, app, ipcMain, clipboard, net } = require("electron");
+const { View, WebContentsView, app, ipcMain, clipboard, nativeTheme, net } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const barPage = require("./tabbar");
+const { paletteVars } = require("../shared/palettes");
 const { text } = require("../shared/text");
 const t = text.app.tab;
 const BAR = { top: 48, bottom: 48, left: 208, leftSmall: 64 };
 const UNREAD = /[([](\d{1,5})\+?[)\]]/;
 const RETRY_MS = 15e3;
 const PICTURES = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon" };
-module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, dark, accent, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal }) {
+module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal }) {
   const container = new View();
   win.contentView.addChildView(container);
   const unloadable = process.platform !== "win32" || cfg.tabInactive !== "pause";
@@ -137,8 +138,25 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
   const appIcon = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || "");
   const logo = iconOf(path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
-  bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({ dark, accent, logo, position: cfg.tabBarPosition, icons: cfg.tabShowIcons, badges: cfg.tabShowBadges, names: cfg.tabShowNames, collapse: cfg.tabCollapseUnloaded }))}`).catch(() => {
-  });
+  const look = lib.appearance();
+  const hues = paletteVars(look.palette, look.custom);
+  const isDark = () => look.mode === "dark" || look.mode === "system" && nativeTheme.shouldUseDarkColors;
+  const loadBar = () => {
+    ready = false;
+    bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({
+      dark: isDark(),
+      hues,
+      logo,
+      position: cfg.tabBarPosition,
+      icons: cfg.tabShowIcons,
+      badges: cfg.tabShowBadges,
+      names: cfg.tabShowNames,
+      collapse: cfg.tabCollapseUnloaded
+    }))}`).catch(() => {
+    });
+  };
+  loadBar();
+  if (look.mode === "system") nativeTheme.on("updated", () => !bar.webContents.isDestroyed() && loadBar());
   const signal = (pids, name) => {
     for (const pid of pids) {
       try {
@@ -333,9 +351,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (!cfg.tabLazyLoad && active >= 0) for (const tab of tabs) ensure(tab);
   }
   function showWelcome() {
+    const tint = `${hues["--hue-s"]}`;
+    const [paper, ink] = isDark() ? [`oklch(14.5% calc(0.03 * ${hues["--vivid"]}) ${tint})`, `oklch(95.5% calc(0.012 * ${hues["--vivid"]}) ${tint})`] : [`oklch(98.2% calc(0.016 * ${hues["--vivid"]}) ${tint})`, `oklch(14% calc(0.025 * ${hues["--vivid"]}) ${tint})`];
     const escape = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-    const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}">
-      <body style="margin:0;height:100vh;display:grid;place-items:center;background:${background};color:${dark ? "#e4e6ec" : "#1c1e23"};font:500 18px system-ui,sans-serif;text-align:center;user-select:none">
+    const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${isDark() ? "dark" : "light"}">
+      <body style="margin:0;height:100vh;display:grid;place-items:center;background:${paper};color:${ink};font:500 18px system-ui,sans-serif;text-align:center;user-select:none">
       <div>${logo ? `<img src="${logo}" width="72" height="72" style="border-radius:16px;margin-bottom:18px"><br>` : ""}${escape(cfg.name)}
       <div style="margin-top:8px;font:400 15px system-ui,sans-serif;opacity:.65">${escape(t.choose)}</div></div>`;
     welcome = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });

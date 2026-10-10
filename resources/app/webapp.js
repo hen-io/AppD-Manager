@@ -439,7 +439,7 @@ async function createWindow() {
       }
     }
   }
-  const lineColour = wantsIconColour(cfg) || multi ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
+  const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
   const hosted = needsHost(cfg) || multi;
   const outset = hosted ? outsetOf(cfg) : 0;
   const dark = !(cfg.colorScheme === "light" && !extension("darkreader"));
@@ -472,7 +472,6 @@ async function createWindow() {
   });
   let host = null;
   if (multi) {
-    const accent = [cfg.windowBorderColor, lineColour].find((one) => /^#[0-9a-f]{6}$/i.test(one)) || "#5b8cff";
     const saveTab = (index) => {
       try {
         fs.writeFileSync(statePath, JSON.stringify({ ...readState(), tab: index }));
@@ -485,8 +484,6 @@ async function createWindow() {
       lib,
       pagePreferences,
       background: dark ? "#15171b" : "#ffffff",
-      dark,
-      accent,
       note,
       saveTab,
       startTab: cfg.tabRememberLast ? Number(state.tab) || 0 : -1,
