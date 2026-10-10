@@ -48,7 +48,7 @@ const HARDWARE_ACCELERATION = [
 ];
 const featureLists = { "enable-features": [], "disable-features": [] };
 const FRAME_LOOK = ["--enable-transparent-visuals"];
-const HOTKEY_DOOR = cfg.trayApp && cfg.trayHotkey && process.env.WAYLAND_DISPLAY ? ["--enable-features=GlobalShortcutsPortal"] : [];
+const HOTKEY_DOOR = lib.isTray(cfg) && cfg.trayHotkey && process.env.WAYLAND_DISPLAY ? ["--enable-features=GlobalShortcutsPortal"] : [];
 for (const flag of [...cfg.hardwareAcceleration ? HARDWARE_ACCELERATION : [], ...hasLook(cfg) ? FRAME_LOOK : [], ...HOTKEY_DOOR, ...cfg.flags]) {
   const m = /^--([^=]+)(?:=(.*))?$/.exec(flag.trim());
   if (!m) console.error(`appd: ignoring flag "${flag}"`);
@@ -227,21 +227,21 @@ function appMenu(wc, inTray = false) {
         click: () => zoom.reset(wc)
       }
     ] : [],
-    ...cfg.trayApp ? [] : [{
+    ...lib.isTray(cfg) ? [] : [{
       label: "Full screen",
       accelerator: "F11",
       type: "checkbox",
       checked: Boolean(window?.isFullScreen()),
       click: () => window?.setFullScreen(!window.isFullScreen())
     }],
-    ...cfg.trayApp && cfg.trayHideOnBlur && trayIcon?.pin ? [sep, {
+    ...lib.isTray(cfg) && cfg.trayHideOnBlur && trayIcon?.pin ? [sep, {
       label: "Keep open",
       type: "checkbox",
       checked: trayIcon.isPinned(),
       click: () => trayIcon.pin(!trayIcon.isPinned())
     }] : [],
-    ...cfg.trayApp && !inTray ? [{ label: "Hide", click: () => window?.hide() }, sep, { label: `Quit ${cfg.name}`, click: () => app.quit() }] : [],
-    ...cfg.windowDecorations || cfg.trayApp ? [] : [
+    ...lib.isTray(cfg) && !inTray ? [{ label: "Hide", click: () => window?.hide() }, sep, { label: `Quit ${cfg.name}`, click: () => app.quit() }] : [],
+    ...cfg.windowDecorations || lib.isTray(cfg) ? [] : [
       sep,
       { label: "Minimize", click: () => window?.minimize() },
       { label: window?.isMaximized() ? "Restore size" : "Maximize", click: () => window?.isMaximized() ? window.unmaximize() : window?.maximize() },
@@ -447,14 +447,14 @@ async function createWindow() {
     const wanted = [.../* @__PURE__ */ new Set([cfg.language, cfg.language.split("-")[0], "en"])].join(",");
     session.defaultSession.setUserAgent(app.userAgentFallback, wanted);
   }
-  const startsHidden = cfg.closeToTray && cfg.startHidden && !cfg.trayApp;
+  const startsHidden = cfg.closeToTray && cfg.startHidden && !lib.isTray(cfg);
   win = new BrowserWindow({
-    alwaysOnTop: cfg.alwaysOnTop || cfg.trayApp,
-    width: cfg.trayApp ? cfg.trayWidth + 2 * outset : state.width || cfg.width,
-    height: cfg.trayApp ? cfg.trayHeight + 2 * outset : state.height || cfg.height,
+    alwaysOnTop: cfg.alwaysOnTop || lib.isTray(cfg),
+    width: lib.isTray(cfg) ? cfg.trayWidth + 2 * outset : state.width || cfg.width,
+    height: lib.isTray(cfg) ? cfg.trayHeight + 2 * outset : state.height || cfg.height,
     title: cfg.name,
     icon,
-    ...cfg.trayApp ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
+    ...lib.isTray(cfg) ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
     ...startsHidden ? { show: false } : {},
     ...dark ? { backgroundColor: "#15171b" } : {},
     frame: !bare,
@@ -486,11 +486,11 @@ async function createWindow() {
     if (cfg.startFullScreen) win.setFullScreen(true);
   };
   if (startsHidden) win.once("show", sizeUp);
-  else if (!cfg.trayApp) sizeUp();
+  else if (!lib.isTray(cfg)) sizeUp();
   if (cfg.startMuted) win.webContents.setAudioMuted(true);
   if (cfg.keepAwake !== "off") powerSaveBlocker.start(cfg.keepAwake === "display" ? "prevent-display-sleep" : "prevent-app-suspension");
   if (startsHidden) {
-  } else if (!cfg.trayApp || cfg.trayShowAtStart) {
+  } else if (!lib.isTray(cfg) || cfg.trayShowAtStart) {
     if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
     else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
   }
@@ -562,10 +562,10 @@ async function createWindow() {
     outset,
     atHome: startUrl === cfg.url
   };
-  if (cfg.trayApp) trayIcon = makeTrayApp(win, cfg, trayOptions);
+  if (lib.isTray(cfg)) trayIcon = makeTrayApp(win, cfg, trayOptions);
   else if (cfg.closeToTray) trayIcon = keepInTray(win, trayOptions);
   if (startsHidden && !trayIcon) win.show();
-  if (cfg.trayApp && cfg.trayHotkey && trayIcon?.toggle) {
+  if (lib.isTray(cfg) && cfg.trayHotkey && trayIcon?.toggle) {
     let taken = false;
     try {
       taken = globalShortcut.register(cfg.trayHotkey, () => trayIcon.toggle());
@@ -608,7 +608,7 @@ async function createWindow() {
     restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
   });
   win.on("close", () => {
-    if (cfg.trayApp) return;
+    if (lib.isTray(cfg)) return;
     const { width, height } = win.getNormalBounds();
     try {
       fs.writeFileSync(statePath, JSON.stringify({ width, height, maximized: win.isMaximized() }));

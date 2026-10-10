@@ -47,7 +47,7 @@ function describeExtension(folder) {
   };
 }
 const startFlags = (cfg) => [
-  ...cfg.trayApp && !WINDOWS ? ["--appd-x11"] : [],
+  ...isTray(cfg) && !WINDOWS ? ["--appd-x11"] : [],
   ...cfg.language && !WINDOWS ? [`--appd-lang=${cfg.language}`] : []
 ];
 function runCommand(id, extra = []) {
@@ -65,6 +65,26 @@ const APP_ACTIONS = {
   "hard-reload": "Hard reload",
   "clear-cache": "Empty cache and hard reload"
 };
+const APP_TYPES = {
+  app: {
+    name: "App",
+    about: "A window of its own, with an entry in the desktop's menu and a place in the taskbar",
+    icon: "window",
+    menu: true,
+    tray: false,
+    actions: {}
+  },
+  tray: {
+    name: "Tray app",
+    about: "Sits in the system tray: a click on its icon opens a small window. Not in the menu, not in the taskbar",
+    icon: "tray",
+    menu: false,
+    tray: true,
+    actions: TRAY_ACTIONS
+  }
+};
+const appType = (cfg) => APP_TYPES[cfg.type] || APP_TYPES.app;
+const isTray = (cfg) => appType(cfg).tray;
 const EXTENSION_CATEGORIES = { blocking: "Blocking", video: "Video", look: "Look", chat: "Chat and streams" };
 const EXTENSIONS = {
   adblock: {
@@ -209,7 +229,7 @@ const DEFAULTS = {
   width: 1280,
   height: 800,
   autostart: false,
-  trayApp: false,
+  type: "app",
   trayWidth: 420,
   trayHeight: 640,
   trayAtIcon: true,
@@ -315,7 +335,7 @@ const DEFAULTS = {
   spellcheckLanguages: [],
   ignoreCertificateErrors: false,
   flags: [],
-  configVersion: 4
+  configVersion: 5
 };
 const EXTENSION_KEYS = {
   adblock: Object.keys(DEFAULTS).filter((key) => key.startsWith("adBlock")),
@@ -340,9 +360,11 @@ const PREFS = {
   backupsKept: 5,
   showUsage: true,
   motion: true,
-  appOrder: "usage"
+  appOrder: "usage",
+  updateChannel: "main"
 };
 const RESTART_ON_SAVE = ["ask", "always", "never"];
+const UPDATE_CHANNELS = ["main", "beta"];
 const APP_ORDERS = ["usage", "name", "used", "running"];
 function prefs() {
   const kept = readSettings().manager || {};
@@ -352,6 +374,7 @@ function prefs() {
   }
   if (!RESTART_ON_SAVE.includes(result.restartOnSave)) result.restartOnSave = PREFS.restartOnSave;
   if (!APP_ORDERS.includes(result.appOrder)) result.appOrder = PREFS.appOrder;
+  if (!UPDATE_CHANNELS.includes(result.updateChannel)) result.updateChannel = PREFS.updateChannel;
   result.backupsKept = Math.min(50, Math.max(1, Math.round(result.backupsKept) || PREFS.backupsKept));
   return result;
 }
@@ -363,6 +386,7 @@ function setPrefs(next) {
   now.backupsKept = Math.min(50, Math.max(1, Math.round(now.backupsKept) || PREFS.backupsKept));
   if (!RESTART_ON_SAVE.includes(now.restartOnSave)) throw new Error(`"restartOnSave" must be one of: ${RESTART_ON_SAVE.join(", ")}`);
   if (!APP_ORDERS.includes(now.appOrder)) throw new Error(`"appOrder" must be one of: ${APP_ORDERS.join(", ")}`);
+  if (!UPDATE_CHANNELS.includes(now.updateChannel)) throw new Error(`"updateChannel" must be one of: ${UPDATE_CHANNELS.join(", ")}`);
   const settings = readSettings();
   settings.manager = now;
   fs.mkdirSync(root, { recursive: true });
@@ -471,6 +495,7 @@ const RULES = {
   windowGlow: { min: 0, max: 40 },
   windowGlowSide: { oneOf: ["inner", "outer", "both"] },
   trayMargin: { min: 0, max: 300 },
+  type: { oneOf: Object.keys(APP_TYPES) },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -660,6 +685,9 @@ function withDefaults(file) {
     else stored.unfocusedCpuPercent = Math.min(limit, 10);
   }
   if (version < 4 && stored.windowBorderColor === "#7a7f87") stored.windowBorderColor = "";
+  if (typeof stored.trayApp === "boolean" && stored.type === void 0) stored.type = stored.trayApp ? "tray" : "app";
+  delete stored.trayApp;
+  if (stored.type !== void 0 && !(stored.type in APP_TYPES)) stored.type = DEFAULTS.type;
   if (stored.windowBorderStyle === "glow") {
     stored.windowGlow = Math.min(40, (stored.windowBorderWidth || 2) * 3);
     stored.windowBorderStyle = "solid";
@@ -982,8 +1010,9 @@ function writeDesktop(id, cfg) {
     `Icon=${entryValue(iconFile(id, cfg) || cfg.icon)}`,
     "Categories=Network;",
     `StartupWMClass=${desktopId(id)}`,
-    `Actions=${Object.keys({ ...APP_ACTIONS, ...cfg.trayApp ? TRAY_ACTIONS : {} }).join(";")};`
-  ], Object.entries({ ...APP_ACTIONS, ...cfg.trayApp ? TRAY_ACTIONS : {} }).flatMap(([action, label]) => [
+    ...appType(cfg).menu ? [] : ["NoDisplay=true"],
+    `Actions=${Object.keys({ ...APP_ACTIONS, ...appType(cfg).actions }).join(";")};`
+  ], Object.entries({ ...APP_ACTIONS, ...appType(cfg).actions }).flatMap(([action, label]) => [
     `[Desktop Action ${action}]`,
     `Name=${label}`,
     `Exec=${execArg(launcher)} run ${id}${startFlags(cfg).map((flag) => ` ${flag}`).join("")} --appd-action=${action}`,
@@ -1082,6 +1111,9 @@ module.exports = {
   exportApps,
   importApps,
   DEFAULTS,
+  APP_TYPES,
+  appType,
+  isTray,
   APP_ACTIONS,
   TRAY_ACTIONS,
   HOTKEY,

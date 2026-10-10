@@ -39,39 +39,75 @@ async function download(url) {
   return res;
 }
 const parts = (version) => String(version).replace(/^v/, "").split(/[.-]/).map((n) => parseInt(n, 10) || 0);
+function halves(version) {
+  const all = String(version).replace(/^v/, "").split(/[.-]/).filter(Boolean);
+  const cut = all.findIndex((part) => !/^\d+$/.test(part));
+  return { numbers: (cut < 0 ? all : all.slice(0, cut)).map(Number), ahead: cut < 0 ? [] : all.slice(cut) };
+}
 function isNewer(a, b) {
-  const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  const [x, y] = [halves(a), halves(b)];
+  for (let i = 0; i < Math.max(x.numbers.length, y.numbers.length); i++) {
+    if ((x.numbers[i] || 0) !== (y.numbers[i] || 0)) return (x.numbers[i] || 0) > (y.numbers[i] || 0);
+  }
+  if (!x.ahead.length || !y.ahead.length) return !x.ahead.length && y.ahead.length > 0;
+  for (let i = 0; i < Math.max(x.ahead.length, y.ahead.length); i++) {
+    const [p, q] = [x.ahead[i] ?? "0", y.ahead[i] ?? "0"];
+    if (p === q) continue;
+    if (/^\d+$/.test(p) && /^\d+$/.test(q)) return Number(p) > Number(q);
+    return p.toLowerCase() > q.toLowerCase();
   }
   return false;
 }
-async function latestRelease() {
-  const res = await net.fetch(`${API}/releases/latest`, { cache: "no-store" });
-  if (res.ok) {
-    const release = await res.json();
-    const url = String(release.html_url || "");
-    return {
-      tag: release.tag_name,
-      name: String(release.name || "").trim(),
-      notes: String(release.body || "").replace(/\r/g, "").trim(),
-      url: url.startsWith(`https://github.com/${REPO}/`) ? url : releasesUrl
-    };
+function described(release) {
+  const url = String(release.html_url || "");
+  return {
+    tag: release.tag_name,
+    name: String(release.name || "").trim(),
+    notes: String(release.body || "").replace(/\r/g, "").trim(),
+    url: url.startsWith(`https://github.com/${REPO}/`) ? url : releasesUrl,
+    date: String(release.published_at || ""),
+    beta: Boolean(release.prerelease)
+  };
+}
+async function latestRelease(channel = "main") {
+  if (channel === "beta") {
+    const list = (await (await download(`${API}/releases?per_page=30`)).json()).filter((release) => !release.draft && release.published_at);
+    const newest = list.reduce((best, release) => !best || Date.parse(release.published_at) > Date.parse(best.published_at) ? release : best, null);
+    if (newest) return described(newest);
   }
+  const res = await net.fetch(`${API}/releases/latest`, { cache: "no-store" });
+  if (res.ok) return described(await res.json());
   if (res.status !== 404) throw new Error(`GitHub answered ${res.status} for ${API}/releases/latest`);
   const tags = await (await download(`${API}/tags?per_page=100`)).json();
   const versions = tags.map((tag2) => tag2.name).filter((name) => /^v?\d+(\.\d+)*$/.test(name));
   const tag = versions.reduce((best, name) => best === null || isNewer(name, best) ? name : best, null);
-  return tag ? { tag, name: "", notes: "", url: releasesUrl } : null;
+  return tag ? { tag, name: "", notes: "", url: releasesUrl, date: "", beta: false } : null;
+}
+async function publishedAt(version) {
+  try {
+    for (const tag of [`v${version}`, version]) {
+      const res = await net.fetch(`${API}/releases/tags/${encodeURIComponent(tag)}`, { cache: "no-store" });
+      if (res.ok) return String((await res.json()).published_at || "");
+    }
+  } catch {
+  }
+  return "";
+}
+async function isUpdate(release, current) {
+  if (!release || release.tag.replace(/^v/, "") === current) return false;
+  const mine = release.date && await publishedAt(current);
+  if (mine) return Date.parse(release.date) > Date.parse(mine);
+  return isNewer(release.tag, current);
 }
 async function check() {
   const current = app.getVersion();
-  const release = await latestRelease();
-  const { tag = null, name = "", notes = "", url = releasesUrl } = release || {};
+  const channel = lib.prefs().updateChannel;
+  const release = await latestRelease(channel);
+  const { tag = null, name = "", notes = "", url = releasesUrl, beta = false } = release || {};
   const latest = tag ? tag.replace(/^v/, "") : current;
-  const available = isNewer(latest, current);
+  const available = await isUpdate(release, current);
   const blocked = available ? await whyNot(tag) : "";
-  return { current, latest, tag, name, notes, url, available, blocked };
+  return { current, latest, tag, name, notes, url, available, blocked, channel, beta };
 }
 async function whyNot(tag) {
   if (!isBuild) return "This copy runs from the source folder and cannot install another version of itself.";
@@ -93,6 +129,7 @@ async function releases() {
     version: release.tag_name.replace(/^v/, ""),
     name: String(release.name || "").trim(),
     date: String(release.published_at || "").slice(0, 10),
+    beta: Boolean(release.prerelease),
     current: release.tag_name.replace(/^v/, "") === current
   }));
 }
@@ -175,4 +212,4 @@ async function install(tag) {
     fs.rmSync(stagedLauncher, { force: true });
   }
 }
-module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir };
+module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir, isNewer };

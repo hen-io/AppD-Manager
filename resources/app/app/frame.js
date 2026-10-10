@@ -3,7 +3,7 @@ const { app } = require("electron");
 const FALLBACK_COLOUR = "#7a7f87";
 const STYLES = ["solid", "double", "dashed", "dotted", "groove", "ridge"];
 const frames = /* @__PURE__ */ new WeakMap();
-const isBare = (cfg) => cfg.trayApp || !cfg.windowDecorations;
+const isBare = (cfg) => cfg.type === "tray" || !cfg.windowDecorations;
 const radiusOf = (cfg) => isBare(cfg) ? cfg.windowRadius : 0;
 const widthOf = (cfg) => isBare(cfg) ? cfg.windowBorderWidth : 0;
 const isColour = (value) => /^#[0-9a-f]{6}$/i.test(value);

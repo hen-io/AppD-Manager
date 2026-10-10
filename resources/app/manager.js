@@ -110,6 +110,7 @@ function state() {
     sponsorCategories: Object.fromEntries(Object.entries(lib.SPONSOR_CATEGORIES).map(([name, info]) => [name, { ...info, choices: lib.sponsorChoices(name) }])),
     appsDir: lib.appsDir(),
     appsDirFixed: Boolean(process.env.APPD_APPS_DIR),
+    appTypes: lib.APP_TYPES,
     version: app.getVersion(),
     updateRepo: update.REPO,
     author: author(),
@@ -479,7 +480,7 @@ const handlers = {
       icon: "update",
       buttons,
       cancel: info.blocked ? 0 : 1,
-      message: `AppD-Manager ${info.latest} is available`,
+      message: `AppD-Manager ${info.latest} is available${info.beta ? " (beta)" : ""}`,
       release: { name: info.name, tag: info.tag, latest: info.latest, notes: info.notes },
       detail: how
     });
