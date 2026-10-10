@@ -323,10 +323,10 @@ module.exports = {
       note: "Each app comes back on the page it was on, running the new version. Off: an app keeps the old version until you close it."
     },
     updateChannel: {
-      label: "Versions to get",
+      label: "Release branch",
       options: {
-        main: ["Main branch", "The releases everybody gets"],
-        beta: ["Beta versions too", "Test versions as soon as they are out: newer, and less tried"]
+        main: ["Stable", "Normal releases"],
+        beta: ["BETA", "WARNING: BETA releases might contain bugs, remember to keep backups of your configuration!"]
       }
     },
     backupBeforeUpdate: {
