@@ -1,6 +1,6 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1 }) {
+module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1, slide = 420 }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
   const role = (light, darker, hue = "--hue") => `oklch(${dark ? darker[0] : light[0]}% calc(${dark ? darker[1] : light[1]} * var(--vivid)) var(${hue}))`;
@@ -17,10 +17,11 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
       --on-accent: ${onAccent}; --tone: ${tone}; --label-accent: ${accent}; }
     html { zoom: ${scale}; }
     * { box-sizing: border-box; }
-    html.peek, html.peek body { background: transparent; border: 0; }
-    html.peek #tabs, html.peek .logo { display: none; }
-    .handle { display: none; }
-    html.peek .handle { display: block; position: fixed; border-radius: 4px; background: var(--accent); opacity: .85; ${vertical ? "left: 3px; top: 50%; width: 5px; height: 100px; transform: translateY(-50%);" : `${bottom ? "bottom" : "top"}: 3px; left: 50%; width: 100px; height: 5px; transform: translateX(-50%);`} }
+    html { background: transparent !important; }
+    body { transition: transform ${slide}ms cubic-bezier(.3, 0, .1, 1), opacity ${slide}ms ease; }
+    html.peek body { transform: ${vertical ? "translateX(-102%)" : `translateY(${bottom ? "102%" : "-102%"})`}; opacity: 0; pointer-events: none; }
+    html::before { content: ""; position: fixed; z-index: 2; border-radius: 4px; background: var(--accent); opacity: 0; transition: opacity ${slide}ms ease; pointer-events: none; ${vertical ? "left: 3px; top: 50%; width: 5px; height: 100px; transform: translateY(-50%);" : `${bottom ? "bottom" : "top"}: 3px; left: 50%; width: 100px; height: 5px; transform: translateX(-50%);`} }
+    html.peek::before { opacity: 0; }
     html, body { height: 100%; margin: 0; overflow: hidden; background: var(--surface); color: var(--ink);
       font: 500 14px/20px system-ui, "Roboto", sans-serif; user-select: none; -webkit-user-select: none; }
     body { display: flex; flex-direction: ${vertical ? "column" : "row"}; align-items: center; border-${vertical ? "right" : bottom ? "top" : "bottom"}: 1px solid var(--line); }
@@ -59,7 +60,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     .ripple { position: absolute; border-radius: 50%; background: color-mix(in srgb, var(--accent) 35%, transparent); transform: scale(0); animation: ripple .5s ease-out forwards; pointer-events: none; }
     @keyframes ripple { to { transform: scale(1); opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-  </style><body><div class="handle"></div>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
+  </style><body>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
     const OPTIONS = ${json({ icons, badges, names, collapse })};
     const list = document.getElementById('tabs');
     const SPEAKER = 'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4M3 9v6h4l5 5V4L7 9z';

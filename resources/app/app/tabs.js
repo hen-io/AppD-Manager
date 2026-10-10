@@ -44,7 +44,12 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   const barSize = Math.round((cfg.tabBarPosition === "left" && !cfg.tabShowNames ? BAR.leftSmall : BAR[cfg.tabBarPosition] ?? BAR.top) * scale);
   const autoHide = cfg.tabBarAutoHide;
   let peek = autoHide && active >= 0;
+  let narrow = peek;
+  let over = false;
   let peekTimer = null;
+  let narrowTimer = null;
+  const STAY_MS = 1800;
+  const SLIDE_MS = 420;
   const inset = autoHide ? { top: 0, bottom: 0, left: 0 } : {
     top: cfg.tabBarPosition === "top" ? barSize : 0,
     bottom: cfg.tabBarPosition === "bottom" ? barSize : 0,
@@ -58,7 +63,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   });
   const HANDLE = { thick: 8 };
   const barRect = () => {
-    if (peek) {
+    if (narrow) {
       if (cfg.tabBarPosition === "left") return { x: 0, y: 0, width: HANDLE.thick, height: Math.max(1, size.height) };
       return { x: 0, y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - HANDLE.thick) : 0, width: Math.max(1, size.width), height: HANDLE.thick };
     }
@@ -68,14 +73,29 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   function setPeek(on) {
     if (!autoHide || peek === on) return;
     peek = on;
-    if (!on) container.addChildView(bar);
-    layout();
-    push();
+    clearTimeout(narrowTimer);
+    if (on) {
+      push();
+      narrowTimer = setTimeout(() => {
+        narrow = true;
+        layout();
+      }, SLIDE_MS + 60);
+    } else {
+      narrow = false;
+      container.addChildView(bar);
+      layout();
+      push();
+    }
   }
+  const hideSoon = () => {
+    clearTimeout(peekTimer);
+    if (active >= 0) peekTimer = setTimeout(() => setPeek(true), STAY_MS);
+  };
   function hover(on) {
+    over = on;
     clearTimeout(peekTimer);
     if (on) setPeek(false);
-    else if (active >= 0) peekTimer = setTimeout(() => setPeek(true), 500);
+    else hideSoon();
   }
   function layout(area) {
     if (area) size = { width: area.width, height: area.height };
@@ -184,7 +204,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       badges: cfg.tabShowBadges,
       names: cfg.tabShowNames,
       collapse: cfg.tabCollapseUnloaded,
-      scale
+      scale,
+      slide: SLIDE_MS
     }))}`).catch(() => {
     });
   };
@@ -351,7 +372,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     next.view.setVisible(true);
     if (focus) next.view.webContents.focus();
     saveTab(index);
-    if (autoHide) setPeek(true);
+    if (autoHide && !over) hideSoon();
     if (next.title) {
       const event = { defaultPrevented: false, preventDefault() {
         this.defaultPrevented = true;

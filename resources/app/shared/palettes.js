@@ -1,6 +1,6 @@
 "use strict";
 const PALETTES = {
-  ocean: { hue: 255, hue2: 300, hue3: 200, vivid: 1.6 },
+  ocean: { hue: 258, hue2: 238, hue3: 195, vivid: 1.35 },
   indigo: { hue: 262 },
   violet: { hue: 295 },
   teal: { hue: 195 },

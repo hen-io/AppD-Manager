@@ -386,7 +386,7 @@ function setPrefs(next) {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return now;
 }
-const DEFAULT_CUSTOM = { primary: "#3b6cf0", accent: "#00a7c9", secondary: "#8a5cf0", surface: "#4a6fb5", vivid: 150 };
+const DEFAULT_CUSTOM = { primary: "#2f6bff", accent: "#00b8b0", secondary: "#1f9bd6", surface: "#3f6fc4", vivid: 150 };
 const COLOUR_HEX = /^#[0-9a-f]{6}$/i;
 const customLooks = (value) => plainObject(value) && ["primary", "accent", "secondary", "surface"].every((key) => COLOUR_HEX.test(value[key])) && Number.isFinite(value.vivid) && value.vivid >= 50 && value.vivid <= 200;
 function appearance() {
