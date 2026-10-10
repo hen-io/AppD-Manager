@@ -330,6 +330,10 @@ const handlers = {
   launch(id) {
     startApp(id);
   },
+  openInstance(id) {
+    lib.checkId(id);
+    startApp(id, [`--appd-instance=${lib.freeInstance(id)}`]);
+  },
   async pickFolder(title) {
     const { filePaths } = await dialog.showOpenDialog(win, { title: String(title || text.ui.form.chooseFolderTitle), properties: ["openDirectory", "createDirectory"] });
     return filePaths[0] || null;

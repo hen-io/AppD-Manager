@@ -42,7 +42,9 @@ app.setName(desktopId);
 process.env.CHROME_DESKTOP = `${desktopId}.desktop`;
 app.setDesktopName?.(`${desktopId}.desktop`);
 if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId(id));
-app.setPath("userData", lib.profileDir(id));
+const instance = Math.max(1, Math.floor(Number(process.argv.find((arg) => arg.startsWith("--appd-instance="))?.slice("--appd-instance=".length)) || 1));
+const profile = lib.instanceDir(id, instance);
+app.setPath("userData", profile);
 const HARDWARE_ACCELERATION = [
   "--ignore-gpu-blocklist",
   "--enable-gpu-rasterization",
@@ -91,7 +93,7 @@ function followGoogleSignIn(wc) {
 }
 const iconFile = lib.iconFile(id, cfg);
 let icon = iconFile && /\.png$/i.test(iconFile) ? iconFile : void 0;
-const statePath = path.join(lib.profileDir(id), "window-state.json");
+const statePath = path.join(profile, "window-state.json");
 const multi = lib.isMultiTab(cfg);
 let tabs = null;
 const tabHosts = () => tabs ? tabs.hosts() : cfg.tabs.map((tab) => new URL(tab.url).hostname);
@@ -431,7 +433,7 @@ async function createWindow() {
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   const bare = isBare(cfg);
   if (!icon && iconFile) {
-    icon = await windowIcon(iconFile, lib.profileDir(id));
+    icon = await windowIcon(iconFile, profile);
     if (icon && lib.WINDOWS) {
       try {
         lib.writeDesktop(id, cfg);
@@ -439,7 +441,7 @@ async function createWindow() {
       }
     }
   }
-  const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
+  const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(profile, "icon-colour.json")).catch(() => null) : null;
   const hosted = needsHost(cfg) || multi;
   const outset = hosted ? outsetOf(cfg) : 0;
   const dark = !(cfg.colorScheme === "light" && !extension("darkreader"));

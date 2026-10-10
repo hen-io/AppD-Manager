@@ -223,6 +223,7 @@ const DEFAULTS = {
   tabBarSize: 100,
   tabTheme: "manager",
   tabBarAutoHide: false,
+  tabBarHideSeconds: 1.8,
   tabShowNames: true,
   tabCollapseUnloaded: true,
   trayWidth: 420,
@@ -508,6 +509,7 @@ const RULES = {
   tabInactive: { oneOf: TAB_INACTIVE },
   tabInactiveAfterSeconds: { min: 1, max: 86400 },
   tabBarSize: { min: 70, max: 160 },
+  tabBarHideSeconds: { min: 0.2, max: 30 },
   tabTheme: { oneOf: ["manager", "system", "light", "dark"] },
   tabStart: { oneOf: ["last", "first", "none"] },
   openLinks: { oneOf: OPEN_LINKS },
@@ -542,7 +544,7 @@ function validate(cfg) {
   if (isMultiTab(cfg)) {
     if (!cfg.tabs.length) throw new Error(text.errors.noTabs);
     cfg.tabs.forEach((tab, index) => {
-      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean" || tab.icon !== void 0 && typeof tab.icon !== "string" || tab.display !== void 0 && !["", "both", "name", "icon"].includes(tab.display)) {
+      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean" || tab.icon !== void 0 && typeof tab.icon !== "string" || tab.display !== void 0 && !["", "both", "name", "icon"].includes(tab.display) || tab.home !== void 0 && typeof tab.home !== "boolean") {
         throw new Error(fill(text.errors.badTab, { number: index + 1 }));
       }
       if (!/^https?:\/\//i.test(tab.url) || !URL.canParse(tab.url)) throw new Error(fill(text.errors.badTabUrl, { number: index + 1, url: tab.url }));
@@ -693,8 +695,10 @@ function settleTabs(cfg) {
     if (!plainObject(tab)) return tab;
     const url = typeof tab.url === "string" ? tab.url.trim() : tab.url;
     const name = typeof tab.name === "string" ? tab.name.trim() : tab.name;
-    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", display: ["both", "name", "icon"].includes(tab.display) ? tab.display : "", keepAlive: tab.keepAlive === true };
+    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", display: ["both", "name", "icon"].includes(tab.display) ? tab.display : "", home: tab.home === true, keepAlive: tab.keepAlive === true };
   });
+  const home2 = cfg.tabs.findIndex((tab) => plainObject(tab) && tab.home);
+  cfg.tabs = cfg.tabs.map((tab, index) => plainObject(tab) && tab.home && index !== home2 ? { ...tab, home: false } : tab);
   if (isMultiTab(cfg) && typeof cfg.tabs[0]?.url === "string") cfg.url = cfg.tabs[0].url;
   return cfg;
 }
@@ -838,6 +842,21 @@ function clearData(id) {
   checkId(id);
   if (runningPid(id)) throw new Error(text.errors.closeFirst);
   fs.rmSync(profileDir(id), { recursive: true, force: true });
+  for (let n = 2; n <= MAX_INSTANCES; n++) fs.rmSync(instanceDir(id, n), { recursive: true, force: true });
+}
+const MAX_INSTANCES = 9;
+const instanceDir = (id, n) => n > 1 ? `${profileDir(id)}-${n}` : profileDir(id);
+function freeInstance(id) {
+  checkId(id);
+  for (let n = 2; n <= MAX_INSTANCES; n++) {
+    try {
+      const lock = fs.readlinkSync(path.join(instanceDir(id, n), "SingletonLock"));
+      process.kill(Number(lock.slice(lock.lastIndexOf("-") + 1)), 0);
+    } catch {
+      return n;
+    }
+  }
+  throw new Error(fill(text.errors.tooManyInstances, { most: MAX_INSTANCES }));
 }
 function duplicate(id) {
   const cfg = load(id);
@@ -1210,6 +1229,8 @@ module.exports = {
   appDir,
   configPath,
   profileDir,
+  instanceDir,
+  freeInstance,
   desktopId,
   markUsed,
   lastUsed,

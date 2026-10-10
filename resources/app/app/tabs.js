@@ -48,7 +48,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   let over = false;
   let peekTimer = null;
   let narrowTimer = null;
-  const STAY_MS = 1800;
+  const STAY_MS = Math.round(cfg.tabBarHideSeconds * 1e3);
   const SLIDE_MS = 420;
   const inset = autoHide ? { top: 0, bottom: 0, left: 0 } : {
     top: cfg.tabBarPosition === "top" ? barSize : 0,
@@ -104,6 +104,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     for (const tab of tabs) tab.view?.setBounds(page);
     welcome?.setBounds(page);
   }
+  const shown = () => [
+    ...tabs.filter((tab) => tab.cfg.home),
+    ...tabs.filter((tab) => !tab.cfg.home && tab.view),
+    ...tabs.filter((tab) => !tab.cfg.home && !tab.view)
+  ];
   let pushTimer = null;
   function push() {
     if (pushTimer || !ready) return;
@@ -113,7 +118,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       bar.webContents.send("appd-tabs-state", {
         active,
         peek,
-        tabs: tabs.map((tab) => ({
+        tabs: shown().map((tab) => ({
+          index: tab.index,
           name: tab.cfg.name,
           favicon: cfg.tabShowIcons ? tab.favicon : "",
           icon: cfg.tabShowIcons ? iconOf(tab.cfg.icon) || appIcon : null,
@@ -403,9 +409,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   function shortcut(input) {
     if (!input.control || input.alt || input.meta) return false;
     const key = input.key.toLowerCase();
-    if (key === "tab" && !input.shift || key === "pagedown") select((active + 1) % tabs.length);
-    else if (key === "tab" && input.shift || key === "pageup") select((Math.max(active, 0) - 1 + tabs.length) % tabs.length);
-    else if (/^[1-9]$/.test(key) && !input.shift) select(key === "9" ? tabs.length - 1 : Math.min(Number(key) - 1, tabs.length - 1));
+    const order = shown();
+    const at = order.findIndex((tab) => tab.index === active);
+    if (key === "tab" && !input.shift || key === "pagedown") select(order[(at + 1) % order.length].index);
+    else if (key === "tab" && input.shift || key === "pageup") select(order[(Math.max(at, 0) - 1 + order.length) % order.length].index);
+    else if (/^[1-9]$/.test(key) && !input.shift) select(order[key === "9" ? order.length - 1 : Math.min(Number(key) - 1, order.length - 1)].index);
     else return false;
     return true;
   }
@@ -493,8 +501,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     summary: () => [...tabs.filter((tab) => tab.view), ...tabs.filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
     isChrome: (contents) => chrome.has(contents),
     current: () => {
-      const shown = tabs[active]?.view?.webContents;
-      return shown && !shown.isDestroyed() ? shown : bar.webContents;
+      const shown2 = tabs[active]?.view?.webContents;
+      return shown2 && !shown2.isDestroyed() ? shown2 : bar.webContents;
     },
     index: () => active,
     homeUrl: () => (tabs[active] ?? tabs[0]).cfg.url,

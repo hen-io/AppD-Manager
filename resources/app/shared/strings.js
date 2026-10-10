@@ -106,6 +106,7 @@ module.exports = {
     },
     tabBarSize: { label: "Size of the tab bar" },
     tabBarAutoHide: { label: "Hide the tab bar until the mouse is at its edge", note: "A small handle at the edge shows where; the bar comes over the page and goes again when the mouse leaves it." },
+    tabBarHideSeconds: { label: "Hide it again after the mouse has left for" },
     tabInactiveAfterSeconds: { label: "After" },
     tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
     tabStart: {
@@ -419,6 +420,7 @@ module.exports = {
     "--disable-gpu": "No use of the graphics card at all (troubleshooting)"
   },
   moreActions: {
+    instance: ["Open another instance", "The app once more, in a window of its own with its own logins: for a second account side by side"],
     duplicate: ["Duplicate", "A second app with the same settings and icon, without the logins"],
     showConfig: ["Show config file", "Its config.json, in the file manager"],
     showLog: ["Open the event log", "What the app did and when: pages loaded and why, reloads, failures, pauses"],
@@ -476,6 +478,7 @@ module.exports = {
       tabName: "Name",
       tabUrl: "Address",
       tabKeepAlive: "Never pause or unload this tab",
+      tabHome: "Home tab: always first in the bar",
       tabIcon: "Icon",
       tabDisplay: "Shows",
       tabDisplayDefault: 'As "Tab bar and behaviour" says',
@@ -528,6 +531,7 @@ module.exports = {
     },
     said: {
       saved: "Saved.",
+      instance: "Another instance is starting. It has its own logins.",
       savedEntry: "Saved. The menu entry is up to date.",
       removed: '"{name}" was removed.',
       undo: "Undo",
@@ -877,6 +881,7 @@ module.exports = {
     mustBeObject: '"{key}" must be an object',
     range: '"{key}" must be a number from {min} to {max}',
     badUrl: 'invalid url "{url}"',
+    tooManyInstances: "this app already runs {most} times",
     noTabs: "a multi-tab app needs at least one tab",
     badTab: "tab {number} must have a name and a url (and keepAlive, if any, true or false)",
     badTabUrl: 'tab {number} has an invalid address "{url}" (it must start with http:// or https://)',

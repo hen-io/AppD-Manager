@@ -80,7 +80,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     document.documentElement.addEventListener('mouseleave', () => appdTabs.hover(false));
     function show(state) {
       document.documentElement.classList.toggle('peek', Boolean(state.peek));
-      list.replaceChildren(...state.tabs.map((tab, index) => {
+      list.replaceChildren(...state.tabs.map((tab, at) => {
+        const index = tab.index; // (which tab it is: the bar shows them in an order of its own)
         const display = tab.display || (OPTIONS.names ? (OPTIONS.icons ? 'both' : 'name') : 'icon');
         const collapsed = OPTIONS.collapse && tab.state === 'unloaded';
         const showName = display !== 'icon';
@@ -137,11 +138,11 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
           const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
           if (!step) return;
           event.preventDefault();
-          list.children[(index + step + state.tabs.length) % state.tabs.length]?.focus();
+          list.children[(at + step + state.tabs.length) % state.tabs.length]?.focus();
         });
         return button;
       }));
-      const current = list.children[state.active];
+      const current = list.children[state.tabs.findIndex((tab) => tab.index === state.active)];
       current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
     appdTabs.onState(show);
