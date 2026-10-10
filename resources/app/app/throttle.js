@@ -1,17 +1,21 @@
 "use strict";
 const { app, BrowserWindow, WebContentsView, session } = require("electron");
 const coverWindow = require("./overlay");
-module.exports = function createThrottle(cfg, { note, because }) {
+module.exports = function createThrottle(cfg, { note, because, pages = () => [] }) {
   let stoppedPids = [];
+  const held = /* @__PURE__ */ new Set();
   function pagePids() {
     const pids = /* @__PURE__ */ new Set();
-    for (const window of BrowserWindow.getAllWindows()) {
-      for (const frame of window.webContents.mainFrame.framesInSubtree) pids.add(frame.osProcessId);
+    const contents = [...BrowserWindow.getAllWindows().map((window) => window.webContents), ...pages()];
+    for (const one of new Set(contents)) {
+      if (one.isDestroyed()) continue;
+      for (const frame of one.mainFrame.framesInSubtree) pids.add(frame.osProcessId);
     }
     return [...pids].filter((pid) => pid > 0);
   }
   function signalAll(pids, signal) {
     for (const pid of pids) {
+      if (held.has(pid)) continue;
       try {
         process.kill(pid, signal);
       } catch {
@@ -111,8 +115,11 @@ module.exports = function createThrottle(cfg, { note, because }) {
   }
   app.on("before-quit", releasePage);
   process.on("exit", releasePage);
+  let watchPage = () => {
+  };
   function watchFocus(window) {
-    const wc = window.webContents;
+    const shown = () => window.webContents;
+    const audible = () => [shown(), ...pages()].some((one) => !one.isDestroyed() && one.isCurrentlyAudible());
     if (cfg.pauseWhenUnfocused) watchRequests();
     const GRACE_MS = 3e3;
     let timer = null;
@@ -132,14 +139,17 @@ module.exports = function createThrottle(cfg, { note, because }) {
     const LOAD_MAX_MS = 6e4;
     let busyUntil = Date.now() + LOAD_MAX_MS;
     const busy = () => Date.now() < busyUntil;
-    wc.on("did-start-navigation", (details) => {
-      if (!details.isMainFrame || details.isSameDocument) return;
-      busyUntil = Date.now() + LOAD_MAX_MS;
-      if (throttled) setCpuPercent(alwaysPercent);
-    });
-    wc.on("did-stop-loading", () => {
-      busyUntil = Date.now() + SETTLE_MS;
-    });
+    const watchLoading = (contents) => {
+      contents.on("did-start-navigation", (details) => {
+        if (!details.isMainFrame || details.isSameDocument) return;
+        busyUntil = Date.now() + LOAD_MAX_MS;
+        if (throttled) setCpuPercent(alwaysPercent);
+      });
+      contents.on("did-stop-loading", () => {
+        busyUntil = Date.now() + SETTLE_MS;
+      });
+    };
+    watchLoading(shown());
     const COVER_STEP_MS = 1500;
     const withinMoment = (promise) => Promise.race([
       promise.catch(() => null),
@@ -161,7 +171,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
       }
     };
     const pause = async () => {
-      if (wc.isDevToolsOpened()) return;
+      if (shown().isDevToolsOpened()) return;
       if (busy()) {
         pauseTimer = setTimeout(pause, Math.max(1e3, busyUntil - Date.now()));
         return;
@@ -170,7 +180,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
       const mine = ++round;
       const overtaken = () => mine !== round || window.isDestroyed();
       stopLimiter();
-      const picture = await withinMoment(wc.capturePage());
+      const picture = await withinMoment(shown().capturePage());
       if (overtaken()) return;
       if (picture && !picture.isEmpty()) {
         const [width, height] = window.getContentSize();
@@ -200,7 +210,7 @@ module.exports = function createThrottle(cfg, { note, because }) {
       if (awayPercent < alwaysPercent) {
         slowTimer = setTimeout(() => {
           throttled = true;
-          const apply = () => setCpuPercent(wc.isCurrentlyAudible() || busy() ? alwaysPercent : awayPercent);
+          const apply = () => setCpuPercent(audible() || busy() ? alwaysPercent : awayPercent);
           apply();
           soundCheck = setInterval(apply, 3e3);
         }, Math.max(0, cfg.slowAfterSeconds * 1e3 - GRACE_MS));
@@ -244,10 +254,10 @@ module.exports = function createThrottle(cfg, { note, because }) {
           dropped = true;
           dropCover(view);
         };
-        if (reloading) wc.once("did-finish-load", drop);
+        if (reloading) shown().once("did-finish-load", drop);
         setTimeout(drop, reloading ? 1e4 : 300);
       }
-      if (reloading) because(`back after ${Math.round(idleMs / 1e3)} s away (reloadAfterIdleSeconds)`) || wc.reloadIgnoringCache();
+      if (reloading) because(`back after ${Math.round(idleMs / 1e3)} s away (reloadAfterIdleSeconds)`) || shown().reloadIgnoringCache();
     };
     const leave = () => {
       clearTimeout(timer);
@@ -278,7 +288,12 @@ module.exports = function createThrottle(cfg, { note, because }) {
         else hoverTimer ??= setTimeout(enter, DWELL_MS);
       });
     }
-    watchMouse(wc);
+    watchMouse(shown());
+    watchPage = (contents) => {
+      watchLoading(contents);
+      watchMouse(contents);
+    };
+    for (const one of pages()) if (one !== shown()) watchPage(one);
     window.on("hide", () => {
       exit();
       if (!hovered) leave();
@@ -301,6 +316,9 @@ module.exports = function createThrottle(cfg, { note, because }) {
   }
   return {
     watchFocus,
+    watchPage: (contents) => watchPage(contents),
+    hold: (pids) => pids.forEach((pid) => held.add(pid)),
+    unhold: (pids) => pids.forEach((pid) => held.delete(pid)),
     runLimiter,
     resumePage,
     releasePage,

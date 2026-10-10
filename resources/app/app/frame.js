@@ -73,39 +73,53 @@ function styleFrame(window, cfg, iconColour, host = null) {
     area: null,
     colour,
     css: () => lineCss(cfg, colour, frame.radius),
+    follow: () => {
+    },
+    inset: host?.inset ?? null,
     fit: () => {
     }
   };
   frames.set(window, frame);
-  if (!frame.wanted) return frame;
+  if (!frame.wanted && !host?.inset) return frame;
   const shaped = fullRadius > 0 && fullOutset === 0 && takesShape();
-  const wc = window.webContents;
-  let sheets = [];
+  const pages = /* @__PURE__ */ new Map();
   const rules = () => [
-    host ? "html { background-color: Canvas; }" : "",
+    host && !host.inset ? "html { background-color: Canvas; }" : "",
     frame.css()
   ].join("\n").trim();
-  const give = () => {
+  const give = (wc) => {
     const css = rules();
-    if (css && !wc.isDestroyed()) wc.insertCSS(css, { cssOrigin: "user" }).then((key) => sheets.push(key)).catch(() => {
+    if (css && !wc.isDestroyed()) wc.insertCSS(css, { cssOrigin: "user" }).then((key) => pages.get(wc)?.push(key)).catch(() => {
     });
   };
   const restyle = () => {
-    for (const key of sheets) wc.removeInsertedCSS(key).catch(() => {
-    });
-    sheets = [];
-    give();
+    for (const [wc, sheets] of pages) {
+      if (wc.isDestroyed()) {
+        pages.delete(wc);
+        continue;
+      }
+      for (const key of sheets) wc.removeInsertedCSS(key).catch(() => {
+      });
+      pages.set(wc, []);
+      give(wc);
+    }
   };
-  let given = false;
-  wc.on("did-navigate", () => {
-    sheets = [];
-    given = true;
-    give();
-  });
-  wc.on("dom-ready", () => {
-    if (!given) give();
-    given = false;
-  });
+  const follow = (wc) => {
+    if (pages.has(wc)) return;
+    pages.set(wc, []);
+    let given = false;
+    wc.on("did-navigate", () => {
+      pages.set(wc, []);
+      given = true;
+      give(wc);
+    });
+    wc.on("dom-ready", () => {
+      if (!given) give(wc);
+      given = false;
+    });
+  };
+  frame.follow = follow;
+  if (!host?.inset) follow(window.webContents);
   if (host && fullOutset > 0) {
     host.contents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(hostPage(cfg, colour))}`).catch(() => {
     });
@@ -130,7 +144,10 @@ function styleFrame(window, cfg, iconColour, host = null) {
       if (!width || !height) [width, height] = window.getContentSize();
       const area = { x: outset, y: outset, width: Math.max(1, width - 2 * outset), height: Math.max(1, height - 2 * outset) };
       const now = frame.area;
-      if (!now || now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) host.view.setBounds(area);
+      if (!now || now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) {
+        host.view.setBounds(area);
+        host.layout?.(area);
+      }
       frame.area = area;
       round(host.view);
       for (const view of frame.overlays) round(view);
@@ -154,11 +171,15 @@ function styleFrame(window, cfg, iconColour, host = null) {
   return frame;
 }
 function pageArea(window) {
-  const area = frames.get(window)?.area;
-  if (area) return area;
-  let { width, height } = window.contentView.getBounds();
-  if (!width || !height) [width, height] = window.getContentSize();
-  return { x: 0, y: 0, width, height };
+  const frame = frames.get(window);
+  let area = frame?.area;
+  if (!area) {
+    let { width, height } = window.contentView.getBounds();
+    if (!width || !height) [width, height] = window.getContentSize();
+    area = { x: 0, y: 0, width, height };
+  }
+  const { top = 0, bottom = 0, left = 0 } = frame?.inset || {};
+  return { x: area.x + left, y: area.y + top, width: Math.max(1, area.width - left), height: Math.max(1, area.height - top - bottom) };
 }
 function roundOverlay(window, view) {
   const frame = frames.get(window);

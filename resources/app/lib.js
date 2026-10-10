@@ -71,6 +71,14 @@ const APP_TYPES = {
     tray: false,
     actions: {}
   },
+  multitab: {
+    ...text.appTypes.multitab,
+    icon: "tabs",
+    menu: true,
+    tray: false,
+    tabs: true,
+    actions: {}
+  },
   tray: {
     ...text.appTypes.tray,
     icon: "tray",
@@ -81,6 +89,9 @@ const APP_TYPES = {
 };
 const appType = (cfg) => APP_TYPES[cfg.type] || APP_TYPES.app;
 const isTray = (cfg) => appType(cfg).tray;
+const isMultiTab = (cfg) => Boolean(appType(cfg).tabs);
+const TAB_INACTIVE = ["keep", "throttle", "pause", "unload"];
+const TAB_BAR = ["top", "bottom", "left"];
 const EXTENSION_CATEGORIES = text.extensionKinds;
 const EXTENSIONS = {
   adblock: {
@@ -201,6 +212,14 @@ const DEFAULTS = {
   height: 800,
   autostart: false,
   type: "app",
+  tabs: [],
+  tabBarPosition: "top",
+  tabInactive: "throttle",
+  tabInactiveAfterSeconds: 60,
+  tabLazyLoad: true,
+  tabRememberLast: true,
+  tabShowIcons: true,
+  tabShowBadges: true,
   trayWidth: 420,
   trayHeight: 640,
   trayAtIcon: true,
@@ -468,6 +487,9 @@ const RULES = {
   windowGlowSide: { oneOf: ["inner", "outer", "both"] },
   trayMargin: { min: 0, max: 300 },
   type: { oneOf: Object.keys(APP_TYPES) },
+  tabBarPosition: { oneOf: TAB_BAR },
+  tabInactive: { oneOf: TAB_INACTIVE },
+  tabInactiveAfterSeconds: { min: 1, max: 86400 },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -497,6 +519,15 @@ function validate(cfg) {
     }
   }
   if (!URL.canParse(cfg.url)) throw new Error(fill(text.errors.badUrl, { url: cfg.url }));
+  if (isMultiTab(cfg)) {
+    if (!cfg.tabs.length) throw new Error(text.errors.noTabs);
+    cfg.tabs.forEach((tab, index) => {
+      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean") {
+        throw new Error(fill(text.errors.badTab, { number: index + 1 }));
+      }
+      if (!/^https?:\/\//i.test(tab.url) || !URL.canParse(tab.url)) throw new Error(fill(text.errors.badTabUrl, { number: index + 1, url: tab.url }));
+    });
+  }
   const unknown = cfg.extensions.find((name) => !(name in EXTENSIONS));
   if (unknown !== void 0) throw new Error(fill(text.errors.unknownExtension, { name: unknown, known: Object.keys(EXTENSIONS).join(", ") }));
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
@@ -636,6 +667,17 @@ function removeImportedExtension(name) {
   fs.rmSync(path.join(extensionsDir, name), { recursive: true, force: true });
   dropFromApps(name);
 }
+function settleTabs(cfg) {
+  if (!Array.isArray(cfg.tabs)) return cfg;
+  cfg.tabs = cfg.tabs.map((tab) => {
+    if (!plainObject(tab)) return tab;
+    const url = typeof tab.url === "string" ? tab.url.trim() : tab.url;
+    const name = typeof tab.name === "string" ? tab.name.trim() : tab.name;
+    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, keepAlive: tab.keepAlive === true };
+  });
+  if (isMultiTab(cfg) && typeof cfg.tabs[0]?.url === "string") cfg.url = cfg.tabs[0].url;
+  return cfg;
+}
 function withDefaults(file) {
   const stored = { ...file };
   const version = stored.configVersion >= 1 ? stored.configVersion : 1;
@@ -677,6 +719,7 @@ function withDefaults(file) {
   }
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
+  settleTabs(cfg);
   for (const key of ["sponsorBlockActions", "sponsorBlockColors"]) {
     if (plainObject(stored[key])) cfg[key] = { ...shared[key], ...stored[key] };
   }
@@ -718,6 +761,7 @@ function iconFile(id, cfg) {
 }
 function save(id, cfg) {
   checkId(id);
+  cfg = settleTabs({ ...cfg });
   validate(cfg);
   fs.mkdirSync(appDir(id), { recursive: true });
   const icon = iconFile(id, cfg);
@@ -1086,6 +1130,9 @@ module.exports = {
   APP_TYPES,
   appType,
   isTray,
+  isMultiTab,
+  TAB_INACTIVE,
+  TAB_BAR,
   APP_ACTIONS,
   TRAY_ACTIONS,
   HOTKEY,

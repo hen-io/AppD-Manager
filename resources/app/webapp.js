@@ -23,6 +23,7 @@ const shareScreens = require("./app/share");
 const { openFind, findAgain, isBar } = require("./app/find");
 const createLinks = require("./app/links");
 const createExtensions = require("./app/extensions");
+const createTabs = require("./app/tabs");
 const id = process.env.APPD_ID;
 let cfg;
 const settingsText = (settings) => JSON.stringify({ ...settings, autostart: void 0 });
@@ -91,8 +92,13 @@ function followGoogleSignIn(wc) {
 const iconFile = lib.iconFile(id, cfg);
 let icon = iconFile && /\.png$/i.test(iconFile) ? iconFile : void 0;
 const statePath = path.join(lib.profileDir(id), "window-state.json");
-const internalHosts = [new URL(cfg.url).hostname, ...cfg.internalHosts];
+const multi = lib.isMultiTab(cfg);
+let tabs = null;
+const tabHosts = () => tabs ? tabs.hosts() : cfg.tabs.map((tab) => new URL(tab.url).hostname);
+const internalHosts = [new URL(cfg.url).hostname, ...multi ? tabHosts() : [], ...cfg.internalHosts];
 let win;
+const homeUrl = () => tabs ? tabs.homeUrl() : cfg.url;
+const isChrome = (wc) => isBar(wc) || Boolean(tabs?.isChrome(wc));
 function isInternal(url) {
   try {
     const host = new URL(url).hostname;
@@ -105,7 +111,7 @@ const { note, because, takeReason, plain } = openLog(path.join(lib.appDir(id), "
 const { openExternal, openElsewhere } = createLinks({ id, cfg, lib, note });
 const extensions = createExtensions({ id, cfg, lib, note, icon: () => icon });
 function restartApp(wc, why = "hard reload, or asked for by the manager") {
-  const url = wc && !wc.isDestroyed() ? wc.getURL() : "";
+  const url = !multi && wc && !wc.isDestroyed() ? wc.getURL() : "";
   let settings = cfg;
   try {
     settings = lib.load(id);
@@ -218,7 +224,7 @@ function appMenu(wc, inTray = false) {
     { label: t.menu.reload, accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
-    { label: fill(t.menu.goHome, { name: cfg.name }), accelerator: "Alt+Home", click: () => wc.loadURL(cfg.url) },
+    { label: fill(t.menu.goHome, { name: cfg.name }), accelerator: "Alt+Home", click: () => wc.loadURL(homeUrl()) },
     sep,
     { label: t.menu.mute, type: "checkbox", checked: wc.isAudioMuted(), click: () => wc.setAudioMuted(!wc.isAudioMuted()) },
     ...cfg.allowZoom ? [
@@ -271,9 +277,10 @@ ipcMain.on("appd-page-filters", (event, url) => {
   event.returnValue = filters;
 });
 function shortcut(wc, input) {
-  if (isBar(wc)) return false;
+  if (isChrome(wc)) return false;
   const key = input.key.toLowerCase();
   const ctrl = input.control && !input.alt;
+  if (tabs?.shortcut(input)) return true;
   const history = wc.navigationHistory;
   const window = BrowserWindow.fromWebContents(wc);
   if (window && ctrl && !input.shift && key === "f") openFind(window);
@@ -296,7 +303,7 @@ function pageShortcut(wc, input, key, ctrl, history) {
   else if (ctrl && key === "0") zoom.reset(wc);
   else if (input.alt && !input.control && key === "arrowleft") history.goBack();
   else if (input.alt && !input.control && key === "arrowright") history.goForward();
-  else if (input.alt && !input.control && key === "home" && !extensions.isOwnPage(wc)) wc.loadURL(cfg.url);
+  else if (input.alt && !input.control && key === "home" && !extensions.isOwnPage(wc)) wc.loadURL(homeUrl());
   else return false;
   return true;
 }
@@ -386,7 +393,7 @@ ${cfg.customJs}
   wc.on("before-input-event", (event, input) => {
     if (input.type === "keyDown" && shortcut(wc, input)) event.preventDefault();
   });
-  wc.on("context-menu", (_e, params) => isBar(wc) || contextMenu(wc, params));
+  wc.on("context-menu", (_e, params) => isChrome(wc) || contextMenu(wc, params));
   wc.on("will-prevent-unload", (event) => {
     if (timedReload) return;
     if (mayLeave(wc)) event.preventDefault();
@@ -399,7 +406,7 @@ function readState() {
     return {};
   }
 }
-const throttle = createThrottle(cfg, { note, because });
+const throttle = createThrottle(cfg, { note, because, pages: () => tabs?.pages() ?? [] });
 const homeButtonScript = `(() => {
   if (document.getElementById('appd-home-button')) return;
   const host = document.createElement('div');
@@ -432,8 +439,8 @@ async function createWindow() {
       }
     }
   }
-  const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
-  const hosted = needsHost(cfg);
+  const lineColour = wantsIconColour(cfg) || multi ? await iconColour(iconFile, path.join(lib.profileDir(id), "icon-colour.json")).catch(() => null) : null;
+  const hosted = needsHost(cfg) || multi;
   const outset = hosted ? outsetOf(cfg) : 0;
   const dark = !(cfg.colorScheme === "light" && !extension("darkreader"));
   const pagePreferences = {
@@ -464,7 +471,41 @@ async function createWindow() {
     webPreferences: hosted ? { sandbox: true, contextIsolation: true, nodeIntegration: false } : pagePreferences
   });
   let host = null;
-  if (hosted) {
+  if (multi) {
+    const accent = [cfg.windowBorderColor, lineColour].find((one) => /^#[0-9a-f]{6}$/i.test(one)) || "#5b8cff";
+    const saveTab = (index) => {
+      try {
+        fs.writeFileSync(statePath, JSON.stringify({ ...readState(), tab: index }));
+      } catch {
+      }
+    };
+    tabs = createTabs({
+      win,
+      cfg,
+      lib,
+      pagePreferences,
+      background: dark ? "#15171b" : "#ffffff",
+      dark,
+      accent,
+      note,
+      saveTab,
+      startTab: cfg.tabRememberLast ? Number(state.tab) || 0 : 0,
+      onPage: (wc) => {
+        preparePage(wc);
+        watchPage(wc);
+        frame.follow(wc);
+      },
+      throttle,
+      menu: popUp,
+      openExternal
+    });
+    host = { view: tabs.container, contents: win.webContents, inset: tabs.inset, layout: tabs.layout };
+    Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });
+    win.on("focus", () => {
+      const shown = tabs.current();
+      if (!shown.isDestroyed()) shown.focus();
+    });
+  } else if (hosted) {
     const view = new WebContentsView({ webPreferences: pagePreferences });
     view.setBackgroundColor(dark ? "#15171b" : "#ffffff");
     host = { view, contents: win.webContents };
@@ -489,9 +530,8 @@ async function createWindow() {
   };
   if (startsHidden) win.once("show", sizeUp);
   else if (!lib.isTray(cfg)) sizeUp();
-  if (cfg.startMuted) win.webContents.setAudioMuted(true);
   if (cfg.keepAwake !== "off") powerSaveBlocker.start(cfg.keepAwake === "display" ? "prevent-display-sleep" : "prevent-app-suspension");
-  if (startsHidden) {
+  if (startsHidden || multi) {
   } else if (!lib.isTray(cfg) || cfg.trayShowAtStart) {
     if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
     else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
@@ -506,27 +546,56 @@ async function createWindow() {
   win.on("focus", markUsed);
   win.on("show", markUsed);
   note(`started, opening ${plain(startUrl)}`);
-  let showing = "";
-  win.webContents.on("did-start-navigation", (details) => {
-    if (!details.isMainFrame || details.isSameDocument || !/^https?:/i.test(details.url)) return;
-    const again = details.url === showing;
-    const why = takeReason() || (again ? "asked for by the page itself, or by the server" : "");
-    note(`${again ? "reloading" : "loading"} ${plain(details.url)}${why ? ` - ${why}` : ""}`);
-  });
-  win.webContents.on("did-navigate", (_e, url) => {
-    showing = url;
-  });
-  let revivals = [];
-  win.webContents.on("render-process-gone", (_e, details) => {
-    if (throttle.isQuitting() || details.reason === "clean-exit") return;
-    revivals = revivals.filter((time) => Date.now() - time < 6e4);
-    note(`the page's process is gone (${details.reason})${revivals.length < 3 ? ": loading the page again" : ""}`);
-    if (revivals.length >= 3 || win.isDestroyed()) return;
-    revivals.push(Date.now());
-    because("its process had died");
-    win.webContents.reload();
-  });
-  win.webContents.on("unresponsive", () => note("the page does not respond"));
+  function watchPage(wc) {
+    let showing = "";
+    wc.on("did-start-navigation", (details) => {
+      if (!details.isMainFrame || details.isSameDocument || !/^https?:/i.test(details.url)) return;
+      const again = details.url === showing;
+      const why = takeReason() || (again ? "asked for by the page itself, or by the server" : "");
+      note(`${again ? "reloading" : "loading"} ${plain(details.url)}${why ? ` - ${why}` : ""}`);
+    });
+    wc.on("did-navigate", (_e, url) => {
+      showing = url;
+    });
+    let revivals = [];
+    wc.on("render-process-gone", (_e, details) => {
+      if (throttle.isQuitting() || details.reason === "clean-exit") return;
+      revivals = revivals.filter((time) => Date.now() - time < 6e4);
+      note(`the page's process is gone (${details.reason})${revivals.length < 3 ? ": loading the page again" : ""}`);
+      if (revivals.length >= 3 || win.isDestroyed() || wc.isDestroyed()) return;
+      revivals.push(Date.now());
+      because("its process had died");
+      wc.reload();
+    });
+    wc.on("unresponsive", () => note("the page does not respond"));
+    wc.on("did-fail-load", (_e, code, description, url, isMainFrame) => {
+      if (!isMainFrame || code === -3 || url.startsWith("data:")) return;
+      note(`could not load ${plain(url)}: ${description} (${code}); trying again in 5 seconds`);
+      because("another try after it could not be loaded");
+      const target = JSON.stringify(url).replace(/</g, "\\u003c");
+      wc.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(
+        `<meta name="color-scheme" content="light dark">
+         <body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;text-align:center">
+         <p><b>Can't reach <span id="u"></span></b><br>${description}<br><br>Retrying…</p>
+         <script>u.textContent = new URL(${target}).host;
+         setTimeout(() => location.replace(${target}), 5000)<\/script>`
+      ));
+    });
+    if (cfg.homeButton) {
+      wc.on("dom-ready", () => {
+        const url = wc.getURL();
+        if (/^https?:/i.test(url) && !isInternal(url)) wc.executeJavaScript(homeButtonScript).catch(() => {
+        });
+      });
+    }
+    if (cfg.startMuted) wc.setAudioMuted(true);
+    throttle.watchPage(wc);
+  }
+  function preparePage(wc) {
+    if (extension("sponsorblock")) extras.enableSponsorBlock(wc, cfg);
+    if (extension("darkreader")) extras.enableDarkMode(wc, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
+  }
+  if (!multi) watchPage(win.webContents);
   if (cfg.unreadBadge) showUnreadCount(win, app);
   showDownloads(session.defaultSession, win, { name: cfg.name, note, folder: cfg.downloadFolder });
   shareScreens(session.defaultSession, {
@@ -577,7 +646,14 @@ async function createWindow() {
     note(taken ? `the key ${cfg.trayHotkey} shows and hides the window` : `the key ${cfg.trayHotkey} was not given to the app (taken by something else, or the desktop does not hand out keys)`);
     app.on("will-quit", () => globalShortcut.unregisterAll());
   }
-  if (host) {
+  if (tabs) {
+    win.on("close", (event) => {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      throttle.resumePage();
+      tabs.closeAll(() => win.isDestroyed() || win.destroy());
+    });
+  } else if (host) {
     win.on("close", (event) => {
       const page = host.view.webContents;
       if (event.defaultPrevented || page.isDestroyed()) return;
@@ -598,12 +674,7 @@ async function createWindow() {
   }).catch((e) => console.error(`appd: no ad blocking: ${e.message}`));
   await extensions.load();
   if (win.isDestroyed()) return;
-  if (extension("sponsorblock")) {
-    extras.enableSponsorBlock(win.webContents, cfg);
-  }
-  if (extension("darkreader")) {
-    extras.enableDarkMode(win.webContents, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
-  }
+  if (!multi) preparePage(win.webContents);
   if (throttle.wanted) throttle.watchFocus(win);
   watchForUpdate((version) => {
     if (throttle.isQuitting() || win.isDestroyed()) return;
@@ -614,33 +685,14 @@ async function createWindow() {
     if (lib.isTray(cfg)) return;
     const { width, height } = win.getNormalBounds();
     try {
-      fs.writeFileSync(statePath, JSON.stringify({ width, height, maximized: win.isMaximized() }));
+      fs.writeFileSync(statePath, JSON.stringify({ ...readState(), width, height, maximized: win.isMaximized() }));
     } catch {
     }
   });
-  win.webContents.on("did-fail-load", (_e, code, description, url, isMainFrame) => {
-    if (!isMainFrame || code === -3 || url.startsWith("data:")) return;
-    note(`could not load ${plain(url)}: ${description} (${code}); trying again in 5 seconds`);
-    because("another try after it could not be loaded");
-    const target = JSON.stringify(url).replace(/</g, "\\u003c");
-    win.webContents.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(
-      `<meta name="color-scheme" content="light dark">
-       <body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;text-align:center">
-       <p><b>Can't reach <span id="u"></span></b><br>${description}<br><br>Retrying…</p>
-       <script>u.textContent = new URL(${target}).host;
-       setTimeout(() => location.replace(${target}), 5000)<\/script>`
-    ));
-  });
-  if (cfg.homeButton) {
-    win.webContents.on("dom-ready", () => {
-      const url = win.webContents.getURL();
-      if (/^https?:/i.test(url) && !isInternal(url)) win.webContents.executeJavaScript(homeButtonScript).catch(() => {
-      });
-    });
-  }
   if (cfg.proxy) await session.defaultSession.setProxy({ proxyRules: cfg.proxy }).catch((e) => note(`proxy not set (${e.message})`));
   if (win.isDestroyed()) return;
-  win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
+  if (tabs) tabs.start({ url: startUrl === cfg.url ? void 0 : startUrl });
+  else win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
   throttle.runLimiter();
 }
 if (!app.requestSingleInstanceLock()) {
@@ -663,7 +715,8 @@ if (!app.requestSingleInstanceLock()) {
     const link = argv.find((value) => value.startsWith("--appd-url="))?.slice("--appd-url=".length);
     if (!action && link && /^https?:\/\//i.test(link) && URL.canParse(link)) {
       because("a link clicked in another app");
-      win.webContents.loadURL(link).catch(() => {
+      if (tabs) tabs.open(link);
+      else win.webContents.loadURL(link).catch(() => {
       });
     }
     return void 0;

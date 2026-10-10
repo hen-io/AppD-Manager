@@ -3,6 +3,7 @@ module.exports = {
   sections: {
     general: "General",
     window: "Window",
+    tabs: "Tabs",
     tray: "Tray window",
     links: "Links",
     extensions: "Extensions",
@@ -78,6 +79,25 @@ module.exports = {
       note: `Your zoom lasts until the page reloads or the app restarts. "Reset zoom" in the app's menu (Ctrl+0) returns to the default.`
     },
     hideScrollbars: { label: "Hide scrollbars (pages still scroll)" },
+    tabBarPosition: {
+      label: "Tab bar",
+      options: { top: ["Top", "Above the page"], bottom: "Bottom", left: ["Left", "A column beside the page: room for long names"] }
+    },
+    tabInactive: {
+      label: "Tabs you are not looking at",
+      note: "What happens to a tab after you have left it. A tab that plays sound or is loading is left alone.",
+      options: {
+        keep: ["Keep running", "Nothing changes: chat and mail tabs keep up to date"],
+        throttle: ["Slow down", "The browser lets the page run about once a second: little saved, nothing lost"],
+        pause: ["Pause", "The page is stopped outright and goes on when you come back: saves the most CPU, but it misses what happens meanwhile"],
+        unload: ["Unload", "The page is closed and loaded anew when you come back: frees the most memory, unsaved input is lost"]
+      }
+    },
+    tabInactiveAfterSeconds: { label: "After" },
+    tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
+    tabRememberLast: { label: "Start on the tab you left" },
+    tabShowIcons: { label: "Show the sites' pictures in the tabs" },
+    tabShowBadges: { label: "Show unread counts in the tabs", note: 'The number a site puts in its title, "(3) Inbox".' },
     trayWidth: { label: "Window width" },
     trayHeight: { label: "Window height" },
     trayPosition: {
@@ -300,6 +320,7 @@ module.exports = {
   notes: {
     windowNote: "The size on first start. After that the window opens the way you left it, unless it always opens maximized.",
     windowNote2: "These apply to windows without a title bar (and to tray apps). Rounded corners need a compositing desktop (KDE has one); maximized and full-screen windows stay square.",
+    tabsNote: "The first tab is the app's own address. Tabs share logins and cookies, as the tabs of one browser do. Ctrl+Tab and Ctrl+1 to 9 switch between them.",
     trayNote: "The app sits in the system tray. Click its icon to open a small window without a title bar; right-click the icon for its menu. It is not in the desktop's menu or the taskbar.",
     sponsorblockNote: 'What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.',
     sponsorblockNote2: "Written like Enter, Backspace, K or Ctrl+Shift+K. The skip key acts on the box that is showing."
@@ -437,6 +458,15 @@ module.exports = {
       chooseKind: "What kind of app should it be? You can change it later, under General.",
       allAppsTitle: "Extension settings for all apps",
       tabs: "Parts of the settings",
+      tabName: "Name",
+      tabUrl: "Address",
+      tabKeepAlive: "Never pause or unload this tab",
+      tabAdd: "Add a tab",
+      tabUp: "Move earlier",
+      tabDown: "Move later",
+      tabRemove: "Remove this tab",
+      tabFirst: "Opens first, and is the app's address",
+      tabLast: "A multi-tab app needs at least one tab",
       running: "Running",
       runningWith: "Running · {usage}",
       closeApp: "Close app",
@@ -709,6 +739,7 @@ module.exports = {
     leave: { message: "Leave this page?", detail: "It may have unsaved changes.", buttons: ["Leave", "Stay"] },
     homeButton: { label: "← {name}", tip: "Back to {name} (Alt+Home)" },
     tray: { quit: "Quit" },
+    tab: { reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
     find: { placeholder: "Find in page", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
     download: { finished: "Download finished", failed: "Download failed" },
     share: { title: "Share with this page:", screen: "Screen {number}", wholeScreen: "The whole screen", window: "A window", nothing: "Nothing" },
@@ -726,6 +757,10 @@ module.exports = {
     app: {
       name: "App",
       about: "A window of its own, with an entry in the desktop's menu and a place in the taskbar"
+    },
+    multitab: {
+      name: "Multi-tab app",
+      about: "One window with a bar of tabs, a site in each. Tabs you are not using can be slowed down, paused or unloaded to save memory and power"
     },
     tray: {
       name: "Tray app",
@@ -809,6 +844,9 @@ module.exports = {
     mustBeObject: '"{key}" must be an object',
     range: '"{key}" must be a number from {min} to {max}',
     badUrl: 'invalid url "{url}"',
+    noTabs: "a multi-tab app needs at least one tab",
+    badTab: "tab {number} must have a name and a url (and keepAlive, if any, true or false)",
+    badTabUrl: 'tab {number} has an invalid address "{url}" (it must start with http:// or https://)',
     badId: 'invalid app id "{id}" (use a-z, 0-9, - and _)',
     unknownLook: "unknown mode or palette",
     unknownExtension: 'unknown extension "{name}" (known: {known})',
