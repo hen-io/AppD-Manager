@@ -56,12 +56,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     width: Math.max(1, size.width - inset.left),
     height: Math.max(1, size.height - inset.top - inset.bottom)
   });
-  const HANDLE = { long: 160, thick: 14 };
+  const HANDLE = { thick: 8 };
   const barRect = () => {
     if (peek) {
-      const across = (total, length) => Math.max(0, Math.round((total - length) / 2));
-      if (cfg.tabBarPosition === "left") return { x: 0, y: across(size.height, HANDLE.long), width: HANDLE.thick, height: Math.min(HANDLE.long, Math.max(1, size.height)) };
-      return { x: across(size.width, HANDLE.long), y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - HANDLE.thick) : 0, width: Math.min(HANDLE.long, Math.max(1, size.width)), height: HANDLE.thick };
+      if (cfg.tabBarPosition === "left") return { x: 0, y: 0, width: HANDLE.thick, height: Math.max(1, size.height) };
+      return { x: 0, y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - HANDLE.thick) : 0, width: Math.max(1, size.width), height: HANDLE.thick };
     }
     if (cfg.tabBarPosition === "left") return { x: 0, y: 0, width: barSize, height: Math.max(1, size.height) };
     return { x: 0, y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - barSize) : 0, width: Math.max(1, size.width), height: barSize };
@@ -98,6 +97,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
           name: tab.cfg.name,
           favicon: cfg.tabShowIcons ? tab.favicon : "",
           icon: cfg.tabShowIcons ? iconOf(tab.cfg.icon) || appIcon : null,
+          display: tab.cfg.display || "",
           badge: tab.badge,
           audible: tab.audible,
           state: tab.paused ? "paused" : !tab.view ? "unloaded" : tab.loading ? "loading" : "live"

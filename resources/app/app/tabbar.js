@@ -27,8 +27,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     .logo { flex: none; width: 28px; height: 28px; object-fit: contain; border-radius: 7px; ${vertical ? "margin: 10px 0 4px;" : "margin: 0 6px 0 14px;"} pointer-events: none; }
     [role=tablist] { display: flex; flex-direction: ${vertical ? "column" : "row"}; ${vertical ? "flex: 1; min-height: 0; width: 100%;" : "flex: 1; min-width: 0; height: 100%;"} ${vertical ? "padding: 8px 8px; gap: 2px; overflow-y: auto;" : "overflow-x: auto;"} scrollbar-width: none; }
     [role=tablist]::-webkit-scrollbar { display: none; }
-    button { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: ${vertical ? "flex-start" : "center"}; gap: 10px;
-      ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 1 1 0; min-width: 96px; max-width: 260px; height: 100%; padding: 0 16px;"}
+    button { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: flex-start; gap: 10px;
+      ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 0 0 148px; width: 148px; height: 100%; padding: 0 10px 0 14px;"}
       color: var(--quiet); cursor: pointer; overflow: hidden; transition: background .15s, color .15s, opacity .2s; }
     button + button::before { content: ""; position: absolute; background: var(--line); pointer-events: none; ${vertical ? "left: 14px; right: 14px; top: -1px; height: 1px;" : "left: 0; top: 24%; bottom: 24%; width: 1px;"} }
     ${vertical ? "button[aria-selected=true]::before, button[aria-selected=true] + button::before { opacity: 0; }" : ""}
@@ -40,16 +40,14 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     button[aria-selected=true]::after { transform: scaleX(1); }`}
     .face { flex: none; width: 20px; height: 20px; border-radius: 5px; object-fit: contain; }
     .letter { display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 30%, var(--surface)); color: var(--ink); font: 700 11px/1 system-ui, sans-serif; }
-    .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .badge { flex: none; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font: 700 11px/18px system-ui, sans-serif; text-align: center; }
     .mark { flex: none; width: 14px; height: 14px; fill: currentColor; opacity: .75; }
-    button.small { flex: 0 0 auto; min-width: 0; ${vertical ? "width: auto; align-self: flex-start; padding: 0 12px;" : "padding: 0 14px;"} }
+    button.small { flex: 0 0 auto; width: auto; min-width: 0; justify-content: center; ${vertical ? "width: auto; align-self: flex-start; padding: 0 12px;" : "padding: 0 14px;"} }
     button.small .name, button.small .badge, button.plain .name { display: none; }
-    button.plain { flex: 0 0 auto; min-width: 56px; ${vertical ? "justify-content: center; padding: 0;" : "padding: 0 18px;"} }
-    .x { flex: none; display: none; width: 18px; height: 18px; border-radius: 50%; font: 400 15px/17px system-ui, sans-serif; text-align: center; color: var(--quiet); }
-    button:hover .x, button:focus-visible .x { display: block; }
+    button.plain { flex: 0 0 auto; width: auto; min-width: 56px; justify-content: center; ${vertical ? "padding: 0 6px;" : "padding: 0 8px 0 14px;"} }
+    .x { flex: none; display: block; margin-left: auto; width: 18px; height: 18px; border-radius: 50%; font: 400 15px/17px system-ui, sans-serif; text-align: center; color: var(--quiet); }
     .x:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--ink); }
-    button.plain .x { display: none !important; }
     .glyph-svg { width: 20px; height: 20px; fill: currentColor; opacity: 1; }
     .glyph { display: grid; place-items: center; font: 16px/1 system-ui, "Noto Color Emoji", sans-serif; }
     button.idle { opacity: .6; }
@@ -77,17 +75,22 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
       svg.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: label }));
       return svg;
     };
-    document.documentElement.addEventListener('mouseenter', () => appdTabs.hover(true));
+    for (const name of ['mouseenter', 'mousemove', 'pointerenter']) document.documentElement.addEventListener(name, () => appdTabs.hover(true));
     document.documentElement.addEventListener('mouseleave', () => appdTabs.hover(false));
     function show(state) {
       document.documentElement.classList.toggle('peek', Boolean(state.peek));
       list.replaceChildren(...state.tabs.map((tab, index) => {
-        const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : '', OPTIONS.collapse && tab.state === 'unloaded' ? 'small' : '', OPTIONS.names ? '' : 'plain'].join(' ').trim() });
+        const display = tab.display || (OPTIONS.names ? (OPTIONS.icons ? 'both' : 'name') : 'icon');
+        const collapsed = OPTIONS.collapse && tab.state === 'unloaded';
+        const showName = display !== 'icon';
+        const showFace = display !== 'name' || collapsed;
+        const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : '', OPTIONS.collapse && tab.state === 'unloaded' ? 'small' : '', showName ? '' : 'plain'].join(' ').trim() });
         button.setAttribute('role', 'tab');
         button.setAttribute('aria-selected', String(index === state.active));
         button.title = tab.name + (tab.state === 'paused' ? ' (paused)' : tab.state === 'unloaded' ? ' (not loaded)' : '');
         const letter = () => make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' });
-        if (tab.icon && tab.icon.kind === 'mdi') {
+        if (!showFace) {
+        } else if (tab.icon && tab.icon.kind === 'mdi') {
           const face = icon(tab.icon.value, '');
           face.setAttribute('class', 'face glyph-svg');
           face.removeChild(face.lastChild);
@@ -98,7 +101,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
           const face = make('img', { className: 'face', alt: '', src: tab.icon.value, draggable: false });
           face.addEventListener('error', () => face.replaceWith(letter()));
           button.append(face);
-        } else if (OPTIONS.icons || !OPTIONS.names || (OPTIONS.collapse && tab.state === 'unloaded')) {
+        } else {
           if (tab.favicon) {
             const face = make('img', { className: 'face', alt: '', src: tab.favicon, draggable: false });
             face.addEventListener('error', () => face.replaceWith(make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' })));
@@ -107,7 +110,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
             button.append(make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' }));
           }
         }
-        button.append(make('span', { className: 'name', textContent: tab.name }));
+        if (showName) button.append(make('span', { className: 'name', textContent: tab.name }));
         if (OPTIONS.badges && tab.badge > 0) button.append(make('span', { className: 'badge', textContent: tab.badge > 99 ? '99+' : String(tab.badge) }));
         if (tab.audible) button.append(icon(SPEAKER, 'Playing sound'));
         else if (tab.state === 'paused') button.append(icon(PAUSE, 'Paused'));

@@ -542,7 +542,7 @@ function validate(cfg) {
   if (isMultiTab(cfg)) {
     if (!cfg.tabs.length) throw new Error(text.errors.noTabs);
     cfg.tabs.forEach((tab, index) => {
-      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean" || tab.icon !== void 0 && typeof tab.icon !== "string") {
+      if (!plainObject(tab) || typeof tab.name !== "string" || typeof tab.url !== "string" || tab.keepAlive !== void 0 && typeof tab.keepAlive !== "boolean" || tab.icon !== void 0 && typeof tab.icon !== "string" || tab.display !== void 0 && !["", "both", "name", "icon"].includes(tab.display)) {
         throw new Error(fill(text.errors.badTab, { number: index + 1 }));
       }
       if (!/^https?:\/\//i.test(tab.url) || !URL.canParse(tab.url)) throw new Error(fill(text.errors.badTabUrl, { number: index + 1, url: tab.url }));
@@ -693,7 +693,7 @@ function settleTabs(cfg) {
     if (!plainObject(tab)) return tab;
     const url = typeof tab.url === "string" ? tab.url.trim() : tab.url;
     const name = typeof tab.name === "string" ? tab.name.trim() : tab.name;
-    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", keepAlive: tab.keepAlive === true };
+    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", display: ["both", "name", "icon"].includes(tab.display) ? tab.display : "", keepAlive: tab.keepAlive === true };
   });
   if (isMultiTab(cfg) && typeof cfg.tabs[0]?.url === "string") cfg.url = cfg.tabs[0].url;
   return cfg;
