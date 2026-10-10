@@ -94,9 +94,27 @@ module.exports = {
         unload: ["Unload", "The page is closed and loaded anew when you come back: frees the most memory, unsaved input is lost"]
       }
     },
+    tabTheme: {
+      label: "Look of the tab bar",
+      options: {
+        manager: ["As AppD-Manager", "Its light or dark, and its colours (read when the app starts)"],
+        system: ["Basic, as the desktop", "Plain greys and blue, light or dark as the desktop is"],
+        light: ["Basic light", "Plain greys and blue"],
+        dark: ["Basic dark", "Plain greys and blue"]
+      }
+    },
+    tabBarSize: { label: "Size of the tab bar" },
+    tabBarAutoHide: { label: "Hide the tab bar until the mouse is at its edge", note: "A small handle at the edge shows where; the bar comes over the page and goes again when the mouse leaves it." },
     tabInactiveAfterSeconds: { label: "After" },
     tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
-    tabRememberLast: { label: "Start on the tab you left", note: "Off: no tab is loaded at start; a screen asks you to select one." },
+    tabStart: {
+      label: "Open on start",
+      options: {
+        last: ["The tab you left", "Where you were when the app was closed"],
+        first: ["The first tab", "Always the first one in the list"],
+        none: ["No tab", "Nothing is loaded; a screen asks you to select a tab"]
+      }
+    },
     tabShowIcons: { label: "Show icons in the tabs", note: "Off: the tabs show names only (a tab that is shrunk, or has no name shown, keeps its first letter)." },
     tabShowNames: { label: "Show the tabs' names", note: "Off: the tabs are pictures only (the name is in the tip). A tab without a picture of its own shows the site's, or its first letter." },
     tabCollapseUnloaded: { label: "Shrink tabs that are not loaded", note: "A tab not opened yet, or unloaded, is shown as its picture alone until it is loaded." },
@@ -748,7 +766,7 @@ module.exports = {
     leave: { message: "Leave this page?", detail: "It may have unsaved changes.", buttons: ["Leave", "Stay"] },
     homeButton: { label: "← {name}", tip: "Back to {name} (Alt+Home)" },
     tray: { quit: "Quit" },
-    tab: { choose: "Select a tab to begin", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
+    tab: { choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
     find: { placeholder: "Find in page", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
     download: { finished: "Download finished", failed: "Download failed" },
     share: { title: "Share with this page:", screen: "Screen {number}", wholeScreen: "The whole screen", window: "A window", nothing: "Nothing" },

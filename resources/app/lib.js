@@ -217,9 +217,12 @@ const DEFAULTS = {
   tabInactive: "throttle",
   tabInactiveAfterSeconds: 60,
   tabLazyLoad: true,
-  tabRememberLast: true,
+  tabStart: "last",
   tabShowIcons: true,
   tabShowBadges: true,
+  tabBarSize: 100,
+  tabTheme: "manager",
+  tabBarAutoHide: false,
   tabShowNames: true,
   tabCollapseUnloaded: true,
   trayWidth: 420,
@@ -504,6 +507,9 @@ const RULES = {
   tabBarPosition: { oneOf: TAB_BAR },
   tabInactive: { oneOf: TAB_INACTIVE },
   tabInactiveAfterSeconds: { min: 1, max: 86400 },
+  tabBarSize: { min: 70, max: 160 },
+  tabTheme: { oneOf: ["manager", "system", "light", "dark"] },
+  tabStart: { oneOf: ["last", "first", "none"] },
   openLinks: { oneOf: OPEN_LINKS },
   permissions: { oneOf: ["app", "all", "none"] },
   colorScheme: { oneOf: COLOR_SCHEMES },
@@ -731,6 +737,8 @@ function withDefaults(file) {
   for (const [key, rule] of Object.entries(RULES)) {
     if ("min" in rule && typeof stored[key] === "number") stored[key] = Math.min(rule.max, Math.max(rule.min, stored[key]));
   }
+  if (typeof stored.tabRememberLast === "boolean" && stored.tabStart === void 0) stored.tabStart = stored.tabRememberLast ? "last" : "none";
+  delete stored.tabRememberLast;
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
   settleTabs(cfg);

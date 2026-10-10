@@ -18,7 +18,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   const bar = new WebContentsView({
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "tabbar-preload.js") }
   });
-  bar.setBackgroundColor(background);
+  bar.setBackgroundColor("#00000000");
   const chrome = new WeakSet([bar.webContents]);
   container.addChildView(bar);
   const tabs = cfg.tabs.map((one, index) => ({
@@ -40,8 +40,12 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   let size = { width: 0, height: 0 };
   let ready = false;
   let finished = false;
-  const barSize = cfg.tabBarPosition === "left" && !cfg.tabShowNames ? BAR.leftSmall : BAR[cfg.tabBarPosition] ?? BAR.top;
-  const inset = {
+  const scale = cfg.tabBarSize / 100;
+  const barSize = Math.round((cfg.tabBarPosition === "left" && !cfg.tabShowNames ? BAR.leftSmall : BAR[cfg.tabBarPosition] ?? BAR.top) * scale);
+  const autoHide = cfg.tabBarAutoHide;
+  let peek = autoHide && active >= 0;
+  let peekTimer = null;
+  const inset = autoHide ? { top: 0, bottom: 0, left: 0 } : {
     top: cfg.tabBarPosition === "top" ? barSize : 0,
     bottom: cfg.tabBarPosition === "bottom" ? barSize : 0,
     left: cfg.tabBarPosition === "left" ? barSize : 0
@@ -52,10 +56,28 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     width: Math.max(1, size.width - inset.left),
     height: Math.max(1, size.height - inset.top - inset.bottom)
   });
+  const HANDLE = { long: 160, thick: 14 };
   const barRect = () => {
+    if (peek) {
+      const across = (total, length) => Math.max(0, Math.round((total - length) / 2));
+      if (cfg.tabBarPosition === "left") return { x: 0, y: across(size.height, HANDLE.long), width: HANDLE.thick, height: Math.min(HANDLE.long, Math.max(1, size.height)) };
+      return { x: across(size.width, HANDLE.long), y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - HANDLE.thick) : 0, width: Math.min(HANDLE.long, Math.max(1, size.width)), height: HANDLE.thick };
+    }
     if (cfg.tabBarPosition === "left") return { x: 0, y: 0, width: barSize, height: Math.max(1, size.height) };
     return { x: 0, y: cfg.tabBarPosition === "bottom" ? Math.max(0, size.height - barSize) : 0, width: Math.max(1, size.width), height: barSize };
   };
+  function setPeek(on) {
+    if (!autoHide || peek === on) return;
+    peek = on;
+    if (!on) container.addChildView(bar);
+    layout();
+    push();
+  }
+  function hover(on) {
+    clearTimeout(peekTimer);
+    if (on) setPeek(false);
+    else if (active >= 0) peekTimer = setTimeout(() => setPeek(true), 500);
+  }
   function layout(area) {
     if (area) size = { width: area.width, height: area.height };
     bar.setBounds(barRect());
@@ -71,6 +93,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       if (bar.webContents.isDestroyed()) return;
       bar.webContents.send("appd-tabs-state", {
         active,
+        peek,
         tabs: tabs.map((tab) => ({
           name: tab.cfg.name,
           favicon: cfg.tabShowIcons ? tab.favicon : "",
@@ -135,10 +158,14 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     push();
   });
   ipcMain.on("appd-tabs-select", (event, index) => owns(event) && select(Number(index)));
+  ipcMain.on("appd-tabs-close", (event, index) => owns(event) && closeTab(Number(index)));
+  ipcMain.on("appd-tabs-hover", (event, on) => owns(event) && hover(Boolean(on)));
   ipcMain.on("appd-tabs-menu", (event, index) => owns(event) && tabMenu(Number(index)));
   const appIcon = iconOf(lib.iconFile(process.env.APPD_ID, cfg) || "");
   const logo = iconOf(path.join(__dirname, "..", "manager", "icon.png"))?.value || "";
-  const look = lib.appearance();
+  const managed = cfg.tabTheme === "manager";
+  const manager = lib.appearance();
+  const look = { ...manager, mode: managed ? manager.mode : cfg.tabTheme };
   const hues = paletteVars(look.palette, look.custom);
   const isDark = () => look.mode === "dark" || look.mode === "system" && nativeTheme.shouldUseDarkColors;
   const loadBar = () => {
@@ -146,12 +173,14 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({
       dark: isDark(),
       hues,
+      basic: !managed,
       logo,
       position: cfg.tabBarPosition,
       icons: cfg.tabShowIcons,
       badges: cfg.tabShowBadges,
       names: cfg.tabShowNames,
-      collapse: cfg.tabCollapseUnloaded
+      collapse: cfg.tabCollapseUnloaded,
+      scale
     }))}`).catch(() => {
     });
   };
@@ -204,7 +233,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       tab.loading = false;
       tab.unloading = false;
       push();
-      if (tab.index === active && !finished) {
+      if (tab.index === active && !finished && !tab.leaving) {
         setTimeout(() => {
           if (!win.isDestroyed() && !finished && !tabs[active].view) select(active);
         }, 300);
@@ -278,6 +307,27 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     note(`tab "${tab.cfg.name}" unloaded`);
     tab.view.webContents.close({ waitForBeforeUnload: true });
   }
+  function closeTab(index) {
+    const tab = tabs[index];
+    if (!tab?.view) return;
+    if (tab.index !== active) return unload(tab);
+    tab.leaving = true;
+    setTimeout(() => {
+      tab.leaving = false;
+    }, 12e4);
+    const contents = tab.view.webContents;
+    contents.once("destroyed", () => {
+      if (!tab.leaving || finished || win.isDestroyed()) return;
+      tab.leaving = false;
+      active = -1;
+      showWelcome();
+      setPeek(false);
+      push();
+    });
+    resume(tab);
+    note(`tab "${tab.cfg.name}" closed`);
+    contents.close({ waitForBeforeUnload: true });
+  }
   function select(index, { focus = true } = {}) {
     if (!(index >= 0 && index < tabs.length) || win.isDestroyed()) return;
     const previous = tabs[active];
@@ -296,6 +346,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     next.view.setVisible(true);
     if (focus) next.view.webContents.focus();
     saveTab(index);
+    if (autoHide) setPeek(true);
     if (next.title) {
       const event = { defaultPrevented: false, preventDefault() {
         this.defaultPrevented = true;
@@ -310,7 +361,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (!tab) return;
     const items = [
       ...tab.view ? [{ label: t.reload, click: () => tab.view?.webContents.reload() }] : [{ label: t.load, click: () => ensure(tab) }],
-      ...tab.view && tab.index !== active ? [{ label: t.unload, click: () => unload(tab) }] : [],
+      ...tab.view ? [{ label: t.close, click: () => closeTab(index) }] : [],
       ...tab.view && tab.index !== active && process.platform !== "win32" ? [{ label: tab.paused ? t.resume : t.pause, click: () => tab.paused ? resume(tab) : settleNow(tab) }] : [],
       { type: "separator" },
       { label: t.copy, click: () => clipboard.writeText(tab.view?.webContents.getURL() || tab.cfg.url) },
@@ -352,7 +403,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   }
   function showWelcome() {
     const tint = `${hues["--hue-s"]}`;
-    const [paper, ink] = isDark() ? [`oklch(14.5% calc(0.03 * ${hues["--vivid"]}) ${tint})`, `oklch(95.5% calc(0.012 * ${hues["--vivid"]}) ${tint})`] : [`oklch(98.2% calc(0.016 * ${hues["--vivid"]}) ${tint})`, `oklch(14% calc(0.025 * ${hues["--vivid"]}) ${tint})`];
+    const [paper, ink] = !managed ? isDark() ? ["#202124", "#e8eaed"] : ["#f1f3f4", "#202124"] : isDark() ? [`oklch(14.5% calc(0.03 * ${hues["--vivid"]}) ${tint})`, `oklch(95.5% calc(0.012 * ${hues["--vivid"]}) ${tint})`] : [`oklch(98.2% calc(0.016 * ${hues["--vivid"]}) ${tint})`, `oklch(14% calc(0.025 * ${hues["--vivid"]}) ${tint})`];
     const escape = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${isDark() ? "dark" : "light"}">
       <body style="margin:0;height:100vh;display:grid;place-items:center;background:${paper};color:${ink};font:500 18px system-ui,sans-serif;text-align:center;user-select:none">
@@ -375,10 +426,19 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     } catch {
     }
   }
+  let closing = false;
   function closeAll(done) {
-    const live = tabs.filter((tab) => tab.view);
+    if (closing) return;
+    closing = true;
+    setTimeout(() => {
+      closing = false;
+    }, 2e3);
+    const live = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
     for (const tab of tabs) resume(tab);
-    if (!live.length) return done();
+    if (!live.length) {
+      finished = true;
+      return done();
+    }
     let left = live.length;
     for (const tab of live) {
       tab.view.webContents.once("destroyed", () => {
@@ -405,7 +465,10 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     closeAll,
     summary: () => [...tabs.filter((tab) => tab.view), ...tabs.filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
     isChrome: (contents) => chrome.has(contents),
-    current: () => tabs[active]?.view?.webContents ?? bar.webContents,
+    current: () => {
+      const shown = tabs[active]?.view?.webContents;
+      return shown && !shown.isDestroyed() ? shown : bar.webContents;
+    },
     index: () => active,
     homeUrl: () => (tabs[active] ?? tabs[0]).cfg.url,
     hosts: () => tabs.map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),

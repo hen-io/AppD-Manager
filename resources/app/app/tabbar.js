@@ -1,21 +1,26 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, hues, position, icons, badges, names, collapse, logo }) {
+module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1 }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
   const role = (light, darker, hue = "--hue") => `oklch(${dark ? darker[0] : light[0]}% calc(${dark ? darker[1] : light[1]} * var(--vivid)) var(${hue}))`;
-  const surface = role([94, 0.04], [21.5, 0.046], "--hue-s");
-  const ink = role([14, 0.025], [95.5, 0.012], "--hue-s");
-  const quiet = role([33, 0.06], [85, 0.045], "--hue-s");
-  const line = role([77, 0.06], [42, 0.06], "--hue-s");
-  const accent = role([44, 0.14], [84, 0.11], "--hue-2");
-  const tone = role([88, 0.11], [36, 0.13], "--hue-2");
-  const onAccent = dark ? role([0, 0], [24, 0.07], "--hue-2") : "#ffffff";
+  const surface = basic ? dark ? "#202124" : "#f1f3f4" : role([94, 0.04], [21.5, 0.046], "--hue-s");
+  const ink = basic ? dark ? "#e8eaed" : "#202124" : role([14, 0.025], [95.5, 0.012], "--hue-s");
+  const quiet = basic ? dark ? "#9aa0a6" : "#5f6368" : role([33, 0.06], [85, 0.045], "--hue-s");
+  const line = basic ? dark ? "#3c4043" : "#dadce0" : role([77, 0.06], [42, 0.06], "--hue-s");
+  const accent = basic ? dark ? "#8ab4f8" : "#1a5fd0" : role([44, 0.14], [84, 0.11], "--hue-2");
+  const tone = basic ? dark ? "#2f3b52" : "#d6e3fb" : role([88, 0.11], [36, 0.13], "--hue-2");
+  const onAccent = dark ? basic ? "#0b1b36" : role([0, 0], [24, 0.07], "--hue-2") : "#ffffff";
   const vars = Object.entries(hues).map(([name, value]) => `${name}: ${value};`).join(" ");
   return `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}"><style>
     :root { ${vars} --surface: ${surface}; --ink: ${ink}; --quiet: ${quiet}; --line: ${line}; --accent: ${accent};
       --on-accent: ${onAccent}; --tone: ${tone}; --label-accent: ${accent}; }
+    html { zoom: ${scale}; }
     * { box-sizing: border-box; }
+    html.peek, html.peek body { background: transparent; border: 0; }
+    html.peek #tabs, html.peek .logo { display: none; }
+    .handle { display: none; }
+    html.peek .handle { display: block; position: fixed; border-radius: 4px; background: var(--accent); opacity: .85; ${vertical ? "left: 3px; top: 50%; width: 5px; height: 100px; transform: translateY(-50%);" : `${bottom ? "bottom" : "top"}: 3px; left: 50%; width: 100px; height: 5px; transform: translateX(-50%);`} }
     html, body { height: 100%; margin: 0; overflow: hidden; background: var(--surface); color: var(--ink);
       font: 500 14px/20px system-ui, "Roboto", sans-serif; user-select: none; -webkit-user-select: none; }
     body { display: flex; flex-direction: ${vertical ? "column" : "row"}; align-items: center; border-${vertical ? "right" : bottom ? "top" : "bottom"}: 1px solid var(--line); }
@@ -25,6 +30,8 @@ module.exports = function barPage({ dark, hues, position, icons, badges, names, 
     button { all: unset; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: ${vertical ? "flex-start" : "center"}; gap: 10px;
       ${vertical ? "height: 44px; padding: 0 14px 0 12px; border-radius: 22px; width: 100%;" : "flex: 1 1 0; min-width: 96px; max-width: 260px; height: 100%; padding: 0 16px;"}
       color: var(--quiet); cursor: pointer; overflow: hidden; transition: background .15s, color .15s, opacity .2s; }
+    button + button::before { content: ""; position: absolute; background: var(--line); pointer-events: none; ${vertical ? "left: 14px; right: 14px; top: -1px; height: 1px;" : "left: 0; top: 24%; bottom: 24%; width: 1px;"} }
+    ${vertical ? "button[aria-selected=true]::before, button[aria-selected=true] + button::before { opacity: 0; }" : ""}
     button:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     button[aria-selected=true] { color: var(--label-accent); ${vertical ? "background: var(--tone);" : ""} }
@@ -39,6 +46,10 @@ module.exports = function barPage({ dark, hues, position, icons, badges, names, 
     button.small { flex: 0 0 auto; min-width: 0; ${vertical ? "width: auto; align-self: flex-start; padding: 0 12px;" : "padding: 0 14px;"} }
     button.small .name, button.small .badge, button.plain .name { display: none; }
     button.plain { flex: 0 0 auto; min-width: 56px; ${vertical ? "justify-content: center; padding: 0;" : "padding: 0 18px;"} }
+    .x { flex: none; display: none; width: 18px; height: 18px; border-radius: 50%; font: 400 15px/17px system-ui, sans-serif; text-align: center; color: var(--quiet); }
+    button:hover .x, button:focus-visible .x { display: block; }
+    .x:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--ink); }
+    button.plain .x { display: none !important; }
     .glyph-svg { width: 20px; height: 20px; fill: currentColor; opacity: 1; }
     .glyph { display: grid; place-items: center; font: 16px/1 system-ui, "Noto Color Emoji", sans-serif; }
     button.idle { opacity: .6; }
@@ -50,7 +61,7 @@ module.exports = function barPage({ dark, hues, position, icons, badges, names, 
     .ripple { position: absolute; border-radius: 50%; background: color-mix(in srgb, var(--accent) 35%, transparent); transform: scale(0); animation: ripple .5s ease-out forwards; pointer-events: none; }
     @keyframes ripple { to { transform: scale(1); opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-  </style><body>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
+  </style><body><div class="handle"></div>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
     const OPTIONS = ${json({ icons, badges, names, collapse })};
     const list = document.getElementById('tabs');
     const SPEAKER = 'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4M3 9v6h4l5 5V4L7 9z';
@@ -66,7 +77,10 @@ module.exports = function barPage({ dark, hues, position, icons, badges, names, 
       svg.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: label }));
       return svg;
     };
+    document.documentElement.addEventListener('mouseenter', () => appdTabs.hover(true));
+    document.documentElement.addEventListener('mouseleave', () => appdTabs.hover(false));
     function show(state) {
+      document.documentElement.classList.toggle('peek', Boolean(state.peek));
       list.replaceChildren(...state.tabs.map((tab, index) => {
         const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : '', OPTIONS.collapse && tab.state === 'unloaded' ? 'small' : '', OPTIONS.names ? '' : 'plain'].join(' ').trim() });
         button.setAttribute('role', 'tab');
@@ -97,6 +111,12 @@ module.exports = function barPage({ dark, hues, position, icons, badges, names, 
         if (OPTIONS.badges && tab.badge > 0) button.append(make('span', { className: 'badge', textContent: tab.badge > 99 ? '99+' : String(tab.badge) }));
         if (tab.audible) button.append(icon(SPEAKER, 'Playing sound'));
         else if (tab.state === 'paused') button.append(icon(PAUSE, 'Paused'));
+        if (tab.state !== 'unloaded') {
+          const close = make('span', { className: 'x', textContent: '×', title: 'Close tab' });
+          close.addEventListener('click', (event) => { event.stopPropagation(); appdTabs.close(index); });
+          close.addEventListener('pointerdown', (event) => event.stopPropagation());
+          button.append(close);
+        }
         button.append(make('span', { className: 'bar' }));
         button.addEventListener('pointerdown', (event) => {
           if (event.button !== 0) return;

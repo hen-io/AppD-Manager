@@ -486,7 +486,7 @@ async function createWindow() {
       background: dark ? "#15171b" : "#ffffff",
       note,
       saveTab,
-      startTab: cfg.tabRememberLast ? Number(state.tab) || 0 : -1,
+      startTab: cfg.tabStart === "last" ? Number(state.tab) || 0 : cfg.tabStart === "first" ? 0 : -1,
       onPage: (wc) => {
         preparePage(wc);
         watchPage(wc);
