@@ -507,26 +507,7 @@ async function createWindow() {
       },
       throttle,
       menu: popUp,
-      openExternal,
-      newWindow: (tabHost) => {
-        const [x, y] = win.getPosition();
-        const [width, height] = win.getSize();
-        const window = new BrowserWindow({
-          x: x + 32,
-          y: y + 32,
-          width,
-          height,
-          title: cfg.name,
-          icon,
-          frame: !bare,
-          ...bare ? frameOptions(cfg) : {},
-          ...dark ? { backgroundColor: "#15171b" } : {},
-          webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }
-        });
-        window.contentView.addChildView(tabHost.view);
-        styleFrame(window, cfg, lineColour, { ...tabHost, contents: window.webContents });
-        return window;
-      }
+      openExternal
     });
     host = { view: tabs.container, contents: win.webContents, inset: tabs.inset, layout: tabs.layout };
     Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });

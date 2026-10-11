@@ -223,7 +223,6 @@ const DEFAULTS = {
   tabBarSize: 100,
   tabTheme: "manager",
   tabBarAutoHide: false,
-  tabWindows: false,
   tabBarHideSeconds: 1.8,
   tabShowNames: true,
   tabCollapseUnloaded: true,
@@ -745,6 +744,7 @@ function withDefaults(file) {
   }
   if (typeof stored.tabRememberLast === "boolean" && stored.tabStart === void 0) stored.tabStart = stored.tabRememberLast ? "last" : "none";
   delete stored.tabRememberLast;
+  delete stored.tabWindows;
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
   settleTabs(cfg);

@@ -12,8 +12,7 @@ const RETRY_MS = 15e3;
 const PICTURES = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon" };
 const HANDLE = 8;
 const SLIDE_MS = 420;
-module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal, newWindow }) {
-  const windowed = Boolean(cfg.tabWindows && newWindow);
+module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal }) {
   const mode = process.platform !== "win32" || cfg.tabInactive !== "pause" ? cfg.tabInactive : "throttle";
   const tabs = cfg.tabs.map((one, index) => ({
     index,
@@ -238,62 +237,10 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     const page = tabs[pane.tab]?.view?.webContents;
     return page && !page.isDestroyed() ? page : pane.bar.webContents;
   };
-  const idle = (pane) => {
-    const tab = tabs[pane.tab];
-    if (tab?.view && mode !== "keep" && !tab.cfg.keepAlive) setThrottled(tab, true);
-  };
-  const wake = (pane) => {
-    const tab = tabs[pane.tab];
-    if (tab) setThrottled(tab, false);
-    push();
-  };
   const main = makePane(win, true);
   win.contentView.addChildView(main.container);
   main.peek = autoHide && startIndex >= 0;
   main.narrow = main.peek;
-  if (windowed) {
-    win.on("blur", () => idle(main));
-    win.on("focus", () => wake(main));
-  }
-  function satellite() {
-    const pane = makePane(null, false);
-    const window = newWindow({ view: pane.container, inset, layout: (area) => layout(pane, area) });
-    pane.window = window;
-    Object.defineProperty(window, "webContents", { get: () => currentOf(pane), configurable: true, enumerable: true });
-    window.on("focus", () => {
-      const page = currentOf(pane);
-      if (!page.isDestroyed()) page.focus();
-      wake(pane);
-    });
-    window.on("blur", () => idle(pane));
-    window.on("close", (event) => {
-      const tab = tabs[pane.tab];
-      if (!tab?.view || tab.view.webContents.isDestroyed()) return;
-      event.preventDefault();
-      pane.closing = true;
-      setTimeout(() => {
-        pane.closing = false;
-      }, 3e3);
-      resume(tab);
-      tab.view.webContents.once("destroyed", () => window.isDestroyed() || window.destroy());
-      tab.view.webContents.close({ waitForBeforeUnload: true });
-    });
-    window.on("closed", () => {
-      panes.splice(panes.indexOf(pane), 1);
-      try {
-        pane.bar.webContents.close();
-      } catch {
-      }
-      push();
-    });
-    return pane;
-  }
-  const raise = (pane) => {
-    if (!alive(pane)) return;
-    if (pane.window.isMinimized()) pane.window.restore();
-    pane.window.show();
-    pane.window.focus();
-  };
   const signal = (pids, name) => {
     for (const pid of pids) {
       try {
@@ -433,7 +380,6 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (!tab?.view) return;
     if (!isShown(tab)) return unload(tab);
     const pane = tab.pane;
-    if (!pane.main) return pane.window.close();
     tab.leaving = true;
     setTimeout(() => {
       tab.leaving = false;
@@ -471,16 +417,13 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   }
   function select(index, { focus = true } = {}) {
     if (!(index >= 0 && index < tabs.length) || win.isDestroyed()) return;
-    const tab = tabs[index];
-    if (!windowed) return show(main, tab, { focus });
-    if (tab.pane) return focus ? raise(tab.pane) : void 0;
-    show(main.tab < 0 ? main : satellite(), tab, { focus });
+    show(main, tabs[index], { focus });
   }
   function tabMenu(index, pane) {
     const tab = tabs[index];
     if (!tab) return;
     const items = [
-      ...tab.view ? [{ label: t.reload, click: () => tab.view?.webContents.reload() }] : [{ label: t.load, click: () => windowed ? select(index) : ensure(tab, main) }],
+      ...tab.view ? [{ label: t.reload, click: () => tab.view?.webContents.reload() }] : [{ label: t.load, click: () => ensure(tab, main) }],
       ...tab.view ? [{ label: t.close, click: () => closeTab(index) }] : [],
       ...tab.view && !isShown(tab) && process.platform !== "win32" ? [{ label: tab.paused ? t.resume : t.pause, click: () => tab.paused ? resume(tab) : pause(tab) }] : [],
       { type: "separator" },
@@ -517,7 +460,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     else if (startIndex >= 0) select(startIndex, { focus: false });
     else showWelcome(main);
     if (cfg.tabLazyLoad || startIndex < 0) return;
-    for (const tab of tabs) if (!tab.view) windowed ? select(tab.index, { focus: false }) : ensure(tab, main);
+    for (const tab of tabs) ensure(tab, main);
   }
   function showWelcome(pane) {
     const tint = `${hues["--hue-s"]}`;
@@ -554,7 +497,6 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     }, 2e3);
     const end = () => {
       finished = true;
-      for (const pane of [...panes]) if (!pane.main && alive(pane)) pane.window.destroy();
       done();
     };
     const live = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
