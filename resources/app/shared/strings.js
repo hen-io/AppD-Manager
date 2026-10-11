@@ -8,9 +8,8 @@ module.exports = {
     tray: "Tray window",
     links: "Links",
     extensions: "Extensions",
-    performance: "Performance",
-    slow: "Slow down when not in use",
-    pause: "Pause when not in use",
+    performance: "Performance and power",
+    site: "Site, privacy and network",
     advanced: "Advanced"
   },
   settings: {
@@ -344,6 +343,23 @@ module.exports = {
     darkBrightness: { label: "Brightness" },
     darkContrast: { label: "Contrast" },
     darkSepia: { label: "Sepia" }
+  },
+  headings: {
+    startClose: "Starting and closing",
+    tabBar: "The bar",
+    tabShows: "What a tab shows",
+    tabLoading: "Loading, and tabs you are not using",
+    windowSize: "Size and position",
+    windowFrame: "Title bar and frame",
+    windowPage: "The page in it",
+    traySize: "Size and place",
+    trayBehaviour: "Behaviour",
+    resources: "What the app may use",
+    slow: "Slow down when not in use",
+    pause: "Pause when not in use",
+    permissions: "What the site may do",
+    identity: "Browser identity and language",
+    network: "Network"
   },
   notes: {
     windowNote: "The size on first start. After that the window opens the way you left it, unless it always opens maximized.",
@@ -840,7 +856,7 @@ module.exports = {
     leave: { message: "Leave this page?", detail: "It may have unsaved changes.", buttons: ["Leave", "Stay"] },
     homeButton: { label: "← {name}", tip: "Back to {name} (Alt+Home)" },
     tray: { quit: "Quit" },
-    tab: { choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
+    tab: { newTab: "New tab", newTabTitle: "Open a page in a new tab", newTabNote: "The tab stays until the app is closed", address: "Web address", open: "Open", cancel: "Cancel", badAddress: "That is not a web address", choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
     find: { placeholder: "Find in page", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
     download: { finished: "Download finished", failed: "Download failed" },
     share: { title: "Share with this page:", screen: "Screen {number}", wholeScreen: "The whole screen", window: "A window", nothing: "Nothing" },

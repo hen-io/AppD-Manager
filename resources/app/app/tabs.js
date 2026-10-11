@@ -63,6 +63,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     const page = pageRect(pane);
     for (const tab of tabs) if (tab.pane === pane) tab.view?.setBounds(page);
     pane.welcome?.setBounds(page);
+    pane.newTab?.setBounds(page);
   }
   function setPeek(pane, on) {
     if (!autoHide || pane.peek === on) return;
@@ -91,10 +92,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (on) setPeek(pane, false);
     else hideSoon(pane);
   }
+  const live = () => tabs.filter((tab) => !tab.removed);
   const shown = () => [
-    ...tabs.filter((tab) => tab.cfg.home),
-    ...tabs.filter((tab) => !tab.cfg.home && tab.view),
-    ...tabs.filter((tab) => !tab.cfg.home && !tab.view)
+    ...live().filter((tab) => tab.cfg.home),
+    ...live().filter((tab) => !tab.cfg.home && tab.view),
+    ...live().filter((tab) => !tab.cfg.home && !tab.view)
   ];
   let pushTimer = null;
   function push() {
@@ -103,7 +105,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       pushTimer = null;
       const list = shown().map((tab) => ({
         index: tab.index,
-        name: tab.cfg.name,
+        name: tab.cfg.temporary ? tab.title || tab.cfg.name : tab.cfg.name,
         favicon: cfg.tabShowIcons ? tab.favicon : "",
         icon: cfg.tabShowIcons ? iconOf(tab.cfg.icon) || appIcon : null,
         display: tab.cfg.display || "",
@@ -181,7 +183,8 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       names: cfg.tabShowNames,
       collapse: cfg.tabCollapseUnloaded,
       scale,
-      slide: SLIDE_MS
+      slide: SLIDE_MS,
+      addLabel: t.newTab
     }))}`).catch(() => {
     });
   }
@@ -198,6 +201,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       size: { width: 0, height: 0 },
       tab: -1,
       welcome: null,
+      newTab: null,
       ready: false,
       peek: false,
       narrow: false,
@@ -225,6 +229,22 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   });
   ipcMain.on("appd-tabs-select", (event, index) => paneOf(event.sender) && select(Number(index)));
   ipcMain.on("appd-tabs-close", (event, index) => paneOf(event.sender) && closeTab(Number(index)));
+  ipcMain.on("appd-tabs-add", (event) => {
+    const pane = paneOf(event.sender);
+    if (pane) showNewTab(pane);
+  });
+  const newTabPane = (sender) => panes.find((pane) => pane.newTab?.webContents === sender);
+  ipcMain.on("appd-newtab-cancel", (event) => {
+    const pane = newTabPane(event.sender);
+    if (pane) closeNewTab(pane);
+  });
+  ipcMain.on("appd-newtab-open", (event, typed) => {
+    const pane = newTabPane(event.sender);
+    const url = pane && webAddress(typed);
+    if (!url) return pane?.newTab.webContents.send("appd-newtab-bad");
+    closeNewTab(pane);
+    addTemporary(url);
+  });
   ipcMain.on("appd-tabs-hover", (event, on) => {
     const pane = paneOf(event.sender);
     if (pane) hover(pane, Boolean(on));
@@ -378,6 +398,12 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   function closeTab(index) {
     const tab = tabs[index];
     if (!tab?.view) return;
+    if (tab.cfg.temporary) {
+      tab.view.webContents.once("destroyed", () => {
+        tab.removed = true;
+        push();
+      });
+    }
     if (!isShown(tab)) return unload(tab);
     const pane = tab.pane;
     tab.leaving = true;
@@ -410,13 +436,14 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     setThrottled(tab, false);
     tab.view.setVisible(true);
     if (focus) tab.view.webContents.focus();
-    if (pane.main) saveTab(tab.index);
+    if (pane.main && !tab.cfg.temporary) saveTab(tab.index);
+    if (pane.newTab) closeNewTab(pane);
     if (autoHide && !pane.over) hideSoon(pane);
     title(tab);
     push();
   }
   function select(index, { focus = true } = {}) {
-    if (!(index >= 0 && index < tabs.length) || win.isDestroyed()) return;
+    if (!(index >= 0 && index < tabs.length) || tabs[index].removed || win.isDestroyed()) return;
     show(main, tabs[index], { focus });
   }
   function tabMenu(index, pane) {
@@ -450,7 +477,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     } catch {
       return;
     }
-    const found = tabs.find((tab) => URL.canParse(tab.cfg.url) && new URL(tab.cfg.url).hostname === host) ?? tabs[Math.max(0, focused().tab)];
+    const found = live().find((tab) => URL.canParse(tab.cfg.url) && new URL(tab.cfg.url).hostname === host) ?? tabs[Math.max(0, focused().tab)];
     select(found.index);
     found.view?.webContents.loadURL(url).catch(() => {
     });
@@ -462,10 +489,17 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     if (cfg.tabLazyLoad || startIndex < 0) return;
     for (const tab of tabs) ensure(tab, main);
   }
-  function showWelcome(pane) {
+  function screenColours() {
     const tint = `${hues["--hue-s"]}`;
-    const [paper, ink] = !managed ? isDark() ? ["#202124", "#e8eaed"] : ["#f1f3f4", "#202124"] : isDark() ? [`oklch(14.5% calc(0.03 * ${hues["--vivid"]}) ${tint})`, `oklch(95.5% calc(0.012 * ${hues["--vivid"]}) ${tint})`] : [`oklch(98.2% calc(0.016 * ${hues["--vivid"]}) ${tint})`, `oklch(14% calc(0.025 * ${hues["--vivid"]}) ${tint})`];
-    const escape = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const vivid = hues["--vivid"];
+    const dark = isDark();
+    const [paper, ink] = !managed ? dark ? ["#202124", "#e8eaed"] : ["#f1f3f4", "#202124"] : dark ? [`oklch(14.5% calc(0.03 * ${vivid}) ${tint})`, `oklch(95.5% calc(0.012 * ${vivid}) ${tint})`] : [`oklch(98.2% calc(0.016 * ${vivid}) ${tint})`, `oklch(14% calc(0.025 * ${vivid}) ${tint})`];
+    const accent = !managed ? dark ? "#8ab4f8" : "#1a5fd0" : `oklch(${dark ? 84 : 44}% calc(${dark ? 0.11 : 0.14} * ${vivid}) ${hues["--hue-2"]})`;
+    return { paper, ink, accent, dark };
+  }
+  const escape = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  function showWelcome(pane) {
+    const { paper, ink } = screenColours();
     const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${isDark() ? "dark" : "light"}">
       <body style="margin:0;height:100vh;display:grid;place-items:center;background:${paper};color:${ink};font:500 18px system-ui,sans-serif;text-align:center;user-select:none">
       <div>${logo ? `<img src="${logo}" width="72" height="72" style="border-radius:16px;margin-bottom:18px"><br>` : ""}${escape(cfg.name)}
@@ -479,6 +513,95 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     view.setBounds(pageRect(pane));
     view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).catch(() => {
     });
+  }
+  function webAddress(typed) {
+    let value = String(typed || "").trim();
+    if (!value) return "";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) value = `https://${value}`;
+    try {
+      const url = new URL(value);
+      return /^https?:$/.test(url.protocol) && url.hostname ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+  function addTemporary(url) {
+    const tab = {
+      index: tabs.length,
+      cfg: { name: new URL(url).hostname, url, temporary: true },
+      view: null,
+      pane: null,
+      title: "",
+      favicon: "",
+      badge: 0,
+      audible: false,
+      loading: false,
+      paused: false,
+      pids: [],
+      timer: null,
+      leaving: false,
+      removed: false
+    };
+    tabs.push(tab);
+    note(`temporary tab "${tab.cfg.name}" opened`);
+    show(main, tab);
+  }
+  function showNewTab(pane) {
+    if (pane.newTab) return pane.newTab.webContents.focus();
+    const { paper, ink, accent, dark } = screenColours();
+    const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}"><style>
+      * { box-sizing: border-box; }
+      body { margin: 0; height: 100vh; display: grid; place-items: center; background: ${paper}; color: ${ink}; font: 400 14px/20px system-ui, "Roboto", sans-serif; }
+      form { width: min(560px, 90vw); display: grid; gap: 16px; }
+      h1 { margin: 0; font: 400 24px/32px system-ui, "Roboto", sans-serif; }
+      p { margin: -8px 0 0; opacity: .7; }
+      .field { position: relative; }
+      input { width: 100%; height: 56px; padding: 0 16px; border: 1px solid color-mix(in srgb, ${ink} 45%, transparent); border-radius: 4px;
+        background: transparent; color: inherit; font: inherit; font-size: 16px; outline: none; }
+      input:focus { border: 2px solid ${accent}; padding: 0 15px; }
+      label { position: absolute; left: 12px; top: -9px; padding: 0 4px; background: ${paper}; font-size: 12px; line-height: 16px; color: color-mix(in srgb, ${ink} 70%, transparent); }
+      input:focus + label { color: ${accent}; }
+      .error { min-height: 16px; margin: 4px 16px 0; font-size: 12px; color: ${dark ? "#f2b8b5" : "#b3261e"}; }
+      .actions { display: flex; justify-content: flex-end; gap: 8px; }
+      button { height: 40px; padding: 0 24px; border: 0; border-radius: 20px; font: 500 14px/20px system-ui, "Roboto", sans-serif; cursor: pointer; }
+      .text { background: transparent; color: ${accent}; }
+      .text:hover { background: color-mix(in srgb, ${accent} 8%, transparent); }
+      .filled { background: ${accent}; color: ${dark ? "#062e6f" : "#ffffff"}; }
+      .filled:hover { box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+      button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
+    </style><form id="f" autocomplete="off">
+      <h1>${escape(t.newTabTitle)}</h1><p>${escape(t.newTabNote)}</p>
+      <div><div class="field"><input id="u" type="text" inputmode="url" spellcheck="false" placeholder="https://" autofocus><label for="u">${escape(t.address)}</label></div>
+      <div class="error" id="e"></div></div>
+      <div class="actions"><button type="button" class="text" id="c">${escape(t.cancel)}</button><button type="submit" class="filled">${escape(t.open)}</button></div>
+    </form><script>
+      const field = document.getElementById('u');
+      document.getElementById('f').addEventListener('submit', (event) => { event.preventDefault(); appdNewTab.open(field.value); });
+      document.getElementById('c').addEventListener('click', () => appdNewTab.cancel());
+      addEventListener('keydown', (event) => { if (event.key === 'Escape') appdNewTab.cancel(); });
+      field.addEventListener('input', () => { document.getElementById('e').textContent = ''; });
+      appdNewTab.onBad(() => { document.getElementById('e').textContent = ${JSON.stringify(t.badAddress)}; field.focus(); });
+      field.focus();
+    <\/script>`;
+    const view = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "newtab-preload.js") } });
+    pane.newTab = view;
+    chrome.add(view.webContents);
+    view.setBackgroundColor(background);
+    pane.container.addChildView(view);
+    if (autoHide) pane.container.addChildView(pane.bar);
+    view.setBounds(pageRect(pane));
+    view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).then(() => view.webContents.focus()).catch(() => {
+    });
+  }
+  function closeNewTab(pane) {
+    const view = pane.newTab;
+    pane.newTab = null;
+    try {
+      pane.container.removeChildView(view);
+      view.webContents.close();
+    } catch {
+    }
+    tabs[pane.tab]?.view?.webContents.focus();
   }
   function closeWelcome(pane) {
     const view = pane.welcome;
@@ -499,11 +622,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       finished = true;
       done();
     };
-    const live = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
+    const live2 = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
     for (const tab of tabs) resume(tab);
-    if (!live.length) return setImmediate(end);
-    let left = live.length;
-    for (const tab of live) {
+    if (!live2.length) return setImmediate(end);
+    let left = live2.length;
+    for (const tab of live2) {
       tab.view.webContents.once("destroyed", () => {
         if (--left === 0) end();
       });
@@ -524,12 +647,12 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     open,
     shortcut,
     closeAll,
-    summary: () => [...tabs.filter((tab) => tab.view), ...tabs.filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
+    summary: () => [...live().filter((tab) => tab.view), ...live().filter((tab) => !tab.view)].map((tab) => ({ name: tab.cfg.name, loaded: Boolean(tab.view) })),
     isChrome: (contents) => chrome.has(contents),
     current: () => currentOf(main),
     index: () => main.tab,
     homeUrl: () => (tabs[focused().tab] ?? tabs[0]).cfg.url,
-    hosts: () => tabs.map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),
+    hosts: () => live().map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),
     pages: () => tabs.filter((tab) => tab.view && !tab.paused).map((tab) => tab.view.webContents),
     all: () => tabs.filter((tab) => tab.view).map((tab) => tab.view.webContents)
   };

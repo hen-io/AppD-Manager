@@ -562,11 +562,12 @@ for (const [name, fn] of Object.entries(handlers)) {
   });
 }
 function createWindow() {
+  const room = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: 1240,
-    height: 900,
-    minWidth: 900,
-    minHeight: 520,
+    width: Math.min(1680, room.width),
+    height: Math.min(1e3, room.height),
+    minWidth: Math.min(1040, room.width),
+    minHeight: 560,
     title: t.windowTitle,
     icon: path.join(__dirname, "manager", lib.WINDOWS ? "icon.ico" : "icon.png"),
     webPreferences: {

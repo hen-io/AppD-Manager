@@ -1,6 +1,6 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1, slide = 420 }) {
+module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1, slide = 420, addLabel = "New tab" }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
   const role = (light, darker, hue = "--hue") => `oklch(${dark ? darker[0] : light[0]}% calc(${dark ? darker[1] : light[1]} * var(--vivid)) var(${hue}))`;
@@ -59,9 +59,13 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     @keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(260%); } }
     .ripple { position: absolute; border-radius: 50%; background: color-mix(in srgb, var(--accent) 35%, transparent); transform: scale(0); animation: ripple .5s ease-out forwards; pointer-events: none; }
     @keyframes ripple { to { transform: scale(1); opacity: 0; } }
+    button.add { flex: 0 0 auto; width: 40px; min-width: 40px; height: 40px; margin: ${vertical ? "4px auto" : "auto 6px"}; padding: 0; justify-content: center; border-radius: 20px; }
+    button.add::before, button.add::after { display: none; }
+    button.add svg { width: 22px; height: 22px; fill: currentColor; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
   </style><body>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
-    const OPTIONS = ${json({ icons, badges, names, collapse })};
+    const OPTIONS = ${json({ icons, badges, names, collapse, addLabel })};
+    const PLUS = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z';
     const list = document.getElementById('tabs');
     const SPEAKER = 'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4M3 9v6h4l5 5V4L7 9z';
     const PAUSE = 'M14 19h4V5h-4M6 19h4V5H6z';
@@ -142,6 +146,13 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
         });
         return button;
       }));
+      const add = make('button', { type: 'button', className: 'add', title: OPTIONS.addLabel });
+      add.setAttribute('aria-label', OPTIONS.addLabel);
+      const plus = icon(PLUS, '');
+      plus.removeChild(plus.lastChild);
+      add.append(plus);
+      add.addEventListener('click', () => appdTabs.add());
+      list.append(add);
       const current = list.children[state.tabs.findIndex((tab) => tab.index === state.active)];
       current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
