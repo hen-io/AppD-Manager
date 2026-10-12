@@ -1,6 +1,7 @@
 "use strict";
 const { ipcRenderer, webFrame } = require("electron");
-if (window.top === window) {
+const arg = (name) => (process.argv.find((one) => one.startsWith(`--appd-${name}=`)) || "").split("=")[1] || "";
+if (window.top === window && arg("filters") === "1") {
   const filters = ipcRenderer.sendSync("appd-page-filters", location.href);
   if (filters) {
     for (const script of filters.scripts) webFrame.executeJavaScript(script).catch(() => {
@@ -42,7 +43,7 @@ function addButton(corner2) {
   host.attachShadow({ mode: "closed" }).append(button);
   document.documentElement.append(host);
 }
-const corner = ipcRenderer.sendSync("appd-action-button");
+const corner = arg("button");
 if (CORNERS[corner]) {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => addButton(corner));
   else addButton(corner);

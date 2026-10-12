@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard } = require("electron");
+const { app, BrowserWindow, Menu, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard, webContents } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -24,6 +24,7 @@ const { openFind, findAgain, isBar } = require("./app/find");
 const createLinks = require("./app/links");
 const createExtensions = require("./app/extensions");
 const createTabs = require("./app/tabs");
+const { surfaceHex } = require("./shared/palettes");
 const id = process.env.APPD_ID;
 let cfg;
 const settingsText = (settings) => JSON.stringify({ ...settings, autostart: void 0 });
@@ -264,9 +265,6 @@ function showActionMenu(wc) {
   if (wc.isDestroyed()) return;
   popUp(appMenu(wc), wc);
 }
-ipcMain.on("appd-action-button", (event) => {
-  event.returnValue = cfg.actionButton;
-});
 ipcMain.on("appd-action-menu", (event) => showActionMenu(event.sender));
 ipcMain.on("appd-page-filters", (event, url) => {
   let filters = null;
@@ -440,6 +438,8 @@ const homeButtonScript = `(() => {
 const extension = (name) => cfg.extensions.includes(name);
 async function createWindow() {
   const state = readState();
+  const look = lib.appearance();
+  const paper = surfaceHex(look.palette, look.custom, look.mode === "dark" || look.mode === "system" && nativeTheme.shouldUseDarkColors);
   nativeTheme.themeSource = cfg.colorScheme;
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   const bare = isBare(cfg);
@@ -455,7 +455,6 @@ async function createWindow() {
   const lineColour = wantsIconColour(cfg) ? await iconColour(iconFile, path.join(profile, "icon-colour.json")).catch(() => null) : null;
   const hosted = needsHost(cfg) || multi;
   const outset = hosted ? outsetOf(cfg) : 0;
-  const dark = !(cfg.colorScheme === "light" && !extension("darkreader"));
   const pagePreferences = {
     sandbox: true,
     contextIsolation: true,
@@ -463,7 +462,8 @@ async function createWindow() {
     backgroundThrottling: cfg.backgroundThrottling,
     spellcheck: cfg.spellcheck,
     v8CacheOptions: "bypassHeatCheck",
-    preload: path.join(__dirname, "webapp-preload.js")
+    preload: path.join(__dirname, "webapp-preload.js"),
+    additionalArguments: [`--appd-button=${cfg.actionButton}`, `--appd-filters=${extension("adblock") || extension("twitch") ? 1 : 0}`]
   };
   if (cfg.language) {
     const wanted = [.../* @__PURE__ */ new Set([cfg.language, cfg.language.split("-")[0], "en"])].join(",");
@@ -478,7 +478,7 @@ async function createWindow() {
     icon,
     ...lib.isTray(cfg) ? { show: false, skipTaskbar: true, resizable: false, minimizable: false, maximizable: false, fullscreenable: false } : {},
     ...startsHidden ? { show: false } : {},
-    ...dark ? { backgroundColor: "#15171b" } : {},
+    backgroundColor: paper,
     frame: !bare,
     ...bare ? frameOptions(cfg) : {},
     webPreferences: hosted ? { sandbox: true, contextIsolation: true, nodeIntegration: false } : pagePreferences
@@ -496,7 +496,7 @@ async function createWindow() {
       cfg,
       lib,
       pagePreferences,
-      background: dark ? "#15171b" : "#ffffff",
+      background: paper,
       note,
       saveTab,
       startTab: cfg.tabStart === "last" ? Number(state.tab) || 0 : cfg.tabStart === "first" ? Math.max(0, cfg.tabs.findIndex((tab) => tab.home)) : -1,
@@ -517,7 +517,7 @@ async function createWindow() {
     });
   } else if (hosted) {
     const view = new WebContentsView({ webPreferences: pagePreferences });
-    view.setBackgroundColor(dark ? "#15171b" : "#ffffff");
+    view.setBackgroundColor(paper);
     host = { view, contents: win.webContents };
     win.contentView.addChildView(view);
     Object.defineProperty(win, "webContents", { value: view.webContents, configurable: true, enumerable: true });
@@ -543,8 +543,8 @@ async function createWindow() {
   if (cfg.keepAwake !== "off") powerSaveBlocker.start(cfg.keepAwake === "display" ? "prevent-display-sleep" : "prevent-app-suspension");
   if (startsHidden || multi) {
   } else if (!lib.isTray(cfg) || cfg.trayShowAtStart) {
-    if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css() });
-    else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css() });
+    if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css(), background: paper });
+    else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css(), background: paper });
   }
   let marked = 0;
   const markUsed = () => {
@@ -710,7 +710,18 @@ async function createWindow() {
   watchForUpdate((version) => {
     if (throttle.isQuitting() || win.isDestroyed()) return;
     if (!lib.prefs().restartAppsOnUpdate) return note(`AppD-Manager was updated to ${version}; the app goes on with the version it started with until it is closed`);
-    restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
+    note(`AppD-Manager was updated to ${version}: restarting once the app is not in use`);
+    const IDLE_MS = 6e4;
+    let idleSince = Date.now();
+    const check = setInterval(() => {
+      if (win.isDestroyed()) return clearInterval(check);
+      const busy = BrowserWindow.getFocusedWindow() || webContents.getAllWebContents().some((page) => !page.isDestroyed() && page.isCurrentlyAudible());
+      if (busy) idleSince = Date.now();
+      else if (Date.now() - idleSince >= IDLE_MS) {
+        clearInterval(check);
+        restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
+      }
+    }, 5e3);
   });
   win.on("close", () => {
     if (lib.isTray(cfg) || win.isDestroyed()) return;

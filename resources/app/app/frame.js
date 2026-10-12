@@ -14,7 +14,7 @@ const spreadOf = (glow) => Math.round(glow / 4);
 const outsetOf = (cfg) => outerGlow(cfg) > 0 ? outerGlow(cfg) + spreadOf(outerGlow(cfg)) + 2 : 0;
 const hasLook = (cfg) => radiusOf(cfg) > 0 || widthOf(cfg) > 0 || glowOf(cfg) > 0;
 const wantsIconColour = (cfg) => (widthOf(cfg) > 0 || glowOf(cfg) > 0) && !cfg.windowBorderColor;
-const needsHost = (cfg) => radiusOf(cfg) > 0 || outsetOf(cfg) > 0;
+const needsHost = (cfg) => radiusOf(cfg) > 0 || outsetOf(cfg) > 0 || widthOf(cfg) > 0;
 function frameOptions(cfg) {
   return needsHost(cfg) ? { transparent: true, backgroundColor: "#00000000" } : {};
 }
@@ -40,12 +40,10 @@ function paintOf(cfg, colour) {
   return strength < 100 ? `color-mix(in srgb, ${colour} ${strength}%, transparent)` : colour;
 }
 function lineCss(cfg, colour, radius) {
-  const width = widthOf(cfg);
   const glow = innerGlow(cfg);
-  if (!(width > 0) && !(glow > 0)) return "";
-  const style = STYLES.includes(cfg.windowBorderStyle) ? cfg.windowBorderStyle : "solid";
+  if (!(glow > 0)) return "";
   const paint = paintOf(cfg, colour);
-  const line = width > 0 ? `border: ${width}px ${style} ${paint} !important;` : "border: 0 !important;";
+  const line = "border: 0 !important;";
   const shade = glow > 0 ? `box-shadow: inset 0 0 ${glow}px ${spreadOf(glow)}px ${paint} !important;` : "box-shadow: none !important;";
   return `html::after { content: "" !important; display: block !important; position: fixed !important;
     inset: 0 calc(100% - 100vw) calc(100% - 100vh) 0 !important;
@@ -55,15 +53,21 @@ function lineCss(cfg, colour, radius) {
 }
 function hostPage(cfg, colour) {
   const glow = outerGlow(cfg);
+  const width = widthOf(cfg);
+  const style = STYLES.includes(cfg.windowBorderStyle) ? cfg.windowBorderStyle : "solid";
   return `<!doctype html><meta charset="utf-8"><style>
     html, body { height: 100%; margin: 0; overflow: hidden; background: transparent; }
-    #glow { position: fixed; inset: ${outsetOf(cfg)}px; border-radius: ${radiusOf(cfg)}px; box-shadow: 0 0 ${glow}px ${spreadOf(glow)}px ${paintOf(cfg, colour)}; }
+    #glow, #line { position: fixed; inset: ${outsetOf(cfg)}px; border-radius: ${radiusOf(cfg)}px; }
+    #glow { box-shadow: 0 0 ${glow}px ${spreadOf(glow)}px ${paintOf(cfg, colour)}; }
+    #line { border: ${width}px ${style} ${paintOf(cfg, colour)}; }
     body.flat #glow { display: none; }
-  </style><body><div id="glow"></div>`;
+    body.flat #line { inset: 0; border-radius: 0; }
+  </style><body><div id="glow"></div><div id="line"></div>`;
 }
 function styleFrame(window, cfg, iconColour, host = null) {
   const fullRadius = radiusOf(cfg);
   const fullOutset = host ? outsetOf(cfg) : 0;
+  const lineWidth = host ? widthOf(cfg) : 0;
   const colour = [cfg.windowBorderColor, iconColour].find(isColour) ?? FALLBACK_COLOUR;
   const frame = {
     wanted: hasLook(cfg),
@@ -120,13 +124,13 @@ function styleFrame(window, cfg, iconColour, host = null) {
   };
   frame.follow = follow;
   if (!host?.inset) follow(window.webContents);
-  if (host && fullOutset > 0) {
+  if (host && (fullOutset > 0 || lineWidth > 0)) {
     host.contents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(hostPage(cfg, colour))}`).catch(() => {
     });
   }
   const round = (view) => {
     try {
-      view.setBorderRadius(frame.radius);
+      view.setBorderRadius(Math.max(0, frame.radius - lineWidth));
     } catch {
       frame.overlays.delete(view);
     }
@@ -142,7 +146,8 @@ function styleFrame(window, cfg, iconColour, host = null) {
     if (host) {
       let { width, height } = window.contentView.getBounds();
       if (!width || !height) [width, height] = window.getContentSize();
-      const area = { x: outset, y: outset, width: Math.max(1, width - 2 * outset), height: Math.max(1, height - 2 * outset) };
+      const edge = outset + lineWidth;
+      const area = { x: edge, y: edge, width: Math.max(1, width - 2 * edge), height: Math.max(1, height - 2 * edge) };
       const now = frame.area;
       if (!now || now.x !== area.x || now.y !== area.y || now.width !== area.width || now.height !== area.height) {
         host.view.setBounds(area);
@@ -161,7 +166,7 @@ function styleFrame(window, cfg, iconColour, host = null) {
     }
     if (changed) {
       restyle();
-      if (host && fullOutset > 0) host.contents.executeJavaScript(`document.body.classList.toggle('flat', ${flat})`).catch(() => {
+      if (host && (fullOutset > 0 || lineWidth > 0)) host.contents.executeJavaScript(`document.body.classList.toggle('flat', ${flat})`).catch(() => {
       });
     }
   };

@@ -3,9 +3,9 @@ const { WebContentsView, nativeTheme } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const coverWindow = require("./overlay");
-module.exports = function showLoadingScreen(window, cfg, iconFile, { plain = false, frameCss = "" } = {}) {
+module.exports = function showLoadingScreen(window, cfg, iconFile, { plain = false, frameCss = "", background: paper = "" } = {}) {
   const dark = cfg.colorScheme === "dark" || cfg.colorScheme !== "light" && nativeTheme.shouldUseDarkColors || cfg.extensions.includes("darkreader");
-  const background = dark ? "#15171b" : "#f4f5f8";
+  const background = paper || (dark ? "#15171b" : "#f4f5f8");
   const text = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const types = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon" };
   let logo = `<div class="logo letter">${text((cfg.name.trim()[0] || "?").toUpperCase())}</div>`;

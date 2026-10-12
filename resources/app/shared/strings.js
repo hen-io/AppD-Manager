@@ -4,35 +4,35 @@ module.exports = {
     general: "General",
     window: "Window",
     tabs: "Tabs",
-    tabbar: "Tab bar and behaviour",
+    tabbar: "Tab bar",
     tray: "Tray window",
     links: "Links",
     extensions: "Extensions",
-    performance: "Performance and power",
-    site: "Site, privacy and network",
+    performance: "Performance",
+    site: "Site and network",
     advanced: "Advanced"
   },
   settings: {
-    type: { label: "Kind of app" },
+    type: { label: "App type" },
     name: { label: "Name", placeholder: "App name..." },
-    url: { label: "URL", placeholder: "url..." },
+    url: { label: "Address", placeholder: "url..." },
     description: { label: "Description", placeholder: "Shown under the name in the menu" },
-    autostart: { label: "Start this app when you log in" },
-    closeToTray: { label: "Keep running in the system tray when the window is closed" },
+    autostart: { label: "Start at login" },
+    closeToTray: { label: "Keep running in the tray when closed" },
     startHidden: { label: "Start hidden in the tray" },
-    unreadBadge: { label: "Show the site's unread count on the app's icon in the taskbar" },
+    unreadBadge: { label: "Unread count on the taskbar icon" },
     width: { label: "Width" },
     height: { label: "Height" },
-    startMaximized: { label: "Always open maximized" },
-    startFullScreen: { label: "Open in full screen" },
+    startMaximized: { label: "Open maximized" },
+    startFullScreen: { label: "Open full screen" },
     colorScheme: {
-      label: "Light or dark mode",
-      note: "Only affects sites that support both. For sites without a dark mode, add the Dark Reader extension.",
+      label: "Light or dark",
+      note: "For sites that support both.",
       options: { system: "Follow the system", light: "Light", dark: "Dark" }
     },
     actionButton: {
       label: "Menu button",
-      note: "A small round button in a corner of the window that opens the app's menu (reload, mute, zoom, full screen, extensions). The same menu always opens with a right-click on the page.",
+      note: "Opens the app menu. Right-clicking the page does too.",
       options: {
         off: ["Hidden", "Open the menu by right-clicking the page"],
         "top-left": "Top left",
@@ -41,14 +41,14 @@ module.exports = {
         "bottom-right": "Bottom right"
       }
     },
-    alwaysOnTop: { label: "Keep the window above all others" },
-    startMuted: { label: "Start with the sound off", note: `Turn sound on or off any time with "Mute sound" in the app's menu.` },
+    alwaysOnTop: { label: "Always on top" },
+    startMuted: { label: "Start muted" },
     windowDecorations: {
-      label: "Show window decorations (title bar and borders)",
-      note: "Without a title bar: move the window with Meta+drag, and minimize, maximize or close it from the app's menu (right-click the page) or with Alt+F4."
+      label: "Title bar and borders",
+      note: "Off: move with Meta+drag, close with Alt+F4 or the app menu."
     },
     windowRadius: { label: "Corner radius" },
-    windowBorderWidth: { label: "Border width" },
+    windowBorderWidth: { label: "Border" },
     windowBorderStyle: {
       label: "Border style",
       options: {
@@ -60,33 +60,32 @@ module.exports = {
         ridge: ["Ridge", "Looks raised; best at width 4 or more"]
       }
     },
-    windowGlow: { label: "Glow size" },
+    windowGlow: { label: "Glow" },
     windowGlowSide: {
-      label: "Glow position",
-      note: "A glow works with or without a border. An outside glow needs a compositing desktop (KDE has one).",
+      label: "Glow side",
       options: {
         inner: ["Inside", "Fades inwards, over the page"],
         outer: ["Outside", "Fades outwards, around the window"],
         both: ["Both", "Inside and outside"]
       }
     },
-    windowBorderOpacity: { label: "Colour opacity" },
-    fixedTitle: { label: "Always show the app name as window title" },
-    loadingScreen: { label: "Show a loading screen with the app's icon at start" },
-    defaultZoom: { label: "Default zoom" },
+    windowBorderOpacity: { label: "Opacity" },
+    fixedTitle: { label: "App name as window title" },
+    loadingScreen: { label: "Loading screen" },
+    defaultZoom: { label: "Zoom" },
     allowZoom: {
-      label: "Allow zooming (Ctrl +, Ctrl -, Ctrl + mouse wheel)",
-      note: `Your zoom lasts until the page reloads or the app restarts. "Reset zoom" in the app's menu (Ctrl+0) returns to the default.`
+      label: "Allow zooming",
+      note: "Ctrl + and − or the mouse wheel; Ctrl+0 resets."
     },
-    hideScrollbars: { label: "Hide scrollbars (pages still scroll)" },
-    confirmClose: { label: "Ask before closing the app", note: 'Closing the window asks "Are you sure?". For a multi-tab app the question lists the tabs that are loaded.' },
+    hideScrollbars: { label: "Hide scrollbars" },
+    confirmClose: { label: "Ask before closing", note: "A multi-tab app only asks while a tab is loaded." },
     tabBarPosition: {
-      label: "Tab bar",
+      label: "Position",
       options: { top: ["Top", "Above the page"], bottom: "Bottom", left: ["Left", "A column beside the page: room for long names"] }
     },
     tabInactive: {
-      label: "Tabs you are not looking at",
-      note: "What happens to a tab after you have left it. A tab that plays sound or is loading is left alone.",
+      label: "Tabs in the background",
+      note: "Tabs playing sound or loading are left alone.",
       options: {
         keep: ["Keep running", "Nothing changes: chat and mail tabs keep up to date"],
         throttle: ["Slow down", "The browser lets the page run about once a second: little saved, nothing lost"],
@@ -95,7 +94,7 @@ module.exports = {
       }
     },
     tabTheme: {
-      label: "Look of the tab bar",
+      label: "Look",
       options: {
         manager: ["As AppD-Manager", "Its light or dark, and its colours (read when the app starts)"],
         system: ["Basic, as the desktop", "Plain greys and blue, light or dark as the desktop is"],
@@ -103,27 +102,27 @@ module.exports = {
         dark: ["Basic dark", "Plain greys and blue"]
       }
     },
-    tabBarSize: { label: "Size of the tab bar" },
-    tabBarAutoHide: { label: "Hide the tab bar until the mouse is at its edge", note: "A small handle at the edge shows where; the bar comes over the page and goes again when the mouse leaves it." },
-    tabBarHideSeconds: { label: "Hide it again after the mouse has left for" },
+    tabBarSize: { label: "Size" },
+    tabBarAutoHide: { label: "Hide until the mouse reaches the edge" },
+    tabBarHideSeconds: { label: "Hide again after" },
     tabInactiveAfterSeconds: { label: "After" },
-    tabLazyLoad: { label: "Load a tab when it is first opened", note: "Off: every tab loads when the app starts." },
+    tabLazyLoad: { label: "Load a tab only when it is opened", note: "Off: all tabs load at start." },
     tabStart: {
-      label: "Open on start",
+      label: "Open at start",
       options: {
         last: ["The tab you left", "Where you were when the app was closed"],
         first: ["The first tab", "The home tab if one is set, else the first in the list"],
         none: ["No tab", "Nothing is loaded; a screen asks you to select a tab"]
       }
     },
-    tabShowIcons: { label: "Show icons in the tabs", note: "Off: the tabs show names only (a tab that is shrunk, or has no name shown, keeps its first letter)." },
-    tabShowNames: { label: "Show the tabs' names", note: "Off: the tabs are pictures only (the name is in the tip). A tab without a picture of its own shows the site's, or its first letter." },
-    tabCollapseUnloaded: { label: "Shrink tabs that are not loaded", note: "A tab not opened yet, or unloaded, is shown as its picture alone until it is loaded." },
-    tabShowBadges: { label: "Show unread counts in the tabs", note: 'The number a site puts in its title, "(3) Inbox".' },
-    trayWidth: { label: "Window width" },
-    trayHeight: { label: "Window height" },
+    tabShowIcons: { label: "Icons" },
+    tabShowNames: { label: "Names", note: "Off: icons only, the name shows on hover." },
+    tabCollapseUnloaded: { label: "Shrink tabs that are not loaded" },
+    tabShowBadges: { label: "Unread counts" },
+    trayWidth: { label: "Width" },
+    trayHeight: { label: "Height" },
     trayPosition: {
-      label: "Window position",
+      label: "Position",
       options: {
         "bottom-right": ["Bottom right", "Where the tray usually is"],
         "bottom-center": "Bottom centre",
@@ -139,62 +138,60 @@ module.exports = {
       any: ["Screen with the mouse pointer", "May pick the wrong screen on Wayland"],
       screen: "Screen {number}",
       main: ", the main screen",
-      note: "Screens are numbered from left to right. Pick the one your tray is on if the window opens on the wrong screen."
+      note: "The screen your tray is on."
     },
     trayMargin: {
-      label: "Margin from screen edges",
-      note: "The gap between the window and the edge of the usable screen area (panels and taskbars are outside that area)."
+      label: "Margin",
+      note: "Space to panels and screen edges."
     },
     trayAtIcon: {
-      label: "Open next to the tray icon when possible",
-      note: "Works on X11 when the tray is in a panel. On Wayland an app cannot see where its icon is: choose a screen and position above, or place the window yourself."
+      label: "Open next to the tray icon",
+      note: "X11 only. On Wayland, pick a screen and position."
     },
-    trayHideOnBlur: { label: "Hide the window when you click elsewhere" },
+    trayHideOnBlur: { label: "Hide when you click elsewhere" },
     trayShowAtStart: {
-      label: "Show the window when the app starts",
-      note: "Off: the app starts hidden in the tray. Corner radius, border and glow are under Window."
+      label: "Show at start"
     },
     trayHotkey: {
-      label: "Shortcut to show or hide the window",
+      label: "Show/hide shortcut",
       placeholder: "Click here, then press the shortcut",
-      note: `Ctrl, Alt, Shift or Super plus a key, for example Super+Alt+Y. Works from anywhere if your desktop allows it; on Wayland it may ask you first. If it does nothing, assign a shortcut to this app's "Show or hide the window" action in your desktop's shortcut settings (KDE: System Settings, Keyboard, Shortcuts).`
+      note: "For example Super+Alt+Y. If it does nothing, set one in your desktop's shortcut settings."
     },
     trayOpenAt: {
-      label: "When the page was closed, show",
-      note: 'Only after the page has been closed ("Unload the page when hidden for", below): until then the window shows the page you left. Off while the page is never closed.',
+      label: "After unloading, open",
+      note: "Only when unloading is on.",
       options: {
         last: ["The last page", "Where you left off, also after the page was closed"],
         home: ["The app's start page", "The URL under General"]
       }
     },
     trayCloseAfterSeconds: {
-      label: "Unload the page when hidden for",
-      note: "0 = never. Frees memory while you are not using the app: the tray icon stays, and the page loads again when you open the window. Never happens while sound is playing."
+      label: "Unload when hidden for",
+      note: "0 = never. Not while sound plays."
     },
     openLinks: {
       label: "Links that open a new window",
       options: { browser: "Open in the default browser", window: "Open in a new window of this app", same: "Open in the same window" }
     },
     internalHosts: {
-      label: "Sites that open inside the app",
+      label: "Sites kept inside the app",
       placeholder: "accounts.google.com",
-      note: `One host per line, such as accounts.google.com. Used with "default browser": links to these sites, and to the app's own site, open in an app window instead (sign-in pop-ups need this).`
+      note: "One per line, for example accounts.google.com. Sign-in pop-ups need this."
     },
     linksToApps: {
-      label: "Open links to your other apps' sites in those apps",
-      note: "A link to a site you have an app for opens in that app (starting it if needed) instead of the browser."
+      label: "Open links to your other apps in those apps"
     },
-    homeButton: { label: 'Show a "Back to app" button on other sites' },
+    homeButton: { label: '"Back to app" button on other sites' },
     hardwareAcceleration: {
       label: "Hardware acceleration",
-      note: "Uses the graphics card for drawing and video wherever possible. Switch it off if the app shows glitches or an empty window."
+      note: "Turn off if the app glitches or stays blank."
     },
     cpuPercent: {
       label: "CPU limit",
-      note: "Limits how much CPU the page may use, even while you are using the app (it will feel slower). 100 = no limit."
+      note: "Always applies. 100 = no limit."
     },
     keepAwake: {
-      label: "Keep the computer awake while the app is open",
+      label: "Keep the computer awake",
       options: {
         off: ["No", "The computer sleeps as usual"],
         display: ["Yes, and keep the screen on", "For dashboards and wall displays"],
@@ -202,67 +199,67 @@ module.exports = {
       }
     },
     reloadEverySeconds: {
-      label: "Reload the page every",
-      note: "0 = never. For dashboards that do not refresh themselves. Skipped while the page is paused or has unsaved changes."
+      label: "Reload every",
+      note: "0 = never."
     },
-    jsHeapMb: { label: "JavaScript memory limit", note: "0 = default. Raise it for very heavy apps." },
+    jsHeapMb: { label: "JavaScript memory limit", note: "0 = default." },
     backgroundThrottling: {
-      label: "Slow the page down when you are not using the window (saves CPU)",
-      note: "A window counts as in use while it has focus or the mouse is over it."
+      label: "Slow down",
+      note: "In use means focused or under the mouse."
     },
-    slowAfterSeconds: { label: "Start slowing down after" },
+    slowAfterSeconds: { label: "After" },
     unfocusedCpuPercent: {
-      label: "CPU limit while slowed down",
-      note: "How much CPU the page may use while slowed down. The app keeps running, just slower. Not applied while sound is playing or a page is loading. If the CPU limit under Performance is lower, that one is used."
+      label: "CPU limit while slowed",
+      note: "Not while sound plays or a page loads."
     },
     pauseWhenUnfocused: {
-      label: "Pause the page when you are not using the window",
-      note: "A paused app does nothing at all until you return to it: no new messages, no notifications, no playback. It keeps showing what was on screen. Until the pause starts, the slow-down above applies."
+      label: "Pause",
+      note: "Nothing runs until you return: no messages or notifications."
     },
-    pauseAfterSeconds: { label: "Pause after" },
+    pauseAfterSeconds: { label: "After" },
     skipMissedUpdates: {
-      label: "Reconnect when you return (skip missed updates)",
-      note: "For apps that show live data. After being slowed down or paused for 30 seconds or more, the app reconnects and shows the current state instead of replaying everything it missed."
+      label: "Reconnect on return",
+      note: "Shows the current state instead of replaying what was missed."
     },
-    reloadAfterIdleSeconds: { label: "Reload when you return after more than", note: "0 = never. Counted from when you stopped using the window." },
+    reloadAfterIdleSeconds: { label: "Reload on return after", note: "0 = never." },
     userAgent: {
       label: "User agent",
       placeholder: "Default: same as Chrome",
-      note: "How the app identifies itself to sites, which use it to choose a phone, tablet or TV layout. Empty = desktop Chrome. Some layouts also need their own URL: YouTube's TV interface is youtube.com/tv with a TV user agent."
+      note: "Empty = desktop Chrome."
     },
     language: {
       label: "Language",
       placeholder: "en-GB",
-      note: "Preferred language for sites, dates and spell-checking, as a code such as en-GB, nb or de. Empty = system language."
+      note: "For example en-GB or nb. Empty = system."
     },
     downloadFolder: {
       label: "Download folder",
       placeholder: "Ask each time",
-      note: "Downloads are saved here without asking. Empty = ask every time.",
+      note: "Empty = ask each time.",
       ask: "Choose the folder this app's downloads go to"
     },
     proxy: {
       label: "Proxy",
       placeholder: "socks5://127.0.0.1:1080",
-      note: "Route this app's traffic through a proxy (socks5://, socks4:// or http://). Empty = system setting. Other apps are not affected."
+      note: "socks5://, socks4:// or http://. Empty = system."
     },
-    spellcheck: { label: "Check spelling in text fields" },
+    spellcheck: { label: "Spell check" },
     spellcheckLanguages: {
       label: "Spell-check languages",
       placeholder: "en-US",
-      note: "One per line, such as en-US, nb or de. Empty = system language. Right-click an underlined word for suggestions."
+      note: "One per line. Empty = system."
     },
     devTools: {
-      label: "Open the developer tools (inspect element) in a separate window",
-      note: "They open with the app, for the site's own page. F12 closes and opens them. A multi-tab app gets one window per loaded tab."
+      label: "Developer tools in their own window",
+      note: "They open with the app. F12 toggles them."
     },
     ignoreCertificateErrors: {
-      label: "Ignore certificate errors (accept invalid, expired and self-signed certificates)",
-      note: "Only for apps on your own network, such as a device with a self-signed certificate. When on, the app no longer verifies that any site is who it claims to be."
+      label: "Ignore certificate errors",
+      note: "Only for your own network: sites are no longer verified."
     },
     permissions: {
-      label: "Site permissions (camera, microphone, location, notifications, screen sharing)",
-      note: "There are no per-site prompts: allowed sites get what they ask for.",
+      label: "Permissions",
+      note: "Camera, microphone, location, notifications. No prompts: allowed sites get access.",
       options: {
         app: ["Only the app's own site", "Plus the sites that open inside the app. Ads and embedded sites get nothing"],
         all: ["All sites", "Including embedded sites and other sites you visit in the app"],
@@ -272,17 +269,17 @@ module.exports = {
     customCss: {
       label: "Custom CSS",
       placeholder: ".some-banner { display: none !important; }",
-      note: "Your own CSS, added to every page of the app: hide something, change a font, widen a column."
+      note: "Added to every page."
     },
     customJs: {
       label: "Custom JavaScript",
       placeholder: "document.querySelector('.some-button')?.click();",
-      note: "Your own script, run on every page of the app after it loads. It can do anything the site can, so only use code you understand."
+      note: "Runs on every page. Use only code you trust."
     },
     flags: {
-      label: "Extra Chromium flags",
+      label: "Chromium flags",
       placeholder: "--some-switch=value",
-      note: "One per line. Applied the next time the app starts."
+      note: "One per line."
     },
     adBlockInPageAds: {
       label: "Block ads served by the site itself (YouTube video ads)",
@@ -345,27 +342,27 @@ module.exports = {
     darkSepia: { label: "Sepia" }
   },
   headings: {
-    startClose: "Starting and closing",
-    tabBar: "The bar",
-    tabShows: "What a tab shows",
-    tabLoading: "Loading, and tabs you are not using",
-    windowSize: "Size and position",
-    windowFrame: "Title bar and frame",
-    windowPage: "The page in it",
+    startClose: "Start and close",
+    tabBar: "Bar",
+    tabShows: "Tabs",
+    tabLoading: "Loading and background tabs",
+    windowSize: "Size",
+    windowFrame: "Frame",
+    windowPage: "Page",
     traySize: "Size and place",
     trayBehaviour: "Behaviour",
-    resources: "What the app may use",
-    slow: "Slow down when not in use",
-    pause: "Pause when not in use",
-    permissions: "What the site may do",
-    identity: "Browser identity and language",
+    resources: "Limits",
+    slow: "When not in use: slow down",
+    pause: "When not in use: pause",
+    permissions: "Permissions and downloads",
+    identity: "Identity and language",
     network: "Network"
   },
   notes: {
-    windowNote: "The size on first start. After that the window opens the way you left it, unless it always opens maximized.",
-    windowNote2: "These apply to windows without a title bar (and to tray apps). Rounded corners need a compositing desktop (KDE has one); maximized and full-screen windows stay square.",
-    tabsNote: "The first tab is the app's own address. Tabs share logins and cookies, as the tabs of one browser do. Ctrl+Tab and Ctrl+1 to 9 switch between them.",
-    trayNote: "The app sits in the system tray. Click its icon to open a small window without a title bar; right-click the icon for its menu. It is not in the desktop's menu or the taskbar.",
+    windowNote: "Size at first start; after that the window remembers its own.",
+    windowNote2: "For windows without a title bar. Maximized windows stay square.",
+    tabsNote: "The first tab is the app's address. Tabs share logins. Switch with Ctrl+Tab or Ctrl+1–9.",
+    trayNote: "Lives in the system tray: click the icon to open it, right-click for the menu.",
     sponsorblockNote: 'What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.',
     sponsorblockNote2: "Written like Enter, Backspace, K or Ctrl+Shift+K. The skip key acts on the box that is showing."
   },
@@ -384,7 +381,7 @@ module.exports = {
     checkUpdates: { label: "Look for a new version every time AppD-Manager starts" },
     restartAppsOnUpdate: {
       label: "Restart running apps when AppD-Manager is updated",
-      note: "Each app comes back on the page it was on, running the new version. Off: an app keeps the old version until you close it."
+      note: "Each app restarts once it has not been used for a minute, on the page it was on. Off: it keeps the old version until you close it."
     },
     updateChannel: {
       label: "Release branch",
@@ -529,7 +526,7 @@ module.exports = {
       tabHome: "Home tab: always first in the bar",
       tabIcon: "Icon",
       tabDisplay: "Shows",
-      tabDisplayDefault: 'As "Tab bar and behaviour" says',
+      tabDisplayDefault: "As the tab bar settings say",
       tabDisplayBoth: "Icon and name",
       tabDisplayName: "Name only",
       tabDisplayIcon: "Icon only",

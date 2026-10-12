@@ -5,6 +5,8 @@ const FILE = path.join(__dirname, "..", "package.json");
 const LOOK_MS = 3e4;
 const SETTLE_MS = 2e4;
 module.exports = function watchForUpdate(onUpdate) {
+  const root = path.dirname(path.dirname(FILE));
+  if (path.basename(path.dirname(FILE)) !== "app" || path.basename(root) !== "resources") return;
   const running = require(FILE).version;
   let settle = null;
   const look = () => {

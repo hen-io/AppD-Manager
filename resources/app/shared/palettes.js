@@ -27,4 +27,20 @@ function paletteVars(name, custom) {
   const { hue, hue3 = hue + 70, hue2 = hue, hueS = hue, vivid = 1 } = palette;
   return { "--hue": String(hue), "--hue-2": String(hue2), "--hue-3": String(hue3), "--hue-s": String(hueS), "--vivid": String(vivid) };
 }
-module.exports = { PALETTES, hueOfColour, paletteVars };
+function surfaceHex(name, custom, dark) {
+  const vars = paletteVars(name, custom);
+  const vivid = Number(vars["--vivid"]);
+  const [lightness, chroma] = dark ? [0.145, 0.03 * vivid] : [0.982, 0.016 * vivid];
+  const hue = Number(vars["--hue-s"]) * Math.PI / 180;
+  const [a, b] = [chroma * Math.cos(hue), chroma * Math.sin(hue)];
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const linear = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+  const channel = (v) => {
+    const c = Math.min(1, Math.max(0, v));
+    return Math.round(255 * (c <= 31308e-7 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055)).toString(16).padStart(2, "0");
+  };
+  return `#${linear.map(channel).join("")}`;
+}
+module.exports = { PALETTES, hueOfColour, paletteVars, surfaceHex };
