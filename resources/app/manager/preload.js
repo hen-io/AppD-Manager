@@ -10,6 +10,7 @@ for (const name of [
   "remove",
   "undoRemove",
   "launch",
+  "testAlert",
   "openInstance",
   "close",
   "restart",

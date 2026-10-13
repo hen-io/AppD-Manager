@@ -24,6 +24,7 @@ const { openFind, findAgain, isBar } = require("./app/find");
 const createLinks = require("./app/links");
 const createExtensions = require("./app/extensions");
 const createTabs = require("./app/tabs");
+const startAlerts = require("./app/alert");
 const { surfaceHex } = require("./shared/palettes");
 const id = process.env.APPD_ID;
 let cfg;
@@ -707,6 +708,21 @@ async function createWindow() {
   if (win.isDestroyed()) return;
   if (!multi) preparePage(win.webContents);
   if (throttle.wanted) throttle.watchFocus(win);
+  startAlerts({
+    cfg,
+    note,
+    icon,
+    inUse: startAlerts.inUse,
+    pages: () => tabs ? tabs.named() : throttle.isPaused() || win.isDestroyed() ? [] : [{ page: win.webContents, name: "" }],
+    show: (page) => {
+      if (win.isDestroyed()) return;
+      if (win.isMinimized()) win.restore();
+      if (trayIcon?.show) trayIcon.show();
+      else win.show();
+      win.focus();
+      tabs?.showPage(page);
+    }
+  });
   watchForUpdate((version) => {
     if (throttle.isQuitting() || win.isDestroyed()) return;
     if (!lib.prefs().restartAppsOnUpdate) return note(`AppD-Manager was updated to ${version}; the app goes on with the version it started with until it is closed`);

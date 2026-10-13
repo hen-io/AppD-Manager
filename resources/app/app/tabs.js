@@ -651,9 +651,14 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     isChrome: (contents) => chrome.has(contents),
     current: () => currentOf(main),
     index: () => main.tab,
+    showPage: (page) => {
+      const tab = tabs.find((one) => one.view?.webContents === page);
+      if (tab) select(tab.index);
+    },
     homeUrl: () => (tabs[focused().tab] ?? tabs[0]).cfg.url,
     hosts: () => live().map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),
     pages: () => tabs.filter((tab) => tab.view && !tab.paused).map((tab) => tab.view.webContents),
-    all: () => tabs.filter((tab) => tab.view).map((tab) => tab.view.webContents)
+    all: () => tabs.filter((tab) => tab.view).map((tab) => tab.view.webContents),
+    named: () => tabs.filter((tab) => tab.view && !tab.paused).map((tab) => ({ page: tab.view.webContents, name: tab.cfg.name }))
   };
 };

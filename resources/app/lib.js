@@ -4,6 +4,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { text, fill } = require("./shared/text");
+const { SOUNDS } = require("./shared/sounds");
 const home = os.homedir();
 const root = path.join(home, ".AppD-manager");
 const settingsPath = path.join(root, "settings.json");
@@ -332,6 +333,20 @@ const DEFAULTS = {
   spellcheckLanguages: [],
   ignoreCertificateErrors: false,
   devTools: false,
+  alertText: "",
+  alertMatch: "html",
+  alertCase: true,
+  alertRegex: false,
+  alertCheckSeconds: 10,
+  alertNotify: true,
+  alertMessage: "",
+  alertSound: "chime",
+  alertVolume: 70,
+  alertRepeatSeconds: 0,
+  alertMaxCount: 5,
+  alertPerSeconds: 3600,
+  alertWhileInUse: true,
+  alertFocus: false,
   flags: [],
   configVersion: 5
 };
@@ -510,6 +525,13 @@ const RULES = {
   tabInactive: { oneOf: TAB_INACTIVE },
   tabInactiveAfterSeconds: { min: 1, max: 86400 },
   tabBarSize: { min: 70, max: 160 },
+  alertMatch: { oneOf: ["html", "text"] },
+  alertSound: { oneOf: ["off", ...SOUNDS] },
+  alertVolume: { min: 0, max: 100 },
+  alertCheckSeconds: { min: 2, max: 3600 },
+  alertRepeatSeconds: { min: 0, max: 3600 },
+  alertMaxCount: { min: 1, max: 100 },
+  alertPerSeconds: { min: 10, max: 86400 },
   tabBarHideSeconds: { min: 0.2, max: 30 },
   tabTheme: { oneOf: ["manager", "system", "light", "dark"] },
   tabStart: { oneOf: ["last", "first", "none"] },
@@ -563,6 +585,13 @@ function validate(cfg) {
   }
   for (const [category, color] of Object.entries(cfg.sponsorBlockColors)) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(fill(text.errors.sponsorColour, { kind: category }));
+  }
+  if (cfg.alertRegex && cfg.alertText) {
+    try {
+      new RegExp(cfg.alertText);
+    } catch (e) {
+      throw new Error(fill(text.errors.alertRegex, { why: e.message }));
+    }
   }
   if (cfg.trayHotkey && !HOTKEY.test(cfg.trayHotkey)) throw new Error(text.errors.hotkey);
   if (cfg.language && !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(cfg.language)) throw new Error(text.errors.language);
@@ -745,6 +774,12 @@ function withDefaults(file) {
   if (typeof stored.tabRememberLast === "boolean" && stored.tabStart === void 0) stored.tabStart = stored.tabRememberLast ? "last" : "none";
   delete stored.tabRememberLast;
   delete stored.tabWindows;
+  for (const [from, to] of [["watchText", "alertText"], ["watchCheckSeconds", "alertCheckSeconds"], ["watchNotify", "alertNotify"], ["watchRepeatSeconds", "alertRepeatSeconds"], ["watchMaxAlerts", "alertMaxCount"], ["watchMaxPerSeconds", "alertPerSeconds"]]) {
+    if (from in stored && !(to in stored)) stored[to] = stored[from];
+    delete stored[from];
+  }
+  if (stored.watchSound === false && !("alertSound" in stored)) stored.alertSound = "off";
+  delete stored.watchSound;
   const shared = extensionDefaults();
   const cfg = { ...DEFAULTS, ...shared, ...stored };
   settleTabs(cfg);

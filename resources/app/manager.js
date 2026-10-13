@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, nativeTheme, screen, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -343,6 +343,10 @@ const handlers = {
   },
   launch(id) {
     startApp(id);
+  },
+  testAlert({ name, body } = {}) {
+    if (!Notification.isSupported()) throw new Error(t.alertUnsupported);
+    new Notification({ title: String(name || t.windowTitle), body: String(body || ""), silent: true }).show();
   },
   openInstance(id) {
     lib.checkId(id);

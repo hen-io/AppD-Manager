@@ -1,6 +1,7 @@
 "use strict";
 module.exports = {
   sections: {
+    alerts: "Alerts",
     general: "General",
     window: "Window",
     tabs: "Tabs",
@@ -249,6 +250,20 @@ module.exports = {
       placeholder: "en-US",
       note: "One per line. Empty = system."
     },
+    alertText: { label: "Alert when the page contains", placeholder: "Text or HTML to look for", note: "Empty = off." },
+    alertMatch: { label: "Look in", options: { html: ["Raw HTML", "The page source as it is now, tags included"], text: ["Visible text", "Only what the page shows"] } },
+    alertCase: { label: "Match case" },
+    alertRegex: { label: "Regular expression", note: "For example: Price: [0-9]+" },
+    alertNotify: { label: "Notification" },
+    alertMessage: { label: "Message", placeholder: "Empty = the text that was found" },
+    alertSound: { label: "Sound", options: { off: "None", chime: "Chime", bell: "Bell", ping: "Ping", alarm: "Alarm", soft: "Soft" } },
+    alertVolume: { label: "Volume" },
+    alertFocus: { label: "Bring the window to the front" },
+    alertWhileInUse: { label: "Also while you are using the app" },
+    alertCheckSeconds: { label: "Check every", note: "Paused apps are not checked." },
+    alertRepeatSeconds: { label: "Repeat while it stays, every", note: "0 = only when it appears." },
+    alertMaxCount: { label: "At most this many alerts" },
+    alertPerSeconds: { label: "Within" },
     devTools: {
       label: "Developer tools in their own window",
       note: "They open with the app. F12 toggles them."
@@ -356,11 +371,15 @@ module.exports = {
     pause: "When not in use: pause",
     permissions: "Permissions and downloads",
     identity: "Identity and language",
-    network: "Network"
+    network: "Network",
+    alertHow: "How",
+    alertWhen: "When and how often",
+    developer: "Developer"
   },
   notes: {
     windowNote: "Size at first start; after that the window remembers its own.",
     windowNote2: "For windows without a title bar. Maximized windows stay square.",
+    alertsNote: "A notification and a sound when the page contains a text you choose.",
     tabsNote: "The first tab is the app's address. Tabs share logins. Switch with Ctrl+Tab or Ctrl+1–9.",
     trayNote: "Lives in the system tray: click the icon to open it, right-click for the menu.",
     sponsorblockNote: 'What happens when a video reaches a part of that kind, and its colour on the seek bar. "Ask" shows a box with a Skip button for as long as the part plays.',
@@ -524,6 +543,8 @@ module.exports = {
       tabUrl: "Address",
       tabKeepAlive: "Never pause or unload this tab",
       tabHome: "Home tab: always first in the bar",
+      alertTest: "Try it",
+      alertTested: "That is how an alert looks and sounds.",
       tabIcon: "Icon",
       tabDisplay: "Shows",
       tabDisplayDefault: "As the tab bar settings say",
@@ -753,6 +774,7 @@ module.exports = {
   },
   manager: {
     windowTitle: "AppD-Manager",
+    alertUnsupported: "This desktop does not show notifications.",
     notAllowed: "Not allowed from here.",
     noLog: "Nothing is logged yet: the log starts the next time the app does.",
     noFile: "{file} does not exist.",
@@ -961,6 +983,7 @@ module.exports = {
     mustBeObject: '"{key}" must be an object',
     range: '"{key}" must be a number from {min} to {max}',
     badUrl: 'invalid url "{url}"',
+    alertRegex: "the alert text is not a valid regular expression ({why})",
     tooManyInstances: "this app already runs {most} times",
     noTabs: "a multi-tab app needs at least one tab",
     badTab: "tab {number} must have a name and a url (and keepAlive, if any, true or false)",
