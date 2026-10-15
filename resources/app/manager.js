@@ -344,8 +344,13 @@ const handlers = {
   launch(id) {
     startApp(id);
   },
-  testAlert({ name, body } = {}) {
+  testAlert({ id, name, body } = {}) {
     if (!Notification.isSupported()) throw new Error(t.alertUnsupported);
+    if (id) {
+      lib.checkId(id);
+      startApp(id, [`--appd-alert-test=${Buffer.from(String(body || "")).toString("base64")}`]);
+      return;
+    }
     new Notification({ title: String(name || t.windowTitle), body: String(body || ""), silent: true }).show();
   },
   openInstance(id) {

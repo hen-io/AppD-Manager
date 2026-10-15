@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard, webContents } = require("electron");
+const { app, BrowserWindow, Menu, Notification, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard, webContents } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -713,6 +713,8 @@ async function createWindow() {
     note,
     icon,
     inUse: startAlerts.inUse,
+    load: () => lib.load(id),
+    configFile: lib.configPath(id),
     pages: () => tabs ? tabs.named() : throttle.isPaused() || win.isDestroyed() ? [] : [{ page: win.webContents, name: "" }],
     show: (page) => {
       if (win.isDestroyed()) return;
@@ -753,10 +755,23 @@ async function createWindow() {
   else win.loadURL(startUrl, startUrl === cfg.url ? void 0 : { extraHeaders: "pragma: no-cache\n" });
   throttle.runLimiter();
 }
+function testNotice(argv) {
+  const arg = argv.find((value) => value.startsWith("--appd-alert-test="));
+  if (!arg) return false;
+  let body = "";
+  try {
+    body = Buffer.from(arg.slice("--appd-alert-test=".length), "base64").toString("utf8").slice(0, 200);
+  } catch {
+  }
+  if (Notification.isSupported()) new Notification({ title: cfg.name, body, icon, silent: true }).show();
+  return true;
+}
+const onlyTesting = process.argv.some((value) => value.startsWith("--appd-alert-test="));
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
+    if (testNotice(argv)) return void 0;
     if (argv.includes("--appd-action=quit")) return app.quit();
     if (!win) return;
     throttle.resumePage();
@@ -785,5 +800,6 @@ if (!app.requestSingleInstanceLock()) {
     app.on("quit", () => fs.rmSync(lib.pidFile(id), { force: true }));
   }
   Menu.setApplicationMenu(null);
-  app.whenReady().then(createWindow);
+  if (onlyTesting) app.whenReady().then(() => testNotice(process.argv) && setTimeout(() => app.quit(), 5e3));
+  else app.whenReady().then(createWindow);
 }
