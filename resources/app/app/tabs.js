@@ -45,6 +45,9 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   };
   const isShown = (tab) => Boolean(tab.pane) && tab.pane.tab === tab.index;
   const alive = (pane) => pane.window && !pane.window.isDestroyed();
+  const focusIn = (pane, contents) => {
+    if (contents && !contents.isDestroyed() && alive(pane) && pane.window.isFocused()) contents.focus();
+  };
   const focused = () => panes.find((pane) => alive(pane) && pane.window.isFocused()) ?? main;
   const pageRect = (pane) => ({
     x: inset.left,
@@ -435,7 +438,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     }
     setThrottled(tab, false);
     tab.view.setVisible(true);
-    if (focus) tab.view.webContents.focus();
+    if (focus) focusIn(pane, tab.view.webContents);
     if (pane.main && !tab.cfg.temporary) saveTab(tab.index);
     if (pane.newTab) closeNewTab(pane);
     if (autoHide && !pane.over) hideSoon(pane);
@@ -547,7 +550,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     show(main, tab);
   }
   function showNewTab(pane) {
-    if (pane.newTab) return pane.newTab.webContents.focus();
+    if (pane.newTab) return focusIn(pane, pane.newTab.webContents);
     const { paper, ink, accent, dark } = screenColours();
     const page = `<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="${dark ? "dark" : "light"}"><style>
       * { box-sizing: border-box; }
@@ -590,7 +593,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     pane.container.addChildView(view);
     if (autoHide) pane.container.addChildView(pane.bar);
     view.setBounds(pageRect(pane));
-    view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).then(() => view.webContents.focus()).catch(() => {
+    view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`).then(() => focusIn(pane, view.webContents)).catch(() => {
     });
   }
   function closeNewTab(pane) {
@@ -601,7 +604,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       view.webContents.close();
     } catch {
     }
-    tabs[pane.tab]?.view?.webContents.focus();
+    focusIn(pane, tabs[pane.tab]?.view?.webContents);
   }
   function closeWelcome(pane) {
     const view = pane.welcome;
