@@ -88,7 +88,6 @@ function styleFrame(window, cfg, iconColour, host = null) {
   const shaped = fullRadius > 0 && fullOutset === 0 && takesShape();
   const pages = /* @__PURE__ */ new Map();
   const rules = () => [
-    host && !host.inset ? "html { background-color: Canvas; }" : "",
     frame.css()
   ].join("\n").trim();
   const give = (wc) => {

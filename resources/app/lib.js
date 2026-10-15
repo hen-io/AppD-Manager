@@ -725,7 +725,7 @@ function settleTabs(cfg) {
     if (!plainObject(tab)) return tab;
     const url = typeof tab.url === "string" ? tab.url.trim() : tab.url;
     const name = typeof tab.name === "string" ? tab.name.trim() : tab.name;
-    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", display: ["both", "name", "icon"].includes(tab.display) ? tab.display : "", home: tab.home === true, keepAlive: tab.keepAlive === true };
+    return { name: name || (typeof url === "string" && URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : ""), url, icon: typeof tab.icon === "string" ? tab.icon.trim() : "", display: ["both", "name", "icon"].includes(tab.display) ? tab.display : "", home: tab.home === true, keepAlive: tab.keepAlive !== false };
   });
   const home2 = cfg.tabs.findIndex((tab) => plainObject(tab) && tab.home);
   cfg.tabs = cfg.tabs.map((tab, index) => plainObject(tab) && tab.home && index !== home2 ? { ...tab, home: false } : tab);
