@@ -514,7 +514,7 @@ async function createWindow() {
     Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });
     win.on("focus", () => {
       const shown = tabs.current();
-      if (!shown.isDestroyed()) shown.focus();
+      if (!shown.isDestroyed() && !shown.isFocused()) shown.focus();
     });
   } else if (hosted) {
     const view = new WebContentsView({ webPreferences: pagePreferences });
@@ -526,7 +526,7 @@ async function createWindow() {
       win.emit("page-title-updated", event, title, explicit);
       if (!event.defaultPrevented && !win.isDestroyed()) win.setTitle(title);
     });
-    win.on("focus", () => view.webContents.isDestroyed() || view.webContents.focus());
+    win.on("focus", () => view.webContents.isDestroyed() || view.webContents.isFocused() || view.webContents.focus());
     win.on("closed", () => {
       try {
         view.webContents.close();

@@ -67,7 +67,7 @@ function closeFind(window) {
   window.webContents.stopFindInPage("clearSelection");
   window.contentView.removeChildView(bar.view);
   bar.view.webContents.close();
-  window.webContents.focus();
+  if (window.isFocused()) window.webContents.focus();
 }
 function openFind(window) {
   const open = bars.get(window);

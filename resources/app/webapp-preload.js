@@ -1,6 +1,18 @@
 "use strict";
-const { ipcRenderer, webFrame } = require("electron");
+const { contextBridge, ipcRenderer, webFrame } = require("electron");
 const arg = (name) => (process.argv.find((one) => one.startsWith(`--appd-${name}=`)) || "").split("=")[1] || "";
+try {
+  contextBridge.executeInMainWorld({
+    func: () => {
+      const focus = window.focus;
+      window.focus = function() {
+        if (document.hasFocus() || navigator.userActivation?.isActive) return focus.call(window);
+        return void 0;
+      };
+    }
+  });
+} catch {
+}
 if (window.top === window && arg("filters") === "1") {
   const filters = ipcRenderer.sendSync("appd-page-filters", location.href);
   if (filters) {
