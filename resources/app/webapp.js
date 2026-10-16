@@ -512,7 +512,7 @@ async function createWindow() {
     });
     host = { view: tabs.container, contents: win.webContents, inset: tabs.inset, layout: tabs.layout };
     Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });
-    win.on("focus", () => {
+    win.once("focus", () => {
       const shown = tabs.current();
       if (!shown.isDestroyed() && !shown.isFocused()) shown.focus();
     });
@@ -526,7 +526,7 @@ async function createWindow() {
       win.emit("page-title-updated", event, title, explicit);
       if (!event.defaultPrevented && !win.isDestroyed()) win.setTitle(title);
     });
-    win.on("focus", () => view.webContents.isDestroyed() || view.webContents.isFocused() || view.webContents.focus());
+    win.once("focus", () => view.webContents.isDestroyed() || view.webContents.isFocused() || view.webContents.focus());
     win.on("closed", () => {
       try {
         view.webContents.close();
