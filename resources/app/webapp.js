@@ -44,6 +44,15 @@ app.setName(desktopId);
 process.env.CHROME_DESKTOP = `${desktopId}.desktop`;
 app.setDesktopName?.(`${desktopId}.desktop`);
 if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId(id));
+function nameNotices() {
+  if (lib.WINDOWS || process.platform === "darwin") return;
+  app.setName(cfg.name || desktopId);
+  try {
+    Notification.isSupported();
+  } finally {
+    app.setName(desktopId);
+  }
+}
 const instance = Math.max(1, Math.floor(Number(process.argv.find((arg) => arg.startsWith("--appd-instance="))?.slice("--appd-instance=".length)) || 1));
 const profile = lib.instanceDir(id, instance);
 app.setPath("userData", profile);
@@ -800,6 +809,7 @@ if (!app.requestSingleInstanceLock()) {
     app.on("quit", () => fs.rmSync(lib.pidFile(id), { force: true }));
   }
   Menu.setApplicationMenu(null);
+  app.whenReady().then(nameNotices);
   if (onlyTesting) app.whenReady().then(() => testNotice(process.argv) && setTimeout(() => app.quit(), 5e3));
   else app.whenReady().then(createWindow);
 }
