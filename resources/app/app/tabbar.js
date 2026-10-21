@@ -1,6 +1,6 @@
 "use strict";
 const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1, slide = 420, addLabel = "New tab" }) {
+module.exports = function barPage({ dark, hues, basic = false, position, icons, badges, names, collapse, logo, scale = 1, slide = 420, words }) {
   const vertical = position === "left";
   const bottom = position === "bottom";
   const role = (light, darker, hue = "--hue") => `oklch(${dark ? darker[0] : light[0]}% calc(${dark ? darker[1] : light[1]} * var(--vivid)) var(${hue}))`;
@@ -64,7 +64,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     button.add svg { width: 22px; height: 22px; fill: currentColor; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
   </style><body>${logo ? `<img class="logo" alt="" src="${logo}" draggable="false">` : ""}<div role="tablist" id="tabs" aria-orientation="${vertical ? "vertical" : "horizontal"}"></div><script>
-    const OPTIONS = ${json({ icons, badges, names, collapse, addLabel })};
+    const OPTIONS = ${json({ icons, badges, names, collapse })};
+    const WORDS = ${json(words)};
     const PLUS = 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z';
     const list = document.getElementById('tabs');
     const SPEAKER = 'M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4M3 9v6h4l5 5V4L7 9z';
@@ -84,6 +85,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
     document.documentElement.addEventListener('mouseleave', () => appdTabs.hover(false));
     function show(state) {
       document.documentElement.classList.toggle('peek', Boolean(state.peek));
+      const focused = document.activeElement?.dataset?.index;
       list.replaceChildren(...state.tabs.map((tab, at) => {
         const index = tab.index; // (which tab it is: the bar shows them in an order of its own)
         const display = tab.display || (OPTIONS.names ? (OPTIONS.icons ? 'both' : 'name') : 'icon');
@@ -93,7 +95,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
         const button = make('button', { type: 'button', className: [tab.state !== 'live' && tab.state !== 'loading' ? 'idle' : '', tab.state === 'loading' ? 'loading' : '', OPTIONS.collapse && tab.state === 'unloaded' ? 'small' : '', showName ? '' : 'plain'].join(' ').trim() });
         button.setAttribute('role', 'tab');
         button.setAttribute('aria-selected', String(index === state.active));
-        button.title = tab.name + (tab.state === 'paused' ? ' (paused)' : tab.state === 'unloaded' ? ' (not loaded)' : '');
+        button.dataset.index = String(index);
+        button.title = tab.state === 'paused' ? WORDS.paused.replace('{name}', tab.name) : (tab.state === 'unloaded' ? WORDS.unloaded.replace('{name}', tab.name) : tab.name);
         const letter = () => make('span', { className: 'face letter', textContent: tab.name.trim().charAt(0).toUpperCase() || '?' });
         if (!showFace) {
         } else if (tab.icon && tab.icon.kind === 'mdi') {
@@ -118,10 +121,10 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
         }
         if (showName) button.append(make('span', { className: 'name', textContent: tab.name }));
         if (OPTIONS.badges && tab.badge > 0) button.append(make('span', { className: 'badge', textContent: tab.badge > 99 ? '99+' : String(tab.badge) }));
-        if (tab.audible) button.append(icon(SPEAKER, 'Playing sound'));
-        else if (tab.state === 'paused') button.append(icon(PAUSE, 'Paused'));
+        if (tab.audible) button.append(icon(SPEAKER, WORDS.playing));
+        else if (tab.state === 'paused') button.append(icon(PAUSE, WORDS.pausedMark));
         if (tab.state !== 'unloaded') {
-          const close = make('span', { className: 'x', textContent: '×', title: 'Close tab' });
+          const close = make('span', { className: 'x', textContent: '×', title: WORDS.close });
           close.addEventListener('click', (event) => { event.stopPropagation(); appdTabs.close(index); });
           close.addEventListener('pointerdown', (event) => event.stopPropagation());
           button.append(close);
@@ -137,6 +140,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
           setTimeout(() => ripple.remove(), 520);
         });
         button.addEventListener('click', () => appdTabs.select(index));
+        button.addEventListener('mousedown', (event) => { if (event.button === 1) event.preventDefault(); });
+        button.addEventListener('auxclick', (event) => { if (event.button === 1 && tab.state !== 'unloaded') appdTabs.close(index); });
         button.addEventListener('contextmenu', (event) => { event.preventDefault(); appdTabs.menu(index); });
         button.addEventListener('keydown', (event) => {
           const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
@@ -146,8 +151,8 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
         });
         return button;
       }));
-      const add = make('button', { type: 'button', className: 'add', title: OPTIONS.addLabel });
-      add.setAttribute('aria-label', OPTIONS.addLabel);
+      const add = make('button', { type: 'button', className: 'add', title: WORDS.add });
+      add.setAttribute('aria-label', WORDS.add);
       const plus = icon(PLUS, '');
       plus.removeChild(plus.lastChild);
       add.append(plus);
@@ -155,6 +160,7 @@ module.exports = function barPage({ dark, hues, basic = false, position, icons, 
       list.append(add);
       const current = list.children[state.tabs.findIndex((tab) => tab.index === state.active)];
       current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (focused !== undefined) list.querySelector('[data-index="' + focused + '"]')?.focus();
     }
     appdTabs.onState(show);
     appdTabs.ready();

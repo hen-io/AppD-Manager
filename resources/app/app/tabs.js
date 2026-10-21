@@ -191,7 +191,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       collapse: cfg.tabCollapseUnloaded,
       scale,
       slide: SLIDE_MS,
-      addLabel: t.newTab
+      words: { ...t.bar, add: t.newTab }
     }))}`).catch(() => {
     });
   }

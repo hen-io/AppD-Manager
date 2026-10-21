@@ -17,7 +17,7 @@ module.exports = {
     type: { label: "App type" },
     name: { label: "Name", placeholder: "App name..." },
     url: { label: "Address", placeholder: "url..." },
-    description: { label: "Description", placeholder: "Shown under the name in the menu" },
+    description: { label: "Description", placeholder: "Shown under the name in the menu; empty: the address" },
     autostart: { label: "Start at login" },
     closeToTray: { label: "Keep running in the tray when closed" },
     startHidden: { label: "Start hidden in the tray" },
@@ -483,6 +483,7 @@ module.exports = {
     ago: { never: "Not used yet", now: "Used just now", minutes: "Used {n} min ago", hours: "Used {n} h ago", yesterday: "Used yesterday", days: "Used {n} days ago", months: "Used {n} months ago" },
     apps: ["app", "apps"],
     icons: ["icon", "icons"],
+    tabCount: ["tab", "tabs"],
     sidebar: {
       banner: "AppD-Manager",
       version: "Version {version}",
@@ -594,6 +595,7 @@ module.exports = {
       unit: "Unit of time",
       seconds: "seconds",
       minutes: "minutes",
+      hours: "hours",
       noKey: "None",
       holdKey: "Hold Ctrl, Alt, Shift or Super with the key.",
       seekBarColour: "Colour on the seek bar",
@@ -750,7 +752,10 @@ module.exports = {
             ["Ctrl + · − · 0", "Zoom in, out, and back to normal"],
             ["F11", "Full screen"],
             ["Ctrl+P", "Print"],
+            ["Ctrl+Shift+Delete", "Empty the cache and reload"],
+            ["F12", "Developer tools"],
             ["Ctrl+Tab · Ctrl+1…9", "Multi-tab apps: next tab, tab by number"],
+            ["Middle click", "Multi-tab apps: close a tab"],
             ["Right click", "The app's menu"]
           ]
         }
@@ -852,7 +857,11 @@ module.exports = {
   app: {
     menu: {
       reload: "Reload",
+      back: "Back",
+      forward: "Forward",
       goHome: "Go to {name}",
+      copyAddress: "Copy page address",
+      openInBrowser: "Open page in browser",
       mute: "Mute sound",
       resetZoom: "Reset zoom ({percent}%)",
       fullScreen: "Full screen",
@@ -877,7 +886,7 @@ module.exports = {
     tray: { quit: "Quit", show: "Show {name}", hide: "Hide {name}" },
     unreachable: { title: "Can't reach {host}", retrying: "Trying again…" },
     actionButton: "App menu",
-    tab: { newTab: "New tab", newTabTitle: "Open a page in a new tab", newTabNote: "The tab stays until the app is closed", address: "Web address", open: "Open", cancel: "Cancel", badAddress: "That is not a web address", choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
+    tab: { bar: { close: "Close tab", paused: "{name} (paused)", unloaded: "{name} (not loaded)", playing: "Playing sound", pausedMark: "Paused" }, newTab: "New tab", newTabTitle: "Open a page in a new tab", newTabNote: "The tab stays until the app is closed", address: "Web address", open: "Open", cancel: "Cancel", badAddress: "That is not a web address", choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
     find: { placeholder: "Find in page", count: "{at} of {of}", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
     download: { finished: "Download finished", failed: "Download failed" },
     share: { title: "Share with this page:", screen: "Screen {number}", wholeScreen: "The whole screen", window: "A window", nothing: "Nothing" },
@@ -1040,7 +1049,7 @@ module.exports = {
     otherRuntime: "Version {version} needs another runtime (Electron {needed}; this one is {have}): run the install script of that version."
   },
   library: {
-    defaultDescription: "AppD Manager application",
+    oldDescription: "AppD Manager application",
     managerComment: "Add, change and remove web apps",
     copyName: "{name} (copy)",
     chromeExtension: "Chrome extension",

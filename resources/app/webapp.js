@@ -237,7 +237,13 @@ function appMenu(wc, inTray = false) {
     { label: t.menu.reload, accelerator: "F5", click: () => because("Reload in the menu") || wc.reload() },
     ...Object.entries(lib.APP_ACTIONS).map(([action, label]) => ({ label, click: () => runAction(action, wc) })),
     sep,
+    { label: t.menu.back, accelerator: "Alt+Left", enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
+    { label: t.menu.forward, accelerator: "Alt+Right", enabled: wc.navigationHistory.canGoForward(), click: () => wc.navigationHistory.goForward() },
     { label: fill(t.menu.goHome, { name: cfg.name }), accelerator: "Alt+Home", click: () => wc.loadURL(homeUrl()) },
+    .../^https?:/i.test(wc.getURL()) ? [
+      { label: t.menu.copyAddress, click: () => clipboard.writeText(wc.getURL()) },
+      { label: t.menu.openInBrowser, click: () => openExternal(wc.getURL()) }
+    ] : [],
     sep,
     { label: t.menu.mute, type: "checkbox", checked: wc.isAudioMuted(), click: () => wc.setAudioMuted(!wc.isAudioMuted()) },
     ...cfg.allowZoom ? [
@@ -724,6 +730,22 @@ async function createWindow() {
   if (win.isDestroyed()) return;
   if (!multi) preparePage(win.webContents);
   if (throttle.wanted) throttle.watchFocus(win);
+  const bringUp = (page) => {
+    const other = page && !page.isDestroyed() ? BrowserWindow.fromWebContents(page) : null;
+    if (other && other !== win && !other.isDestroyed()) {
+      if (other.isMinimized()) other.restore();
+      other.show();
+      other.focus();
+      return;
+    }
+    if (win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    if (trayIcon?.show) trayIcon.show();
+    else win.show();
+    win.focus();
+    tabs?.showPage(page);
+  };
+  ipcMain.on("appd-notice-click", (event) => bringUp(event.sender));
   startAlerts({
     cfg,
     note,
@@ -732,14 +754,7 @@ async function createWindow() {
     load: () => lib.load(id),
     configFile: lib.configPath(id),
     pages: () => tabs ? tabs.named() : throttle.isPaused() || win.isDestroyed() ? [] : [{ page: win.webContents, name: "" }],
-    show: (page) => {
-      if (win.isDestroyed()) return;
-      if (win.isMinimized()) win.restore();
-      if (trayIcon?.show) trayIcon.show();
-      else win.show();
-      win.focus();
-      tabs?.showPage(page);
-    }
+    show: bringUp
   });
   watchForUpdate((version) => {
     if (throttle.isQuitting() || win.isDestroyed()) return;

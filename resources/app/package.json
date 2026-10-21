@@ -1,6 +1,6 @@
 {
   "name": "AppD-Manager",
-  "version": "1.0.0.BETA.4.11",
+  "version": "1.0.0.BETA.5.0",
   "description": "Easily create standalone container applications for your webapps on Linux and Windows!",
   "author": {
     "name": "hen-io",
@@ -13,10 +13,10 @@
     "postinstall": "node node_modules/electron/install.js"
   },
   "dependencies": {
-    "@ghostery/adblocker": "^2.18.2",
+    "@ghostery/adblocker": "^2.20.1",
     "@material/web": "2.5.0",
     "darkreader": "^4.9.133",
-    "electron": "latest",
+    "electron": "^45.0.0",
     "lit": "3.3.3"
   },
   "devDependencies": {

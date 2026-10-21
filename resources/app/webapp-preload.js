@@ -1,16 +1,36 @@
 "use strict";
 const { contextBridge, ipcRenderer, webFrame } = require("electron");
 const arg = (name) => (process.argv.find((one) => one.startsWith(`--appd-${name}=`)) || "").slice(`--appd-${name}=`.length);
+const NOTICE_CLICK = `appd-notice-${Math.random().toString(36).slice(2)}`;
 try {
   contextBridge.executeInMainWorld({
-    func: () => {
+    args: [NOTICE_CLICK],
+    func: (clickEvent) => {
       const focus = window.focus;
+      let clickedAt = 0;
       window.focus = function() {
-        if (document.hasFocus() || navigator.userActivation?.isActive) return focus.call(window);
+        if (document.hasFocus() || navigator.userActivation?.isActive || Date.now() - clickedAt < 2e3) return focus.call(window);
         return void 0;
       };
+      const Native = window.Notification;
+      if (typeof Native !== "function") return;
+      window.Notification = new Proxy(Native, {
+        construct(target, args, newTarget) {
+          const notice = Reflect.construct(target, args, newTarget === window.Notification ? target : newTarget);
+          notice.addEventListener("click", () => {
+            clickedAt = Date.now();
+            window.dispatchEvent(new Event(clickEvent));
+          });
+          return notice;
+        },
+        get(target, name) {
+          const value = target[name];
+          return typeof value === "function" && name !== "prototype" ? value.bind(target) : value;
+        }
+      });
     }
   });
+  window.addEventListener(NOTICE_CLICK, () => ipcRenderer.send("appd-notice-click"));
 } catch {
 }
 if (window.top === window && arg("filters") === "1") {

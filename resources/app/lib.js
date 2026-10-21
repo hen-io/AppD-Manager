@@ -207,7 +207,7 @@ const ID_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DEFAULTS = {
   name: "",
   url: "",
-  description: text.library.defaultDescription,
+  description: "",
   icon: "applications-internet",
   width: 1280,
   height: 800,
@@ -771,6 +771,7 @@ function withDefaults(file) {
   }
   if (typeof stored.reloadAfterIdleMinutes === "number" && stored.reloadAfterIdleSeconds === void 0) stored.reloadAfterIdleSeconds = stored.reloadAfterIdleMinutes * 60;
   delete stored.reloadAfterIdleMinutes;
+  if (stored.description === text.library.oldDescription) stored.description = "";
   if (Array.isArray(stored.extensions)) stored.extensions = stored.extensions.filter((name) => name in EXTENSIONS);
   for (const key of ["cpuPercent", "unfocusedCpuPercent"]) {
     if (typeof stored[key] === "number" && stored[key] <= 0) stored[key] = 100;
@@ -932,11 +933,21 @@ function freeInstance(id) {
   }
   throw new Error(fill(text.errors.tooManyInstances, { most: MAX_INSTANCES }));
 }
+function tabPictures(id, cfg) {
+  const found = {};
+  cfg.tabs.forEach((tab, index) => {
+    const file = tab.icon && !/^(https?:|data:|mdi[:-])/i.test(tab.icon) && /\.(png|svg|jpe?g|webp|gif|ico)$/i.test(tab.icon) ? path.resolve(appDir(id), tab.icon) : "";
+    if (file && path.dirname(file) === appDir(id) && fs.statSync(file, { throwIfNoEntry: false })?.isFile()) found[index] = file;
+  });
+  return found;
+}
 function duplicate(id) {
   const cfg = load(id);
   const name = fill(text.library.copyName, { name: cfg.name });
   const copy = newId(name);
-  save(copy, { ...cfg, name, icon: iconFile(id, cfg) || cfg.icon, autostart: false });
+  const pictures = tabPictures(id, cfg);
+  const tabs = cfg.tabs.map((tab, index) => pictures[index] ? { ...tab, icon: pictures[index] } : tab);
+  save(copy, { ...cfg, name, tabs, icon: iconFile(id, cfg) || cfg.icon, autostart: false });
   return copy;
 }
 function exportApps() {
@@ -946,7 +957,8 @@ function exportApps() {
       const config = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
       const icon = iconFile(id, load(id));
       const own = icon && path.dirname(icon) === appDir(id);
-      apps.push({ id, config, icon: own ? { name: path.basename(icon), data: fs.readFileSync(icon).toString("base64") } : null });
+      const tabIcons = Object.values(tabPictures(id, load(id))).map((file) => ({ name: path.basename(file), data: fs.readFileSync(file).toString("base64") }));
+      apps.push({ id, config, icon: own ? { name: path.basename(icon), data: fs.readFileSync(icon).toString("base64") } : null, ...tabIcons.length ? { tabIcons } : {} });
     } catch {
     }
   }
@@ -966,9 +978,13 @@ function importApps(data) {
       validate(cfg);
       const id = ID_RE.test(entry.id || "") && !fs.existsSync(appDir(entry.id)) ? entry.id : newId(cfg.name);
       fs.mkdirSync(appDir(id), { recursive: true });
-      if (entry.icon && /^\w[\w-]*\.(png|svg|jpe?g|webp|ico)$/i.test(entry.icon.name || "")) {
+      const picture = /^\w[\w-]*\.(png|svg|jpe?g|webp|gif|ico)$/i;
+      if (entry.icon && picture.test(entry.icon.name || "")) {
         fs.writeFileSync(path.join(appDir(id), entry.icon.name), Buffer.from(String(entry.icon.data), "base64"));
         cfg.icon = entry.icon.name;
+      }
+      for (const file of Array.isArray(entry.tabIcons) ? entry.tabIcons : []) {
+        if (picture.test(file?.name || "")) fs.writeFileSync(path.join(appDir(id), file.name), Buffer.from(String(file.data), "base64"));
       }
       save(id, cfg);
       result.added.push(cfg.name);

@@ -58,7 +58,9 @@ function main([command, id, ...rest]) {
       break;
     case "rm":
       lib.load(id);
+      if (lib.runningPid(id)) throw new Error(text.errors.closeFirst);
       lib.remove(id);
+      lib.emptyTrash(id);
       sync();
       break;
     case "version":
