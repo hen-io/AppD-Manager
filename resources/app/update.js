@@ -241,6 +241,10 @@ function finishRuntime(staged, ids = []) {
   ].join("\r\n"));
   spawn("cmd.exe", ["/c", script], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
+function installedAt() {
+  if (path.basename(path.dirname(__dirname)) !== "resources") return 0;
+  return Math.max(...[path.join(__dirname, "package.json"), path.join(installDir, "version")].map((file) => fs.statSync(file, { throwIfNoEntry: false })?.ctimeMs || 0));
+}
 function tidy() {
   fs.rmSync(`${installDir}.runtime-old`, { recursive: true, force: true });
   if (!lib.WINDOWS) fs.rmSync(`${installDir}.runtime-new`, { recursive: true, force: true });
@@ -342,4 +346,4 @@ async function install(tag) {
     fs.rmSync(stagedLauncher, { force: true });
   }
 }
-module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir, isNewer, runtimeBehind, updateRuntime, finishRuntime, tidy };
+module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir, isNewer, runtimeBehind, updateRuntime, finishRuntime, tidy, installedAt };

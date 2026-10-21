@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, nativeTheme, screen, shell } = require("electron");
+const { app, BrowserWindow, Menu, Notification, dialog, ipcMain, nativeImage, screen, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -15,7 +15,7 @@ app.setDesktopName?.(desktopFile);
 if (lib.WINDOWS) app.setAppUserModelId(lib.windowsAppId("manager"));
 app.setPath("userData", lib.managerDataDir);
 app.userAgentFallback = app.userAgentFallback.split(" ").filter((token) => !/^(Electron|appd[\w-]*)\//i.test(token)).join(" ");
-nativeTheme.themeSource = lib.appearance().mode;
+const applyLook = require("./app/darkmode").follow(() => lib.appearance().mode);
 let win;
 let pendingEdit = null;
 function editRequest(argv) {
@@ -172,11 +172,6 @@ function startApp(id, extra = []) {
   child.unref();
 }
 const restartApp = (id) => startApp(id, ["--appd-action=restart"]);
-function restartAfterRuntime() {
-  for (const id of lib.list()) {
-    if (lib.runningPid(id)) restartApp(id);
-  }
-}
 const handlers = {
   state() {
     const value = state();
@@ -244,7 +239,7 @@ const handlers = {
       ...next.palette ? { palette: String(next.palette) } : {},
       ...next.custom && typeof next.custom === "object" ? { custom: next.custom } : {}
     });
-    nativeTheme.themeSource = now.mode;
+    applyLook();
     return now;
   },
   async exportApps() {
@@ -531,19 +526,38 @@ const handlers = {
     shell.openExternal(page.startsWith(`https://github.com/${update.REPO}/`) ? page : update.releasesUrl);
   },
   async installUpdate(tag, restart = true) {
-    const { version, staged, runtime } = await update.install(tag || void 0);
+    const { version, staged } = await update.install(tag || void 0);
     stagedRuntime = staged || null;
-    if (runtime) restartAfterRuntime();
     if (restart) setTimeout(() => handlers.restartManager(), 1500);
     return version;
   },
   runtimeNeeded: () => update.runtimeBehind() || null,
+  staleApps() {
+    const since = update.installedAt();
+    const apps = [];
+    for (const id of since ? lib.list() : []) {
+      const pid = lib.runningPid(id);
+      const started = pid ? lib.startedAt(pid) : 0;
+      if (!started || started > since - 1e3) continue;
+      let name = id;
+      try {
+        name = lib.load(id).name;
+      } catch {
+      }
+      apps.push({ id, name });
+    }
+    return { since, apps };
+  },
+  restartApps(ids) {
+    for (const id of Array.isArray(ids) ? ids : []) {
+      lib.checkId(id);
+      if (lib.runningPid(id)) restartApp(id);
+    }
+  },
   async updateRuntime() {
     const version = update.runtimeBehind();
     if (!version) return null;
-    const { staged, runtime } = await update.updateRuntime();
-    stagedRuntime = staged || null;
-    if (runtime) restartAfterRuntime();
+    stagedRuntime = (await update.updateRuntime()).staged || null;
     setTimeout(() => handlers.restartManager(), 1500);
     return version;
   },

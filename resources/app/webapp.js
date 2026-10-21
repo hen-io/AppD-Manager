@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, Menu, Notification, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard, webContents } = require("electron");
+const { app, BrowserWindow, Menu, Notification, WebContentsView, dialog, globalShortcut, ipcMain, nativeTheme, powerSaveBlocker, session, clipboard } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const lib = require("./lib");
@@ -26,6 +26,7 @@ const createExtensions = require("./app/extensions");
 const createTabs = require("./app/tabs");
 const startAlerts = require("./app/alert");
 const { surfaceHex } = require("./shared/palettes");
+const darkmode = require("./app/darkmode");
 const id = process.env.APPD_ID;
 let cfg;
 const settingsText = (settings) => JSON.stringify({ ...settings, autostart: void 0 });
@@ -457,8 +458,11 @@ let paper = "";
 async function createWindow() {
   const state = readState();
   const look = lib.appearance();
-  nativeTheme.themeSource = cfg.colorScheme !== "system" ? cfg.colorScheme : look.mode;
-  const dark = nativeTheme.shouldUseDarkColors || extension("darkreader");
+  const isDark = () => nativeTheme.shouldUseDarkColors || extension("darkreader");
+  darkmode.follow(() => cfg.colorScheme !== "system" ? cfg.colorScheme : lib.appearance().mode, () => {
+    paper = surfaceHex(look.palette, look.custom, isDark());
+  });
+  const dark = isDark();
   paper = surfaceHex(look.palette, look.custom, dark);
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   const bare = isBare(cfg);
@@ -758,22 +762,7 @@ async function createWindow() {
     pages: () => tabs ? tabs.named() : throttle.isPaused() || win.isDestroyed() ? [] : [{ page: win.webContents, name: "" }],
     show: bringUp
   });
-  watchForUpdate((version) => {
-    if (throttle.isQuitting() || win.isDestroyed()) return;
-    if (!lib.prefs().restartAppsOnUpdate) return note(`AppD-Manager was updated to ${version}; the app goes on with the version it started with until it is closed`);
-    note(`AppD-Manager was updated to ${version}: restarting once the app is not in use`);
-    const IDLE_MS = 6e4;
-    let idleSince = Date.now();
-    const check = setInterval(() => {
-      if (win.isDestroyed()) return clearInterval(check);
-      const busy = BrowserWindow.getFocusedWindow() || webContents.getAllWebContents().some((page) => !page.isDestroyed() && page.isCurrentlyAudible());
-      if (busy) idleSince = Date.now();
-      else if (Date.now() - idleSince >= IDLE_MS) {
-        clearInterval(check);
-        restartApp(win.webContents, `AppD-Manager was updated to ${version}`);
-      }
-    }, 5e3);
-  });
+  watchForUpdate((version) => note(`AppD-Manager was updated to ${version}; the app goes on with the version it started with until it is restarted`));
   win.on("close", () => {
     if (lib.isTray(cfg) || win.isDestroyed()) return;
     const { width, height } = win.getNormalBounds();

@@ -51,7 +51,9 @@ for (const name of [
   "installUpdate",
   "runtimeNeeded",
   "updateRuntime",
-  "restartManager"
+  "restartManager",
+  "staleApps",
+  "restartApps"
 ]) {
   api[name] = (...args) => ipcRenderer.invoke(name, ...args);
 }

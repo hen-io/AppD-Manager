@@ -125,6 +125,7 @@ module.exports = {
     trayPosition: {
       label: "Position",
       options: {
+        tray: ["Over the tray icon", "Like the tray's own menus: right by the icon that was clicked, beside the panel and never over it"],
         "bottom-right": ["Bottom right", "Where the tray usually is"],
         "bottom-center": "Bottom centre",
         "bottom-left": "Bottom left",
@@ -403,8 +404,8 @@ module.exports = {
       note: "A new version is installed without asking, and AppD-Manager restarts with it once it is not in use. Off: you are asked first."
     },
     restartAppsOnUpdate: {
-      label: "Restart running apps when AppD-Manager is updated",
-      note: "Each app restarts once it has not been used for a minute, on the page it was on. Off: it keeps the old version until you close it."
+      label: "Offer to restart running apps after an update",
+      note: "AppD-Manager asks once, when it starts after an update; each app restarts on the page it was on. Apps never restart by themselves: until then, or with this off, an app keeps the old version until you close it."
     },
     updateChannel: {
       label: "Release branch",
@@ -775,6 +776,14 @@ module.exports = {
       downloading: "Downloading…",
       updated: "Updated to {version}. Restarting…",
       updatedLater: "Updated to {version}. AppD-Manager restarts with it as soon as it is not in use.",
+      restartApps: {
+        message: ['Restart "{name}" with the new version?', "Restart the {count} running apps with the new version?"],
+        detail: [
+          "AppD-Manager was updated. {names} still runs the old version, and keeps it until it restarts; it comes back on the page it was on.",
+          "AppD-Manager was updated. {names} still run the old version, and keep it until they restart; each comes back on the page it was on."
+        ],
+        buttons: [["Restart it", "Restart them"], "Later"]
+      },
       installed: "Version {version} is installed. Restarting…",
       runtime: "Updating the runtime to Electron {version}…",
       runtimeDone: "The runtime is now Electron {version}. Restarting…",

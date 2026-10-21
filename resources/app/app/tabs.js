@@ -3,6 +3,7 @@ const { View, WebContentsView, app, ipcMain, clipboard, nativeTheme, net } = req
 const fs = require("fs");
 const path = require("path");
 const barPage = require("./tabbar");
+const { desktopIsDark } = require("./darkmode");
 const { unreadIn } = require("./badge");
 const { paletteVars } = require("../shared/palettes");
 const { text } = require("../shared/text");
@@ -176,7 +177,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
   const manager = lib.appearance();
   const look = { ...manager, mode: managed ? manager.mode : cfg.tabTheme };
   const hues = paletteVars(look.palette, look.custom);
-  const isDark = () => look.mode === "dark" || look.mode === "system" && nativeTheme.shouldUseDarkColors;
+  const isDark = () => look.mode === "dark" || look.mode === "system" && (desktopIsDark() ?? nativeTheme.shouldUseDarkColors);
   function loadBar(pane) {
     pane.ready = false;
     pane.bar.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(barPage({

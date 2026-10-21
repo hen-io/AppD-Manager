@@ -230,7 +230,7 @@ const DEFAULTS = {
   trayWidth: 420,
   trayHeight: 640,
   trayAtIcon: true,
-  trayPosition: "bottom-right",
+  trayPosition: "tray",
   trayMargin: 8,
   trayScreen: 0,
   trayX: 100,
@@ -516,7 +516,7 @@ const RULES = {
   defaultZoom: { min: 25, max: 500 },
   trayWidth: { min: 200, max: 2400 },
   trayHeight: { min: 150, max: 2e3 },
-  trayPosition: { oneOf: ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center", "custom"] },
+  trayPosition: { oneOf: ["tray", "bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center", "custom"] },
   trayScreen: { min: 0, max: 16 },
   trayX: { min: 0, max: 100 },
   trayY: { min: 0, max: 100 },
@@ -1043,6 +1043,16 @@ function resourceUse() {
   }
   return use;
 }
+function startedAt(pid) {
+  if (WINDOWS) return 0;
+  try {
+    const bootTime = Date.now() - Number(fs.readFileSync("/proc/uptime", "utf8").split(" ")[0]) * 1e3;
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    return bootTime + Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]) * 10;
+  } catch {
+    return 0;
+  }
+}
 function close(id) {
   const pid = runningPid(id);
   if (pid && WINDOWS) {
@@ -1333,6 +1343,7 @@ module.exports = {
   remove,
   list,
   runningPid,
+  startedAt,
   close,
   iconFile,
   writeDesktop,
