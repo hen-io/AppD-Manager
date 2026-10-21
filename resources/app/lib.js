@@ -358,6 +358,19 @@ const EXTENSION_KEYS = {
 const MODES = text.modes;
 const DEFAULT_PALETTE = "ocean";
 const PALETTES = text.palettes;
+function writeAtomic(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const part = `${file}.${process.pid}.part`;
+  try {
+    fs.writeFileSync(part, data);
+    fs.renameSync(part, file);
+  } catch (e) {
+    fs.rmSync(part, { force: true });
+    throw e;
+  }
+}
+const writeJson = (file, value) => writeAtomic(file, JSON.stringify(value, null, 2) + "\n");
+const writeSettings = (settings) => writeJson(settingsPath, settings);
 function readSettings() {
   try {
     return JSON.parse(fs.readFileSync(settingsPath, "utf8"));
@@ -399,8 +412,7 @@ function setPrefs(next) {
   if (!UPDATE_CHANNELS.includes(now.updateChannel)) throw new Error(fill(text.errors.oneOf, { key: "updateChannel", values: UPDATE_CHANNELS.join(", ") }));
   const settings = readSettings();
   settings.manager = now;
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
   return now;
 }
 const DEFAULT_CUSTOM = { primary: "#2f6bff", accent: "#00b8b0", secondary: "#1f9bd6", surface: "#3f6fc4", vivid: 150 };
@@ -426,8 +438,7 @@ function setAppearance(next) {
   const now = appearance();
   settings.appearance = { ...now, ...next, custom: { ...now.custom, ...next.custom } };
   if (!(settings.appearance.mode in MODES) || !(settings.appearance.palette in PALETTES) || !customLooks(settings.appearance.custom)) throw new Error(text.errors.unknownLook);
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
   return appearance();
 }
 function appsDir() {
@@ -464,8 +475,7 @@ function setAppsDir(dir) {
   const settings = readSettings();
   if (dir) settings.appsDir = dir;
   else delete settings.appsDir;
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
 }
 const appDir = (id) => path.join(appsDir(), id);
 const usedMark = (id) => path.join(appDir(id), "last-used");
@@ -620,8 +630,7 @@ function setExtensionDefaults(values) {
   validate({ ...DEFAULTS, url: "https://example.com", ...picked });
   const settings = readSettings();
   settings.extensionSettings = picked;
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
 }
 const ALL_EXTENSION_KEYS = Object.values(EXTENSION_KEYS).flat();
 const plainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -659,14 +668,13 @@ function addStoreExtension(id) {
   if (!STORE_ID.test(id)) throw new Error(fill(text.errors.notExtensionId, { id }));
   const settings = readSettings();
   settings.storeExtensions = { ...settings.storeExtensions, [id]: { added: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) } };
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
 }
 function removeStoreExtension(id) {
   if (!STORE_ID.test(id)) throw new Error(fill(text.errors.notExtensionId, { id }));
   const settings = readSettings();
   if (settings.storeExtensions) delete settings.storeExtensions[id];
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  writeSettings(settings);
   if (!Object.values(STORE_EXTENSIONS).includes(id)) fs.rmSync(path.join(storeDir, id), { recursive: true, force: true });
   dropFromApps(`store:${id}`);
 }
@@ -676,7 +684,7 @@ function dropFromApps(entry) {
       const stored = JSON.parse(fs.readFileSync(configPath(id), "utf8"));
       if (!Array.isArray(stored.customExtensions) || !stored.customExtensions.includes(entry)) continue;
       stored.customExtensions = stored.customExtensions.filter((other) => other !== entry);
-      fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
+      writeJson(configPath(id), stored);
     } catch {
     }
   }
@@ -848,7 +856,7 @@ function save(id, cfg) {
   const stored = { ...cfg };
   for (const key of ALL_EXTENSION_KEYS) delete stored[key];
   Object.assign(stored, differing(cfg, extensionDefaults()));
-  fs.writeFileSync(configPath(id), JSON.stringify(stored, null, 2) + "\n");
+  writeJson(configPath(id), stored);
   setAutostart(id, cfg);
 }
 const trashDir = path.join(root, "Trash");
@@ -958,7 +966,7 @@ function importApps(data) {
       validate(cfg);
       const id = ID_RE.test(entry.id || "") && !fs.existsSync(appDir(entry.id)) ? entry.id : newId(cfg.name);
       fs.mkdirSync(appDir(id), { recursive: true });
-      if (entry.icon && /^[\w.-]+$/.test(entry.icon.name || "")) {
+      if (entry.icon && /^\w[\w-]*\.(png|svg|jpe?g|webp|ico)$/i.test(entry.icon.name || "")) {
         fs.writeFileSync(path.join(appDir(id), entry.icon.name), Buffer.from(String(entry.icon.data), "base64"));
         cfg.icon = entry.icon.name;
       }
@@ -1311,5 +1319,6 @@ module.exports = {
   close,
   iconFile,
   writeDesktop,
-  sync
+  sync,
+  writeAtomic
 };

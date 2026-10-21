@@ -27,8 +27,6 @@ pendingEdit = editRequest(process.argv);
 const CORES = Math.max(1, require("os").availableParallelism?.() || require("os").cpus().length);
 let lastUse = { at: 0, apps: {} };
 const UNDO_MS = 12e3;
-lib.emptyTrash();
-update.purgeBackups();
 let disk = { at: 0, value: null, pending: null };
 let unsaved = false;
 let leaving = false;
@@ -222,6 +220,7 @@ const handlers = {
     if (lib.close(id)) {
       for (let tries = 0; tries < 30 && lib.runningPid(id); tries++) await new Promise((done) => setTimeout(done, 100));
     }
+    if (lib.runningPid(id)) throw new Error(text.errors.closeFirst);
     const undo = lib.remove(id);
     lib.sync();
     if (undo) setTimeout(() => lib.emptyTrash(id), UNDO_MS + 3e3);
@@ -611,6 +610,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("window-all-closed", () => app.quit());
   Menu.setApplicationMenu(null);
+  lib.emptyTrash();
+  update.purgeBackups();
   app.whenReady().then(async () => {
     try {
       lib.sync();

@@ -5,7 +5,7 @@ const path = require("path");
 const lib = require("./lib");
 const extras = require("./extras");
 const setUpPermissions = require("./app/permissions");
-const showUnreadCount = require("./app/badge");
+const { showUnreadCount } = require("./app/badge");
 const keepInTray = require("./app/tray");
 const makeTrayApp = require("./app/trayapp");
 const { frameOptions, styleFrame, isBare, hasLook, needsHost, wantsIconColour, outsetOf } = require("./app/frame");
@@ -229,7 +229,7 @@ function popUp(items, wc) {
   });
 }
 let trayIcon = null;
-const zoom = createZoom(cfg);
+const zoom = createZoom(cfg, () => [...BrowserWindow.getAllWindows().map((window) => window.webContents), ...tabs ? tabs.all() : []]);
 function appMenu(wc, inTray = false) {
   const window = BrowserWindow.fromWebContents(wc);
   const sep = { type: "separator" };
@@ -428,7 +428,8 @@ function readState() {
   }
 }
 const throttle = createThrottle(cfg, { note, because, pages: () => tabs?.pages() ?? [] });
-const homeButtonScript = `(() => {
+const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const homeButtonScript = (target) => `(() => {
   if (document.getElementById('appd-home-button')) return;
   const host = document.createElement('div');
   host.id = 'appd-home-button';
@@ -441,7 +442,7 @@ const homeButtonScript = `(() => {
     + 'box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;opacity:.7';
   button.addEventListener('mouseenter', () => { button.style.opacity = '1'; });
   button.addEventListener('mouseleave', () => { button.style.opacity = '.7'; });
-  button.addEventListener('click', () => { location.href = ${JSON.stringify(cfg.url)}; });
+  button.addEventListener('click', () => { location.href = ${JSON.stringify(target)}; });
   host.attachShadow({ mode: 'closed' }).append(button);
   document.documentElement.append(host);
 })()`;
@@ -473,7 +474,7 @@ async function createWindow() {
     spellcheck: cfg.spellcheck,
     v8CacheOptions: "bypassHeatCheck",
     preload: path.join(__dirname, "webapp-preload.js"),
-    additionalArguments: [`--appd-button=${cfg.actionButton}`, `--appd-filters=${extension("adblock") || extension("twitch") ? 1 : 0}`]
+    additionalArguments: [`--appd-button=${cfg.actionButton}`, `--appd-button-title=${encodeURIComponent(t.actionButton)}`, `--appd-filters=${extension("adblock") || extension("twitch") ? 1 : 0}`]
   };
   if (cfg.language) {
     const wanted = [.../* @__PURE__ */ new Set([cfg.language, cfg.language.split("-")[0], "en"])].join(",");
@@ -517,7 +518,13 @@ async function createWindow() {
       },
       throttle,
       menu: popUp,
-      openExternal
+      openExternal,
+      onUnread: cfg.unreadBadge ? (count) => {
+        try {
+          app.setBadgeCount(count);
+        } catch {
+        }
+      } : null
     });
     host = { view: tabs.container, contents: win.webContents, inset: tabs.inset, layout: tabs.layout };
     Object.defineProperty(win, "webContents", { get: () => tabs.current(), configurable: true, enumerable: true });
@@ -593,18 +600,18 @@ async function createWindow() {
       note(`could not load ${plain(url)}: ${description} (${code}); trying again in 5 seconds`);
       because("another try after it could not be loaded");
       const target = JSON.stringify(url).replace(/</g, "\\u003c");
+      const host2 = URL.canParse(url) ? new URL(url).host : url;
       wc.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(
         `<meta name="color-scheme" content="light dark">
          <body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;text-align:center">
-         <p><b>Can't reach <span id="u"></span></b><br>${description}<br><br>Retrying…</p>
-         <script>u.textContent = new URL(${target}).host;
-         setTimeout(() => location.replace(${target}), 5000)<\/script>`
+         <p><b>${escapeHtml(fill(t.unreachable.title, { host: host2 }))}</b><br>${escapeHtml(description)}<br><br>${escapeHtml(t.unreachable.retrying)}</p>
+         <script>setTimeout(() => location.replace(${target}), 5000)<\/script>`
       ));
     });
     if (cfg.homeButton) {
       wc.on("dom-ready", () => {
         const url = wc.getURL();
-        if (/^https?:/i.test(url) && !isInternal(url)) wc.executeJavaScript(homeButtonScript).catch(() => {
+        if (/^https?:/i.test(url) && !isInternal(url)) wc.executeJavaScript(homeButtonScript(tabs?.homeOf(wc) ?? cfg.url)).catch(() => {
         });
       });
     }
@@ -617,7 +624,7 @@ async function createWindow() {
     if (extension("darkreader")) extras.enableDarkMode(wc, { brightness: cfg.darkBrightness, contrast: cfg.darkContrast, sepia: cfg.darkSepia });
   }
   if (!multi) watchPage(win.webContents);
-  if (cfg.unreadBadge) showUnreadCount(win, app);
+  if (cfg.unreadBadge && !multi) showUnreadCount(win, app);
   showDownloads(session.defaultSession, win, { name: cfg.name, note, folder: cfg.downloadFolder });
   shareScreens(session.defaultSession, {
     note,
@@ -776,11 +783,16 @@ function testNotice(argv) {
   return true;
 }
 const onlyTesting = process.argv.some((value) => value.startsWith("--appd-alert-test="));
+let startAfterTest = null;
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", (_event, argv) => {
     if (testNotice(argv)) return void 0;
+    if (onlyTesting) {
+      startAfterTest = argv;
+      return void 0;
+    }
     if (argv.includes("--appd-action=quit")) return app.quit();
     if (!win) return;
     throttle.resumePage();
@@ -810,6 +822,8 @@ if (!app.requestSingleInstanceLock()) {
   }
   Menu.setApplicationMenu(null);
   app.whenReady().then(nameNotices);
-  if (onlyTesting) app.whenReady().then(() => testNotice(process.argv) && setTimeout(() => app.quit(), 5e3));
-  else app.whenReady().then(createWindow);
+  if (onlyTesting) {
+    app.whenReady().then(() => testNotice(process.argv) && setTimeout(() => app.quit(), 5e3));
+    app.on("will-quit", () => startAfterTest && app.relaunch({ execPath: startAfterTest[0], args: startAfterTest.slice(1) }));
+  } else app.whenReady().then(createWindow);
 }

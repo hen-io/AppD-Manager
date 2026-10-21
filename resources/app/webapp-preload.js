@@ -1,6 +1,6 @@
 "use strict";
 const { contextBridge, ipcRenderer, webFrame } = require("electron");
-const arg = (name) => (process.argv.find((one) => one.startsWith(`--appd-${name}=`)) || "").split("=")[1] || "";
+const arg = (name) => (process.argv.find((one) => one.startsWith(`--appd-${name}=`)) || "").slice(`--appd-${name}=`.length);
 try {
   contextBridge.executeInMainWorld({
     func: () => {
@@ -43,7 +43,7 @@ function addButton(corner2) {
   host.style.cssText = `all:initial;position:fixed;${CORNERS[corner2]};z-index:2147483647`;
   const button = document.createElement("button");
   button.textContent = "⋯";
-  button.title = "App menu";
+  button.title = decodeURIComponent(arg("button-title")) || "App menu";
   button.style.cssText = "all:initial;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font:700 20px/1 system-ui,sans-serif;background:rgba(35,38,41,.9);color:#fff;border:1px solid rgba(255,255,255,.3);box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;opacity:.45";
   button.addEventListener("mouseenter", () => {
     button.style.opacity = "1";

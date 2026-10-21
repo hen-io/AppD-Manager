@@ -1,6 +1,6 @@
 "use strict";
 const { Menu, Tray, nativeImage } = require("electron");
-const { text } = require("../shared/text");
+const { text, fill } = require("../shared/text");
 module.exports = function keepInTray(window, { name, icon, isQuitting, quit, note, menu = () => [], show }) {
   let tray;
   try {
@@ -26,7 +26,7 @@ module.exports = function keepInTray(window, { name, icon, isQuitting, quit, not
     const seen = window.isVisible() && !window.isMinimized();
     const own = menu();
     tray.setContextMenu(Menu.buildFromTemplate([
-      { label: seen ? `Hide ${name}` : `Show ${name}`, click: () => toggle() },
+      { label: fill(seen ? text.app.tray.hide : text.app.tray.show, { name }), click: () => toggle() },
       ...own.length ? [{ type: "separator" }, ...own] : [],
       { type: "separator" },
       { label: text.app.tray.quit, click: quit }

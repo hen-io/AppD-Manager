@@ -159,14 +159,19 @@ async function fetchInto(id, folder, withKey) {
   }
   if (!res.ok) throw new Error(fill(text.errors.storeAnswered, { status: res.status }));
   const { archive, key } = opened(Buffer.from(await res.arrayBuffer()), id);
-  const fresh = `${folder}.new`;
+  const fresh = `${folder}.new-${process.pid}`;
   fs.rmSync(fresh, { recursive: true, force: true });
   fs.mkdirSync(fresh, { recursive: true });
   unzip(archive, fresh);
   if (!fs.existsSync(path.join(fresh, "manifest.json"))) throw new Error(text.errors.noManifest);
   makeAtHome(fresh, withKey ? key : null);
   fs.rmSync(folder, { recursive: true, force: true });
-  fs.renameSync(fresh, folder);
+  try {
+    fs.renameSync(fresh, folder);
+  } catch (e) {
+    fs.rmSync(fresh, { recursive: true, force: true });
+    if (!fs.existsSync(path.join(folder, "manifest.json"))) throw e;
+  }
 }
 module.exports = async function storeExtension(id, root, note = () => {
 }) {

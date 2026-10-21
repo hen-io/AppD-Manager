@@ -31,15 +31,15 @@ function main([command, id, ...rest]) {
     case "add": {
       const [url, ...pairs] = rest;
       lib.checkId(id);
-      if (!url) throw new Error("missing url");
-      if (fs.existsSync(lib.appDir(id))) throw new Error(`app "${id}" already exists`);
+      if (!url) throw new Error(text.cli.noUrl);
+      if (fs.existsSync(lib.appDir(id))) throw new Error(fill(text.cli.exists, { id }));
       lib.save(id, applySettings({ ...lib.fresh(), name: id, url }, pairs));
       sync();
       console.log(fill(text.cli.created, { file: lib.configPath(id) }));
       break;
     }
     case "set":
-      if (!rest.length) throw new Error("nothing to set");
+      if (!rest.length) throw new Error(text.cli.nothingToSet);
       lib.save(id, applySettings(lib.load(id), rest));
       sync();
       break;

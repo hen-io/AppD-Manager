@@ -1,9 +1,10 @@
 "use strict";
-module.exports = function showUnreadCount(window, app) {
+const UNREAD = /[([](\d{1,5})\+?[)\]]/;
+const unreadIn = (title) => Number(UNREAD.exec(title)?.[1] || 0);
+function showUnreadCount(window, app) {
   let shown = 0;
   window.on("page-title-updated", (_event, title) => {
-    const found = /[([](\d{1,5})\+?[)\]]/.exec(title);
-    const count = found ? Number(found[1]) : 0;
+    const count = unreadIn(title);
     if (count === shown) return;
     shown = count;
     try {
@@ -11,4 +12,5 @@ module.exports = function showUnreadCount(window, app) {
     } catch {
     }
   });
-};
+}
+module.exports = { showUnreadCount, unreadIn };

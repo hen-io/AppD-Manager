@@ -3,16 +3,16 @@ const { View, WebContentsView, app, ipcMain, clipboard, nativeTheme, net } = req
 const fs = require("fs");
 const path = require("path");
 const barPage = require("./tabbar");
+const { unreadIn } = require("./badge");
 const { paletteVars } = require("../shared/palettes");
 const { text } = require("../shared/text");
 const t = text.app.tab;
 const BAR = { top: 48, bottom: 48, left: 208, leftSmall: 64 };
-const UNREAD = /[([](\d{1,5})\+?[)\]]/;
 const RETRY_MS = 15e3;
 const PICTURES = { ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon" };
 const HANDLE = 8;
 const SLIDE_MS = 420;
-module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal }) {
+module.exports = function createTabs({ win, cfg, lib, pagePreferences, background, note, startTab = 0, saveTab, onPage, throttle, menu, openExternal, onUnread = null }) {
   const mode = process.platform !== "win32" || cfg.tabInactive !== "pause" ? cfg.tabInactive : "throttle";
   const tabs = cfg.tabs.map((one, index) => ({
     index,
@@ -102,10 +102,14 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     ...live().filter((tab) => !tab.cfg.home && !tab.view)
   ];
   let pushTimer = null;
+  let unread = 0;
   function push() {
     if (pushTimer) return;
     pushTimer = setTimeout(() => {
       pushTimer = null;
+      const total = live().reduce((sum, tab) => sum + (tab.view ? tab.badge : 0), 0);
+      if (onUnread && total !== unread) onUnread(total);
+      unread = total;
       const list = shown().map((tab) => ({
         index: tab.index,
         name: tab.cfg.temporary ? tab.title || tab.cfg.name : tab.cfg.name,
@@ -287,8 +291,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
     const contents = tab.view.webContents;
     contents.on("page-title-updated", (event, value, explicit) => {
       tab.title = value;
-      const found = UNREAD.exec(value);
-      tab.badge = found ? Number(found[1]) : 0;
+      tab.badge = unreadIn(value);
       push();
       title(tab, event, explicit);
     });
@@ -317,6 +320,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       }
       tab.view = null;
       tab.pane = null;
+      tab.badge = 0;
       tab.audible = false;
       tab.loading = false;
       push();
@@ -481,8 +485,9 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       return;
     }
     const found = live().find((tab) => URL.canParse(tab.cfg.url) && new URL(tab.cfg.url).hostname === host) ?? tabs[Math.max(0, focused().tab)];
+    const made = !found.view && ensure(found, main, url);
     select(found.index);
-    found.view?.webContents.loadURL(url).catch(() => {
+    if (!made) found.view?.webContents.loadURL(url).catch(() => {
     });
   }
   function start({ url } = {}) {
@@ -625,11 +630,11 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       finished = true;
       done();
     };
-    const live2 = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
+    const open2 = tabs.filter((tab) => tab.view && !tab.view.webContents.isDestroyed());
     for (const tab of tabs) resume(tab);
-    if (!live2.length) return setImmediate(end);
-    let left = live2.length;
-    for (const tab of live2) {
+    if (!open2.length) return setImmediate(end);
+    let left = open2.length;
+    for (const tab of open2) {
       tab.view.webContents.once("destroyed", () => {
         if (--left === 0) end();
       });
@@ -659,6 +664,7 @@ module.exports = function createTabs({ win, cfg, lib, pagePreferences, backgroun
       if (tab) select(tab.index);
     },
     homeUrl: () => (tabs[focused().tab] ?? tabs[0]).cfg.url,
+    homeOf: (page) => tabs.find((tab) => tab.view?.webContents === page)?.cfg.url ?? null,
     hosts: () => live().map((tab) => URL.canParse(tab.cfg.url) ? new URL(tab.cfg.url).hostname : "").filter(Boolean),
     pages: () => tabs.filter((tab) => tab.view && !tab.paused).map((tab) => tab.view.webContents),
     all: () => tabs.filter((tab) => tab.view).map((tab) => tab.view.webContents),

@@ -874,9 +874,11 @@ module.exports = {
     confirmClose: { message: "Are you sure?", buttons: ["Close", "Keep open"] },
     leave: { message: "Leave this page?", detail: "It may have unsaved changes.", buttons: ["Leave", "Stay"] },
     homeButton: { label: "← {name}", tip: "Back to {name} (Alt+Home)" },
-    tray: { quit: "Quit" },
+    tray: { quit: "Quit", show: "Show {name}", hide: "Hide {name}" },
+    unreachable: { title: "Can't reach {host}", retrying: "Trying again…" },
+    actionButton: "App menu",
     tab: { newTab: "New tab", newTabTitle: "Open a page in a new tab", newTabNote: "The tab stays until the app is closed", address: "Web address", open: "Open", cancel: "Cancel", badAddress: "That is not a web address", choose: "Select a tab to begin", close: "Close tab (frees its memory)", reload: "Reload tab", load: "Load tab", unload: "Unload tab (frees its memory)", pause: "Pause tab", resume: "Resume tab", copy: "Copy address", browser: "Open in the browser", next: "Next tab", previous: "Previous tab" },
-    find: { placeholder: "Find in page", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
+    find: { placeholder: "Find in page", count: "{at} of {of}", previous: "Previous (Shift+Enter)", next: "Next (Enter)", close: "Close (Escape)" },
     download: { finished: "Download finished", failed: "Download failed" },
     share: { title: "Share with this page:", screen: "Screen {number}", wholeScreen: "The whole screen", window: "A window", nothing: "Nothing" },
     extensions: {
@@ -1123,6 +1125,9 @@ module.exports = {
     created: "Created {file}",
     unknownSetting: 'unknown setting "{pair}"',
     needsJson: '"{key}" needs a JSON value, got "{value}"',
-    broken: "(broken: {why})"
+    broken: "(broken: {why})",
+    noUrl: "missing url",
+    nothingToSet: "nothing to set",
+    exists: 'app "{id}" already exists'
   }
 };

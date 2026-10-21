@@ -1,10 +1,10 @@
 "use strict";
 const { BrowserWindow } = require("electron");
-module.exports = function createZoom(cfg) {
+module.exports = function createZoom(cfg, pages = () => BrowserWindow.getAllWindows().map((window) => window.webContents)) {
   const normal = Math.min(5, Math.max(0.25, cfg.defaultZoom / 100));
   let byHand = null;
   const apply = (wc) => wc.setZoomFactor(byHand ?? normal);
-  const everyPage = (run) => BrowserWindow.getAllWindows().forEach((window) => run(window.webContents));
+  const everyPage = (run) => new Set(pages()).forEach((wc) => wc.isDestroyed() || run(wc));
   function zoomBy(wc, step) {
     if (!cfg.allowZoom) return;
     wc.setZoomLevel(Math.min(8, Math.max(-7, wc.getZoomLevel() + step * 0.5)));

@@ -110,6 +110,7 @@ function styleFrame(window, cfg, iconColour, host = null) {
   const follow = (wc) => {
     if (pages.has(wc)) return;
     pages.set(wc, []);
+    wc.once("destroyed", () => pages.delete(wc));
     let given = false;
     wc.on("did-navigate", () => {
       pages.set(wc, []);

@@ -45,7 +45,7 @@ function page(dark) {
     document.getElementById('down').addEventListener('click', () => look(true, true));
     document.getElementById('close').addEventListener('click', () => appdFind.close());
     appdFind.onCount((at, of) => {
-      count.textContent = text.value ? at + ' of ' + of : '';
+      count.textContent = text.value ? ${JSON.stringify(t.count)}.replace('{at}', at).replace('{of}', of) : '';
       count.classList.toggle('none', Boolean(text.value) && !of);
     });
     window.takeFocus = () => { text.focus(); text.select(); };
@@ -57,14 +57,27 @@ function place(window, view) {
   const wide = Math.min(WIDTH, Math.max(160, area.width - 2 * MARGIN));
   view.setBounds({ x: area.x + Math.max(MARGIN, area.width - wide - MARGIN), y: area.y + MARGIN, width: wide, height: HEIGHT });
 }
+function pageOf(window, bar) {
+  const now = window.webContents;
+  if (bar.page === now) return now;
+  if (bar.page && !bar.page.isDestroyed()) {
+    bar.page.removeListener("found-in-page", bar.found);
+    bar.page.stopFindInPage("clearSelection");
+  }
+  bar.page = now;
+  now.on("found-in-page", bar.found);
+  return now;
+}
 function closeFind(window) {
   const bar = bars.get(window);
   if (!bar) return;
   bars.delete(window);
   window.removeListener("resize", bar.fit);
+  if (bar.page && !bar.page.isDestroyed()) {
+    bar.page.removeListener("found-in-page", bar.found);
+    bar.page.stopFindInPage("clearSelection");
+  }
   if (window.isDestroyed()) return;
-  window.webContents.removeListener("found-in-page", bar.found);
-  window.webContents.stopFindInPage("clearSelection");
   window.contentView.removeChildView(bar.view);
   bar.view.webContents.close();
   if (window.isFocused()) window.webContents.focus();
@@ -85,6 +98,7 @@ function openFind(window) {
   view.setBorderRadius?.(14);
   const bar = {
     view,
+    page: null,
     fit: () => place(window, view),
     found: (_event, result) => {
       if (result.finalUpdate && !view.webContents.isDestroyed()) view.webContents.send("appd-find-count", result.activeMatchOrdinal, result.matches);
@@ -94,7 +108,7 @@ function openFind(window) {
   window.contentView.addChildView(view);
   bar.fit();
   window.on("resize", bar.fit);
-  window.webContents.on("found-in-page", bar.found);
+  pageOf(window, bar);
   view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page(nativeTheme.shouldUseDarkColors))}`).then(() => view.webContents.focus()).catch(() => {
   });
 }
@@ -111,11 +125,14 @@ ipcMain.on("appd-find", (event, text2, forward, next) => {
   const window = windowOf(event.sender);
   if (!window) return;
   const wanted = String(text2 ?? "");
+  const bar = bars.get(window);
+  const before = bar.page;
+  const page2 = pageOf(window, bar);
   if (!wanted) {
-    window.webContents.stopFindInPage("clearSelection");
+    page2.stopFindInPage("clearSelection");
     event.sender.send("appd-find-count", 0, 0);
   } else {
-    window.webContents.findInPage(wanted, { forward: Boolean(forward), findNext: !next });
+    page2.findInPage(wanted, { forward: Boolean(forward), findNext: !next || page2 !== before });
   }
 });
 ipcMain.on("appd-find-close", (event) => {
