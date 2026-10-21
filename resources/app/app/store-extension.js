@@ -204,3 +204,4 @@ module.exports.adoptRefreshed = function adoptRefreshed(id, root) {
   fs.renameSync(later, folder);
 };
 module.exports.archiveOf = archiveOf;
+module.exports.unzip = unzip;

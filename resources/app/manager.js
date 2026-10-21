@@ -30,6 +30,7 @@ const UNDO_MS = 12e3;
 let disk = { at: 0, value: null, pending: null };
 let unsaved = false;
 let leaving = false;
+let stagedRuntime = null;
 async function mayLeave() {
   if (!unsaved) return true;
   const response = await ask({
@@ -171,6 +172,11 @@ function startApp(id, extra = []) {
   child.unref();
 }
 const restartApp = (id) => startApp(id, ["--appd-action=restart"]);
+function restartAfterRuntime() {
+  for (const id of lib.list()) {
+    if (lib.runningPid(id)) restartApp(id);
+  }
+}
 const handlers = {
   state() {
     const value = state();
@@ -524,13 +530,33 @@ const handlers = {
     const page = String(url || "");
     shell.openExternal(page.startsWith(`https://github.com/${update.REPO}/`) ? page : update.releasesUrl);
   },
-  async installUpdate(tag) {
-    const version = await update.install(tag);
-    setTimeout(() => {
-      app.relaunch();
-      app.exit(0);
-    }, 1500);
+  async installUpdate(tag, restart = true) {
+    const { version, staged, runtime } = await update.install(tag || void 0);
+    stagedRuntime = staged || null;
+    if (runtime) restartAfterRuntime();
+    if (restart) setTimeout(() => handlers.restartManager(), 1500);
     return version;
+  },
+  runtimeNeeded: () => update.runtimeBehind() || null,
+  async updateRuntime() {
+    const version = update.runtimeBehind();
+    if (!version) return null;
+    const { staged, runtime } = await update.updateRuntime();
+    stagedRuntime = staged || null;
+    if (runtime) restartAfterRuntime();
+    setTimeout(() => handlers.restartManager(), 1500);
+    return version;
+  },
+  restartManager() {
+    if (stagedRuntime) {
+      const running = lib.list().filter((id) => lib.runningPid(id));
+      update.finishRuntime(stagedRuntime, running);
+      for (const id of running) lib.close(id);
+      setTimeout(() => app.exit(0), 300);
+      return;
+    }
+    app.relaunch();
+    app.exit(0);
   }
 };
 const pictureOfStore = (storeId) => path.join(lib.storeDir, "pictures", `${storeId}.png`);
@@ -612,6 +638,7 @@ if (!app.requestSingleInstanceLock()) {
   Menu.setApplicationMenu(null);
   lib.emptyTrash();
   update.purgeBackups();
+  update.tidy();
   app.whenReady().then(async () => {
     try {
       lib.sync();

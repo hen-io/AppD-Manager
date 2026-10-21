@@ -1,6 +1,7 @@
 "use strict";
 const { app, net } = require("electron");
-const { spawnSync } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -40,7 +41,6 @@ async function download(url) {
   if (!res.ok) throw new Error(fill(t.github, { status: res.status, url }));
   return res;
 }
-const parts = (version) => String(version).replace(/^v/, "").split(/[.-]/).map((n) => parseInt(n, 10) || 0);
 function halves(version) {
   const all = String(version).replace(/^v/, "").split(/[.-]/).filter(Boolean);
   const cut = all.findIndex((part) => !/^\d+$/.test(part));
@@ -121,11 +121,129 @@ async function whyNot(tag) {
     return fill(t.notWritable, { folder: installDir });
   }
   if (packaged()) return fill(t.packaged, { command: packageCommand() });
-  const runtime = await download(rawUrl(tag, "resources/app/electron-version")).then((r) => r.text(), () => "");
-  if (runtime.trim() && parts(runtime)[0] !== parts(process.versions.electron)[0]) {
-    return fill(t.otherRuntime, { version: tag.replace(/^v/, ""), needed: runtime.trim(), have: process.versions.electron });
-  }
   return "";
+}
+function runtimeOf(appFolder) {
+  try {
+    return String(JSON.parse(fs.readFileSync(path.join(appFolder, "runtime.json"), "utf8")).electron || "");
+  } catch {
+    try {
+      return fs.readFileSync(path.join(appFolder, "electron-version"), "utf8").trim().replace(/^v/, "");
+    } catch {
+      return "";
+    }
+  }
+}
+function runtimeBehind() {
+  const wanted = runtimeOf(__dirname);
+  if (!wanted || wanted === process.versions.electron || !isBuild || packaged() || !writable()) return "";
+  return wanted;
+}
+const ARCH = { x64: "x64", arm64: "arm64", arm: "armv7l", ia32: "ia32" }[process.arch];
+async function fetchRuntime(version, tmp) {
+  const file = `electron-v${version}-${lib.WINDOWS ? "win32" : "linux"}-${ARCH}.zip`;
+  const base = `https://github.com/electron/electron/releases/download/v${version}`;
+  const sums = ARCH && /^\d+\.\d+\.\d+(-[\w.]+)?$/.test(version) ? await (await download(`${base}/SHASUMS256.txt`)).text() : "";
+  const wanted = sums.split("\n").map((line) => line.trim().split(/\s+/)).find(([, name]) => name?.replace(/^\*/, "") === file)?.[0];
+  if (!wanted) throw new Error(fill(t.noRuntime, { version, file }));
+  const data = Buffer.from(await (await download(`${base}/${file}`)).arrayBuffer());
+  if (crypto.createHash("sha256").update(data).digest("hex") !== wanted) throw new Error(fill(t.runtimeChecksum, { version }));
+  const zip = path.join(tmp, file);
+  fs.writeFileSync(zip, data);
+  return zip;
+}
+function unpackRuntime(zip, folder, version) {
+  const tools = lib.WINDOWS ? [["tar", ["-xf", zip, "-C", folder]]] : [["unzip", ["-q", "-o", zip, "-d", folder]], ["bsdtar", ["-xf", zip, "-C", folder]]];
+  for (const [command, args] of tools) {
+    fs.rmSync(folder, { recursive: true, force: true });
+    fs.mkdirSync(folder, { recursive: true });
+    const done = spawnSync(command, args, { encoding: "utf8", windowsHide: true });
+    if (!done.error && done.status === 0) return;
+  }
+  try {
+    fs.rmSync(folder, { recursive: true, force: true });
+    fs.mkdirSync(folder, { recursive: true });
+    require("./app/store-extension").unzip(fs.readFileSync(zip), folder);
+    for (const name of ["electron", "chrome_crashpad_handler", "chrome-sandbox"]) {
+      if (!lib.WINDOWS && fs.existsSync(path.join(folder, name))) fs.chmodSync(path.join(folder, name), 493);
+    }
+  } catch (e) {
+    throw new Error(fill(t.notUnzipped, { version, why: e.message }));
+  }
+}
+async function swapRuntime(version, { appFolder = __dirname, launcher = lib.launcher } = {}) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "appd-runtime-"));
+  const staged = `${installDir}.runtime-new`;
+  const asar = process.noAsar;
+  process.noAsar = true;
+  try {
+    unpackRuntime(await fetchRuntime(version, tmp), staged, version);
+    fs.rmSync(path.join(staged, "resources", "default_app.asar"), { force: true });
+    fs.cpSync(appFolder, path.join(staged, "resources", "app"), { recursive: true });
+    if (!lib.WINDOWS) {
+      fs.copyFileSync(launcher, path.join(staged, path.basename(lib.launcher)));
+      fs.chmodSync(path.join(staged, path.basename(lib.launcher)), 493);
+    }
+    for (const name of ["install.sh", "appd.cmd"]) {
+      if (fs.existsSync(path.join(installDir, name))) fs.copyFileSync(path.join(installDir, name), path.join(staged, name));
+    }
+    if (lib.WINDOWS) {
+      const exe = path.join(staged, path.basename(process.execPath));
+      fs.renameSync(path.join(staged, "electron.exe"), exe);
+      try {
+        require("./ico").setExeIcon(exe, path.join(__dirname, "manager", "icon.ico"));
+      } catch {
+      }
+      return { staged };
+    }
+    const old = `${installDir}.runtime-old`;
+    fs.rmSync(old, { recursive: true, force: true });
+    fs.renameSync(installDir, old);
+    try {
+      fs.renameSync(staged, installDir);
+    } catch (e) {
+      fs.renameSync(old, installDir);
+      throw e;
+    }
+    return { now: true, runtime: version };
+  } catch (e) {
+    fs.rmSync(staged, { recursive: true, force: true });
+    throw e;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    process.noAsar = asar;
+  }
+}
+const updateRuntime = () => swapRuntime(runtimeBehind());
+function finishRuntime(staged, ids = []) {
+  const exe = path.basename(process.execPath);
+  const script = path.join(os.tmpdir(), `appd-runtime-${Date.now()}.cmd`);
+  fs.writeFileSync(script, [
+    "@echo off",
+    "chcp 65001 >nul",
+    `set "DEST=${installDir}"`,
+    `set "NEW=${staged}"`,
+    "set /a TRIES=0",
+    ":wait",
+    `tasklist /FI "IMAGENAME eq ${exe}" /NH | find /I "${exe}" >nul`,
+    "if errorlevel 1 goto swap",
+    "set /a TRIES+=1",
+    `if %TRIES% GEQ 120 taskkill /F /IM "${exe}" >nul 2>&1`,
+    "timeout /t 1 /nobreak >nul",
+    "goto wait",
+    ":swap",
+    'robocopy "%NEW%" "%DEST%" /E /MOVE /R:5 /W:1 >nul',
+    'rmdir /S /Q "%NEW%" 2>nul',
+    `start "" "%DEST%\\${exe}"`,
+    ...ids.filter((id) => /^[a-z0-9][a-z0-9_-]*$/.test(id)).map((id) => `start "" "%DEST%\\${exe}" --appd-run=${id}`),
+    '(goto) 2>nul & del "%~f0"',
+    ""
+  ].join("\r\n"));
+  spawn("cmd.exe", ["/c", script], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+function tidy() {
+  fs.rmSync(`${installDir}.runtime-old`, { recursive: true, force: true });
+  if (!lib.WINDOWS) fs.rmSync(`${installDir}.runtime-new`, { recursive: true, force: true });
 }
 async function releases() {
   const wantBeta = lib.prefs().updateChannel === "beta";
@@ -197,6 +315,10 @@ async function install(tag) {
       throw new Error(t.notBuild);
     }
     const version = JSON.parse(fs.readFileSync(path.join(newApp, "package.json"), "utf8")).version;
+    const runtime = runtimeOf(newApp);
+    if (runtime && runtime !== process.versions.electron) {
+      return { version, ...await swapRuntime(runtime, { appFolder: newApp, launcher: path.join(src, "appd") }) };
+    }
     fs.rmSync(staged, { recursive: true, force: true });
     fs.rmSync(previous, { recursive: true, force: true });
     fs.cpSync(newApp, staged, { recursive: true });
@@ -213,11 +335,11 @@ async function install(tag) {
     }
     if (!lib.WINDOWS) fs.renameSync(stagedLauncher, lib.launcher);
     fs.rmSync(previous, { recursive: true, force: true });
-    return version;
+    return { version, now: true };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.rmSync(staged, { recursive: true, force: true });
     fs.rmSync(stagedLauncher, { force: true });
   }
 }
-module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir, isNewer };
+module.exports = { REPO, releasesUrl, check, install, releases, backup, purgeBackups, backupsDir, isNewer, runtimeBehind, updateRuntime, finishRuntime, tidy };

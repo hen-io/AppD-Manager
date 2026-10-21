@@ -380,6 +380,7 @@ function readSettings() {
 }
 const PREFS = {
   checkUpdates: true,
+  autoUpdate: true,
   confirmRemove: true,
   restartOnSave: "ask",
   backupBeforeUpdate: true,

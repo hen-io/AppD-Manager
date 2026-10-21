@@ -397,7 +397,11 @@ module.exports = {
     },
     showUsage: { label: "Show CPU and memory use of running apps" },
     motion: { label: "Animations", note: "Off: views, menus and sliders switch instantly instead of animating." },
-    checkUpdates: { label: "Look for a new version every time AppD-Manager starts" },
+    checkUpdates: { label: "Look for new versions", note: "When AppD-Manager starts, and every few hours while it is open." },
+    autoUpdate: {
+      label: "Install updates automatically",
+      note: "A new version is installed without asking, and AppD-Manager restarts with it once it is not in use. Off: you are asked first."
+    },
     restartAppsOnUpdate: {
       label: "Restart running apps when AppD-Manager is updated",
       note: "Each app restarts once it has not been used for a minute, on the page it was on. Off: it keeps the old version until you close it."
@@ -770,7 +774,11 @@ module.exports = {
       failed: "Could not check for updates: {why}",
       downloading: "Downloading…",
       updated: "Updated to {version}. Restarting…",
+      updatedLater: "Updated to {version}. AppD-Manager restarts with it as soon as it is not in use.",
       installed: "Version {version} is installed. Restarting…",
+      runtime: "Updating the runtime to Electron {version}…",
+      runtimeDone: "The runtime is now Electron {version}. Restarting…",
+      runtimeFailed: "The runtime could not be updated: {why}. It is tried again at the next start.",
       ask: "Install version {version}?",
       askDetail: "You have {current}. AppD-Manager restarts with version {version}; your apps are not touched.",
       askBackup: " A copy of what is there now is kept first.",
@@ -1046,7 +1054,9 @@ module.exports = {
     notWritable: "AppD-Manager cannot write to its own folder ({folder}): move it to a folder of your own, or download the version from the release page.",
     packaged: "This copy was installed by the system's package manager, so its version is changed there: {command}",
     packageManager: "your system's package manager",
-    otherRuntime: "Version {version} needs another runtime (Electron {needed}; this one is {have}): run the install script of that version."
+    noRuntime: "there is no Electron {version} for this system ({file})",
+    runtimeChecksum: "the download of Electron {version} does not match its checksum",
+    notUnzipped: "could not unpack Electron {version}: {why}"
   },
   library: {
     oldDescription: "AppD Manager application",

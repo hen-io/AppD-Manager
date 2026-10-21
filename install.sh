@@ -70,7 +70,12 @@ if [[ -z "$SRC" ]]; then
     [[ -f "$SRC/appd" && -f "$SRC/resources/app/main.js" ]] || fail "The repository holds no AppD-Manager build yet."
 fi
 
-ELECTRON="$(tr -d '[:space:]' < "$SRC/resources/app/electron-version")"
+if [[ -f "$SRC/resources/app/runtime.json" ]]; then
+    ELECTRON="$(sed -n 's/.*"electron"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' "$SRC/resources/app/runtime.json" | head -1)"
+else
+    ELECTRON="$(tr -d '[:space:]' < "$SRC/resources/app/electron-version")"
+fi
+[[ -n "$ELECTRON" ]] || fail "The build does not say which Electron it needs."
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SRC/resources/app/package.json" | head -1)"
 say "Installing AppD-Manager $VERSION to $DEST"
 
