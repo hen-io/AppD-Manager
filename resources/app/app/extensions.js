@@ -4,7 +4,7 @@ const storeExtension = require("./store-extension");
 const { launch } = require("./links");
 const { text, fill } = require("../shared/text");
 const t = text.app.extensions;
-module.exports = function createExtensions({ id, cfg, lib, note, icon }) {
+module.exports = function createExtensions({ id, cfg, lib, note, icon, background = () => "" }) {
   const loaded = [];
   async function load() {
     const loader = session.defaultSession.extensions || session.defaultSession;
@@ -42,7 +42,7 @@ module.exports = function createExtensions({ id, cfg, lib, note, icon }) {
     launch(command, args);
   }
   function openPage(extension, page, isMenu) {
-    const options = { title: extension.name, icon: icon(), autoHideMenuBar: true };
+    const options = { title: extension.name, icon: icon(), autoHideMenuBar: true, ...background() ? { backgroundColor: background() } : {} };
     if (isMenu) {
       Object.assign(options, { width: 380, height: 520, useContentSize: true, minimizable: false, maximizable: false, alwaysOnTop: true, skipTaskbar: true });
       try {

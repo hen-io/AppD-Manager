@@ -122,7 +122,7 @@ function isInternal(url) {
 }
 const { note, because, takeReason, plain } = openLog(path.join(lib.appDir(id), "events.log"));
 const { openExternal, openElsewhere } = createLinks({ id, cfg, lib, note });
-const extensions = createExtensions({ id, cfg, lib, note, icon: () => icon });
+const extensions = createExtensions({ id, cfg, lib, note, icon: () => icon, background: () => paper });
 function restartApp(wc, why = "hard reload, or asked for by the manager") {
   const url = !multi && wc && !wc.isDestroyed() ? wc.getURL() : "";
   let settings = cfg;
@@ -405,7 +405,7 @@ ${cfg.customJs}
     });
   }
   wc.setWindowOpenHandler(({ url }) => {
-    const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true, frame: cfg.windowDecorations } };
+    const appWindow = { action: "allow", overrideBrowserWindowOptions: { icon, autoHideMenuBar: true, frame: cfg.windowDecorations, ...paper ? { backgroundColor: paper } : {} } };
     if (url === "about:blank") return appWindow;
     const web = /^https?:/i.test(url);
     if (web && cfg.openLinks === "window") return appWindow;
@@ -453,11 +453,13 @@ const homeButtonScript = (target) => `(() => {
   document.documentElement.append(host);
 })()`;
 const extension = (name) => cfg.extensions.includes(name);
+let paper = "";
 async function createWindow() {
   const state = readState();
   const look = lib.appearance();
-  const paper = surfaceHex(look.palette, look.custom, look.mode === "dark" || look.mode === "system" && nativeTheme.shouldUseDarkColors);
-  nativeTheme.themeSource = cfg.colorScheme;
+  nativeTheme.themeSource = cfg.colorScheme !== "system" ? cfg.colorScheme : look.mode;
+  const dark = nativeTheme.shouldUseDarkColors || extension("darkreader");
+  paper = surfaceHex(look.palette, look.custom, dark);
   setUpPermissions(session.defaultSession, { mode: cfg.permissions, isInternal, note });
   const bare = isBare(cfg);
   if (!icon && iconFile) {
@@ -566,8 +568,8 @@ async function createWindow() {
   if (cfg.keepAwake !== "off") powerSaveBlocker.start(cfg.keepAwake === "display" ? "prevent-display-sleep" : "prevent-app-suspension");
   if (startsHidden || multi) {
   } else if (!lib.isTray(cfg) || cfg.trayShowAtStart) {
-    if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css(), background: paper });
-    else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css(), background: paper });
+    if (cfg.loadingScreen) showLoadingScreen(win, cfg, iconFile, { frameCss: frame.css(), background: paper, dark });
+    else if (frame.wanted) showLoadingScreen(win, cfg, iconFile, { plain: true, frameCss: frame.css(), background: paper, dark });
   }
   let marked = 0;
   const markUsed = () => {
